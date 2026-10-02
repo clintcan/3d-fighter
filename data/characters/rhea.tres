@@ -1,8 +1,11 @@
 [gd_resource type="Resource" script_class="CharacterData" format=3]
 
 [ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_0tygf"]
+[ext_resource type="PackedScene" path="res://assets/characters/base/Superhero_Female_FullBody.gltf" id="1_0wr6o"]
 [ext_resource type="Script" path="res://scripts/character_data.gd" id="1_char"]
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Buns.gltf" id="1_is8na"]
 [ext_resource type="Resource" path="res://data/moves/jab.tres" id="2_0wr6o"]
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Eyebrows_Female.gltf" id="2_028q6"]
 [ext_resource type="Resource" path="res://data/moves/straight.tres" id="3_fjqyu"]
 [ext_resource type="Resource" path="res://data/moves/mid_kick.tres" id="4_is8na"]
 [ext_resource type="Resource" path="res://data/moves/roundhouse.tres" id="5_028q6"]
@@ -17,6 +20,9 @@ display_name = "Rhea"
 archetype = "Rushdown"
 description = "Lightning-fast pressure fighter. Quick jabs and relentless offense, but takes hits hard."
 select_order = 1
+model_scene = ExtResource("1_0wr6o")
+hair_scenes = Array[PackedScene]([ExtResource("1_is8na"), ExtResource("2_028q6")])
+hair_color = Color(0.5, 0.16, 0.08, 1)
 placeholder_color = Color(0.9, 0.25, 0.4, 1)
 max_health = 900
 walk_speed = 2.6

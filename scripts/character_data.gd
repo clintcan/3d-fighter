@@ -11,8 +11,15 @@ extends Resource
 
 @export_group("Visuals")
 @export var portrait: Texture2D
-## Imported .glb model (with skeleton + animations). Null until models are imported.
+## Rigged glTF body (Quaternius UAL skeleton). Null = graybox capsule.
 @export var model_scene: PackedScene
+## Extra skinned pieces (hair, beard) rigged to the same skeleton.
+@export var hair_scenes: Array[PackedScene] = []
+## Optional skin texture variant replacing the body's base color.
+@export var body_albedo: Texture2D
+@export var model_scale: float = 1.0
+## Tint for hair/eyebrow materials (the free Quaternius hair textures are greyscale).
+@export var hair_color: Color = Color.WHITE
 ## Tint used for graybox stand-ins and UI until real models/portraits exist.
 @export var placeholder_color: Color = Color.WHITE
 

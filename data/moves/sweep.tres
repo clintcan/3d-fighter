@@ -6,7 +6,8 @@
 script = ExtResource("1_mfavu")
 name = "Sweep"
 input = "2LK"
-animation = &"sweep"
+animation = &"fight/sweep"
+animation_impact = 0.18
 startup = 7
 recovery = 16
 damage = 40
@@ -14,4 +15,4 @@ hit_level = 2
 hitstun = 16
 blockstun = 12
 hitbox_radius = 0.18
-hitbox_offset = Vector3(0, 0.25, -1)
+hitbox_offset = Vector3(0.1, 0.25, -0.72)

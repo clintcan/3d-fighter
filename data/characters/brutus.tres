@@ -1,9 +1,12 @@
 [gd_resource type="Resource" script_class="CharacterData" format=3]
 
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Buzzed.gltf" id="1_2ndvl"]
 [ext_resource type="Script" path="res://scripts/character_data.gd" id="1_char"]
 [ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_k5w2a"]
 [ext_resource type="Resource" path="res://data/moves/jab.tres" id="2_7sic7"]
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Beard.gltf" id="2_adg58"]
 [ext_resource type="Resource" path="res://data/moves/straight.tres" id="3_eu30i"]
+[ext_resource type="PackedScene" path="res://assets/characters/base/Superhero_Male_FullBody.gltf" id="3_ryvlx"]
 [ext_resource type="Resource" path="res://data/moves/mid_kick.tres" id="4_2ndvl"]
 [ext_resource type="Resource" path="res://data/moves/roundhouse.tres" id="5_adg58"]
 [ext_resource type="Resource" path="res://data/moves/crouch_jab.tres" id="6_ryvlx"]
@@ -17,6 +20,10 @@ display_name = "Brutus"
 archetype = "Power"
 description = "Slow, heavy hitter. Every connected blow hurts, and he shrugs off knockback."
 select_order = 2
+model_scene = ExtResource("3_ryvlx")
+hair_scenes = Array[PackedScene]([ExtResource("1_2ndvl"), ExtResource("2_adg58")])
+model_scale = 1.08
+hair_color = Color(0.22, 0.13, 0.07, 1)
 placeholder_color = Color(0.95, 0.6, 0.15, 1)
 max_health = 1150
 walk_speed = 1.5

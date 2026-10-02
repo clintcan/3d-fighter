@@ -7,7 +7,12 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 @export var name: String
 ## Input notation, e.g. "LP", "HP", "LK", "HK", "2LP" (crouching), later "236P".
 @export var input: String
+## Clip as "library/name", e.g. "ual1/Punch_Jab" or "fight/front_kick".
 @export var animation: StringName
+## Time (s) in the clip where the strike lands. Mapped onto the first active frame.
+@export var animation_impact: float = 0.2
+## Clip time (s) reached at the end of recovery. 0 = clip length.
+@export var animation_end: float = 0.0
 
 @export_group("Timing")
 ## Ticks after the press before the hitbox appears.

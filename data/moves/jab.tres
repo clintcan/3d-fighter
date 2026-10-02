@@ -6,7 +6,8 @@
 script = ExtResource("1_igfqj")
 name = "Jab"
 input = "LP"
-animation = &"jab"
+animation = &"ual1/Punch_Jab"
+animation_end = 0.62
 startup = 4
 active = 2
 recovery = 8
@@ -15,5 +16,5 @@ hit_level = 0
 hitstun = 14
 hitstop = 5
 knockback = Vector2(1.2, 0)
-hitbox_offset = Vector3(0, 1.45, -0.75)
+hitbox_offset = Vector3(0, 1.4, -0.78)
 cancel_into = Array[String](["LP", "HP", "2LP"])

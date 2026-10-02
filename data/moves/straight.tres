@@ -6,7 +6,9 @@
 script = ExtResource("1_fehyj")
 name = "Straight"
 input = "HP"
-animation = &"straight"
+animation = &"ual1/Punch_Cross"
+animation_impact = 0.28
+animation_end = 0.85
 startup = 9
 recovery = 18
 damage = 80
@@ -16,5 +18,5 @@ blockstun = 14
 hitstop = 8
 knockback = Vector2(2.5, 0)
 hitbox_radius = 0.18
-hitbox_offset = Vector3(0, 1.4, -0.95)
+hitbox_offset = Vector3(0.1, 1.36, -0.7)
 camera_intensity = 0.1

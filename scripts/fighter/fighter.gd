@@ -31,7 +31,7 @@ const DASH_FRAMES := 16
 const BACKDASH_FRAMES := 18
 const SIDESTEP_FRAMES := 14
 const KNOCKDOWN_FRAMES := 40
-const GETUP_FRAMES := 20
+const GETUP_FRAMES := 40
 const JUMP_FORWARD_SPEED := 2.5
 const JUMP_BACK_SPEED := 2.0
 const BLOCK_PUSHBACK_SCALE := 0.7
@@ -70,6 +70,9 @@ var current_move: MoveData
 var move_has_hit := false
 var sidestep_dir := Vector3.ZERO
 var debug_draw := false
+var last_hit_level: MoveData.HitLevel = MoveData.HitLevel.MID
+## Skinned character model, or null for a graybox capsule.
+var model: FighterModel
 
 var _flash_color := Color.WHITE
 var _material: StandardMaterial3D
@@ -100,6 +103,12 @@ func _ready() -> void:
 	debug_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	debug_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	hurtbox_debug.material_override = debug_material
+
+	if data.model_scene:
+		model = FighterModel.new()
+		add_child(model)
+		model.build(data)
+		visual.visible = false
 
 
 func reset_to(spawn_position: Vector3) -> void:
@@ -351,6 +360,7 @@ func receive_hit(attacker: Fighter, move: MoveData) -> bool:
 	health_changed.emit(health, data.max_health)
 	_set_combo(combo_hits + 1)
 	_flash_color = Color.WHITE
+	last_hit_level = move.hit_level
 	current_move = null
 	velocity = push_dir * move.knockback.x / data.weight + Vector3.UP * move.knockback.y
 
@@ -437,6 +447,11 @@ func _set_combo(hits: int) -> void:
 # --- Visuals (render rate, cosmetic only) --------------------------------------
 
 func _process(delta: float) -> void:
+	if model:
+		_update_model(delta)
+		_update_limb()
+		_update_hurtbox_debug()
+		return
 	var smoothing := 1.0 - exp(-18.0 * delta)
 
 	var target_scale_y := CROUCH_HEIGHT / STAND_HEIGHT if crouching else 1.0
@@ -460,6 +475,10 @@ func _process(delta: float) -> void:
 	_material.emission_energy_multiplier = 0.8
 
 	_update_limb()
+	_update_hurtbox_debug()
+
+
+func _update_hurtbox_debug() -> void:
 	hurtbox_debug.visible = debug_draw and state not in INVULNERABLE_STATES
 	if hurtbox_debug.visible:
 		var height := CROUCH_HEIGHT if crouching else STAND_HEIGHT
@@ -470,7 +489,7 @@ func _process(delta: float) -> void:
 ## Placeholder attack animation: a sphere extends from the body to the hitbox during
 ## startup, stays out (red) while active, and retracts during recovery.
 func _update_limb() -> void:
-	if state != State.ATTACK or current_move == null:
+	if state != State.ATTACK or current_move == null or (model and not debug_draw):
 		limb.visible = false
 		return
 	var move := current_move
@@ -486,3 +505,63 @@ func _update_limb() -> void:
 	limb.position = shoulder.lerp(move.hitbox_offset, progress)
 	limb.scale = Vector3.ONE * move.hitbox_radius * 2.0
 	(limb.material_override as StandardMaterial3D).albedo_color = Color(1.0, 0.2, 0.15) if active and not move_has_hit else data.placeholder_color.lightened(0.3)
+
+
+func _update_model(delta: float) -> void:
+	var frozen := hitstop > 0
+	var request := _animation_request(frozen)
+	model.show_clip(request[0], request[1], request[2], 0.0 if frozen else delta)
+	var shake := Vector3.ZERO
+	if frozen and state in [State.HITSTUN, State.BLOCKSTUN, State.AIR_HIT, State.KO]:
+		shake.x = randf_range(-0.03, 0.03)
+	model.position = shake
+
+
+## Logic → animation: [clip, time (s, or -1 to free-run), speed].
+func _animation_request(frozen: bool) -> Array:
+	# Interpolate between ticks so timed clips stay smooth at high refresh rates.
+	var f := float(state_frame) + (0.0 if frozen else Engine.get_physics_interpolation_fraction())
+	var t := f * DT
+	match state:
+		State.WALK_FWD:
+			return [&"fight/walk_guard", -1.0, data.walk_speed / 1.5]
+		State.WALK_BACK:
+			return [&"fight/walk_guard", -1.0, -data.back_walk_speed / 1.5]
+		State.CROUCH:
+			return [&"fight/crouch_guard", -1.0, 1.0]
+		State.JUMP_SQUAT:
+			return [&"ual1/Jump_Start", 0.15 * f / JUMP_SQUAT_FRAMES, 1.0]
+		State.JUMP:
+			return [&"ual1/Jump_Start", 0.15 + t, 1.0]
+		State.LANDING:
+			return [&"ual1/Jump_Land", 0.05 + t, 1.0]
+		State.DASH, State.SIDESTEP:
+			return [&"fight/walk_guard", -1.0, 2.5]
+		State.BACKDASH:
+			return [&"fight/walk_guard", -1.0, -2.5]
+		State.ATTACK:
+			return [current_move.animation, _attack_clip_time(f), 1.0]
+		State.BLOCKSTUN:
+			return [&"fight/block_crouch" if crouching else &"fight/block_stand", 0.0, 1.0]
+		State.HITSTUN:
+			if crouching:
+				return [&"fight/crouch_guard", 0.0, 1.0]
+			return [&"ual1/Hit_Head" if last_hit_level == MoveData.HitLevel.HIGH else &"ual1/Hit_Chest", t, 1.0]
+		State.AIR_HIT, State.KO:
+			return [&"ual2/Hit_Knockback", t, 1.0]
+		State.KNOCKDOWN:
+			return [&"ual2/Hit_Knockback", model.clip_length(&"ual2/Hit_Knockback"), 1.0]
+		State.GETUP:
+			return [&"ual2/LayToIdle", lerpf(0.35, model.clip_length(&"ual2/LayToIdle"), f / GETUP_FRAMES), 1.0]
+	return [&"fight/guard", -1.0, 1.0]
+
+
+## Maps the move's frame onto clip time: startup covers [0, impact], so the strike lands
+## on the first active frame, and active + recovery cover [impact, end].
+func _attack_clip_time(f: float) -> float:
+	var move := current_move
+	var impact_frame := float(move.startup + 1)
+	if f <= impact_frame:
+		return move.animation_impact * f / impact_frame
+	var end_time: float = move.animation_end if move.animation_end > 0.0 else model.clip_length(move.animation)
+	return lerpf(move.animation_impact, end_time, (f - impact_frame) / maxf(move.total_frames() - impact_frame, 1.0))
