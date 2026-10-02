@@ -38,6 +38,8 @@ func _process(delta: float) -> void:
 	position = position.lerp(targets[0], t)
 	_look_target = _look_target.lerp(targets[1], t)
 	look_at(_look_target)
+	if manager.stage:
+		manager.stage.update_camera_occlusion(global_position)
 
 
 ## Returns [camera_position, look_target].
