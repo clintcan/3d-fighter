@@ -1,8 +1,8 @@
 extends Node3D
 ## Fight scene root. Owns the fixed-order 60 Hz simulation:
 ##   view → input → fighter tick → pushbox → hits
-## Milestone 2: P1 vs. a training dummy, endless rounds (KO → reset). Rounds, timer
-## and the real AI come in later milestones (see CLAUDE.md §9).
+## P1 vs. the CPU (AIController, or a training dummy via F1). Endless rounds for now
+## (KO → reset); rounds and the timer come in milestone 8 (see CLAUDE.md §9).
 
 signal hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult)
 signal throw_landed(attacker: Fighter, defender: Fighter)
@@ -20,7 +20,10 @@ var fighters: Array[Fighter] = []
 ## Unit vector (flattened) from the fighters' midpoint toward the camera. Part of the
 ## simulation state because it decides which way "left/right" map for each player.
 var view_dir := Vector3.BACK
+var ai: AIController
 var dummy: DummyController
+## -1 = AI controls P2, otherwise a DummyController.Mode.
+var cpu_mode := -1
 var ko_timer := -1
 var debug_draw := false
 
@@ -33,9 +36,11 @@ func _ready() -> void:
 	stage = (load(GameState.stage_path) as PackedScene).instantiate() as Stage
 	add_child(stage)
 
+	ai = AIController.new(GameState.ai_difficulty, GameState.match_seed)
 	dummy = DummyController.new()
 	var p1 := _spawn_fighter(GameState.player_character, PlayerController.new("p1_"))
-	var p2 := _spawn_fighter(GameState.cpu_character, dummy)
+	var p2 := _spawn_fighter(GameState.cpu_character, ai)
+	ai.attach(p2)
 	p1.opponent = p2
 	p2.opponent = p1
 	for fighter in fighters:
@@ -59,6 +64,7 @@ func _spawn_fighter(character: CharacterData, controller: FighterController) -> 
 
 func _reset_round() -> void:
 	ko_timer = -1
+	ai.reset()
 	fighters[0].reset_to(stage.p1_spawn.global_position)
 	fighters[1].reset_to(stage.p2_spawn.global_position)
 	view_dir = Vector3.BACK
@@ -152,13 +158,16 @@ func _resolve_throws() -> void:
 
 ## Collects all connecting hitboxes first, then applies them, so simultaneous hits trade.
 func _resolve_hits() -> void:
-	var connecting: Array[Fighter] = []
+	# Capture each attacker's move now: in a trade, applying the first hit clears the
+	# other fighter's current_move before its own hit is applied.
+	var connecting: Array[Array] = []
 	for attacker in fighters:
 		var hitbox := attacker.get_active_hitbox()
 		if not hitbox.is_empty() and attacker.opponent.overlaps_hurtbox(hitbox.center, hitbox.radius):
-			connecting.append(attacker)
-	for attacker in connecting:
-		var move := attacker.current_move
+			connecting.append([attacker, attacker.current_move])
+	for hit in connecting:
+		var attacker: Fighter = hit[0]
+		var move: MoveData = hit[1]
 		var defender := attacker.opponent
 		var result := defender.receive_hit(attacker, move)
 		attacker.on_hit_confirmed()
@@ -192,7 +201,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_F1:
-				dummy.cycle_mode()
+				_cycle_cpu_mode()
+			KEY_F4:
+				ai.set_difficulty(((ai.difficulty + 1) % AIController.Difficulty.size()) as AIController.Difficulty)
+				GameState.ai_difficulty = ai.difficulty
 			KEY_F3:
 				camera.cycle_mode()
 			KEY_F2:
@@ -206,6 +218,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		_update_debug_text()
 
 
+## F1 cycles P2 between the AI and each training-dummy mode.
+func _cycle_cpu_mode() -> void:
+	cpu_mode += 1
+	if cpu_mode >= DummyController.Mode.size():
+		cpu_mode = -1
+	if cpu_mode < 0:
+		ai.reset()
+		fighters[1].controller = ai
+	else:
+		dummy.mode = cpu_mode as DummyController.Mode
+		fighters[1].controller = dummy
+
+
 func _update_debug_text() -> void:
-	hud.set_debug_text("F1 Dummy: %s  ·  F2 Hurtboxes: %s  ·  F3 Action Cam: %s  ·  F5 Reset  ·  Esc Back" % [
-		dummy.mode_name(), "On" if debug_draw else "Off", camera.mode_name()])
+	var cpu := "AI" if cpu_mode < 0 else "Dummy " + dummy.mode_name()
+	hud.set_debug_text("F1 CPU: %s  ·  F4 AI: %s  ·  F2 Hurtboxes: %s  ·  F3 Action Cam: %s  ·  F5 Reset  ·  Esc Back" % [
+		cpu, ai.difficulty_name(), "On" if debug_draw else "Off", camera.mode_name()])

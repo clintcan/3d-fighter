@@ -68,6 +68,9 @@ const TECH_PUSH_SPEED := 2.5
 const NOT_THROWABLE_STATES := [State.JUMP, State.AIR_HIT, State.KNOCKDOWN, State.GETUP, State.KO,
 	State.HITSTUN, State.BLOCKSTUN, State.THROW, State.THROWN, State.TECH]
 
+## Extra distance beyond an attack's reach at which holding back stops walking.
+const PROXIMITY_GUARD_MARGIN := 0.5
+
 const BUFFER_WINDOW := 6 # ticks an attack press stays buffered
 const DOUBLE_TAP_WINDOW := 14
 ## Checked heaviest first so a mash of several buttons picks the stronger move.
@@ -146,6 +149,8 @@ func _ready() -> void:
 		visual.visible = false
 
 
+## Restores a fresh round state. Everything that affects the simulation is reset here,
+## so a round with the same inputs always plays out the same way.
 func reset_to(spawn_position: Vector3) -> void:
 	position = spawn_position
 	velocity = Vector3.ZERO
@@ -153,8 +158,14 @@ func reset_to(spawn_position: Vector3) -> void:
 	hitstop = 0
 	stun = 0
 	current_move = null
+	move_has_hit = false
+	input = InputBuffer.new()
 	input_locked = false
 	juggle_hits = 0
+	air_attack_used = false
+	throw_grab_frame = -1
+	sidestep_dir = Vector3.ZERO
+	last_hit_level = MoveData.HitLevel.MID
 	_set_combo(0)
 	_set_state(State.IDLE)
 	health_changed.emit(health, data.max_health)
@@ -270,7 +281,9 @@ func _tick_neutral() -> void:
 		State.WALK_FWD:
 			velocity = forward * data.walk_speed
 		State.WALK_BACK:
-			velocity = -forward * data.back_walk_speed
+			# Proximity guard: holding back against a threatening attack blocks in place
+			# instead of walking out of range.
+			velocity = Vector3.ZERO if opponent.is_threatening(self) else -forward * data.back_walk_speed
 		_:
 			velocity = Vector3.ZERO
 
@@ -477,6 +490,21 @@ func on_hit_confirmed() -> void:
 		return
 	move_has_hit = true
 	hitstop = current_move.hitstop
+
+
+## True while this fighter's attack is in startup/active and close enough to `target`
+## that it could connect.
+func is_threatening(target: Fighter) -> bool:
+	if state != State.ATTACK or current_move == null:
+		return false
+	if state_frame > current_move.startup + current_move.active:
+		return false
+	var reach := absf(current_move.hitbox_offset.z) + current_move.hitbox_radius + BODY_RADIUS
+	return _flat_distance_to(target) <= reach + PROXIMITY_GUARD_MARGIN
+
+
+func _flat_distance_to(other: Fighter) -> float:
+	return Vector2(other.position.x - position.x, other.position.z - position.z).length()
 
 
 ## True on the tick a throw's grab checks for a target (FightManager resolves it).

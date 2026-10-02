@@ -35,7 +35,7 @@ func dist() -> float:
 	return Vector2(p2.position.x - p1.position.x, p2.position.z - p1.position.z).length()
 
 func reset(mode: int) -> void:
-	m._reset_round(); m.dummy.mode = mode; ctl.dir = 5; step(2)
+	m._reset_round(); p2.controller = m.dummy; m.dummy.mode = mode; ctl.dir = 5; step(2)
 
 func approach(target: float) -> void:
 	ctl.dir = 6
@@ -288,6 +288,72 @@ func _initialize() -> void:
 
 	milestone4_tests()
 	await camera_tests()
+	ai_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
+
+func ai_tests() -> void:
+	var D := DummyController.Mode
+
+	# Blocks a telegraphed roundhouse (fast reactions, guaranteed block, no offense).
+	var ai := AIController.new(AIController.Difficulty.HARD, 7)
+	ai.attach(p2)
+	reset(D.STAND); p2.controller = ai; ai.reset()
+	ai.reaction_frames = 2; ai.block_chance = 1.0; ai.punish_chance = 0.0
+	ai.anti_air_chance = 0.0; ai.decision_interval = 100000
+	approach(1.1)
+	var hp := p2.health
+	press(InputBuffer.HK)
+	wait_until(func(): return p2.state == Fighter.State.BLOCKSTUN or p2.health < hp, 30)
+	check("AI blocks a telegraphed high", p2.state == Fighter.State.BLOCKSTUN and p2.health == hp, "%s hp %d" % [state_name(p2), p2.health])
+	step(60)
+
+	# Punishes a whiffed uppercut from jab range.
+	reset(D.STAND); p2.controller = ai; ai.reset()
+	ai.reaction_frames = 4; ai.punish_chance = 1.0; ai.block_chance = 0.0; ai.combo_drop_chance = 0.0
+	approach(1.15)
+	var p1_hp := p1.health
+	press(InputBuffer.HP, 2)
+	wait_until(func(): return p1.health < p1_hp, 50)
+	check("AI punishes a whiffed uppercut", p1.health < p1_hp, "p1 hp %d -> %d" % [p1_hp, p1.health])
+	step(90)
+
+	# AI vs AI: 30 seconds of real fighting, everyone in bounds.
+	var result := _ai_match(3, 5, 1800)
+	check("AI vs AI lands hits", result.hits >= 10, "%d hits, %d blocks, %d KOs" % [result.hits, result.blocks, result.kos])
+	check("AI vs AI blocks some", result.blocks >= 1, "%d blocks" % result.blocks)
+	check("fighters stay in bounds", result.in_bounds)
+
+	# Determinism: same seeds, same inputs -> identical match.
+	var a := _ai_match(11, 12, 600)
+	var b := _ai_match(11, 12, 600)
+	check("AI match is deterministic", a.state == b.state, "%s vs %s" % [a.state, b.state])
+
+	p1.controller = ctl
+	reset(D.STAND)
+
+
+## Runs an AI-vs-AI match from a fresh round and summarizes it.
+func _ai_match(seed1: int, seed2: int, ticks: int) -> Dictionary:
+	var ai1 := AIController.new(AIController.Difficulty.NORMAL, seed1)
+	var ai2 := AIController.new(AIController.Difficulty.NORMAL, seed2)
+	ai1.attach(p1); ai2.attach(p2)
+	m._reset_round()
+	p1.controller = ai1; p2.controller = ai2
+	var stats := {hits = 0, blocks = 0, kos = 0, in_bounds = true}
+	var on_hit := func(_a, _d, _m, r):
+		if r == Fighter.HitResult.BLOCKED: stats.blocks += 1
+		else: stats.hits += 1
+	var on_ko := func(_f): stats.kos += 1
+	m.hit_landed.connect(on_hit)
+	p1.knocked_out.connect(on_ko); p2.knocked_out.connect(on_ko)
+	for i in ticks:
+		step()
+		for f in [p1, p2]:
+			if absf(f.position.x) > f.bounds_half_extent + 0.01 or absf(f.position.z) > f.bounds_half_extent + 0.01:
+				stats.in_bounds = false
+	m.hit_landed.disconnect(on_hit)
+	p1.knocked_out.disconnect(on_ko); p2.knocked_out.disconnect(on_ko)
+	stats.state = "%d/%d %s %s" % [p1.health, p2.health, p1.position.snappedf(0.001), p2.position.snappedf(0.001)]
+	return stats
