@@ -12,6 +12,11 @@
 [ext_resource type="Resource" path="res://data/moves/crouch_jab.tres" id="6_ryvlx"]
 [ext_resource type="Resource" path="res://data/moves/sweep.tres" id="7_27se4"]
 [ext_resource type="Resource" path="res://data/moves/uppercut.tres" id="8_rrx7e"]
+[ext_resource type="Resource" path="res://data/moves/low_kick.tres" id="10_mx3k3"]
+[ext_resource type="Resource" path="res://data/moves/jump_jab.tres" id="13_oevla"]
+[ext_resource type="Resource" path="res://data/moves/jump_hammer.tres" id="14_nd1kg"]
+[ext_resource type="Resource" path="res://data/moves/jump_kick.tres" id="15_hbv0f"]
+[ext_resource type="Resource" path="res://data/moves/flying_kick.tres" id="16_063lg"]
 
 [resource]
 script = ExtResource("1_char")
@@ -30,4 +35,4 @@ walk_speed = 1.5
 back_walk_speed = 1.2
 dash_speed = 4.5
 weight = 1.3
-moves = Array[ExtResource("1_k5w2a")]([ExtResource("2_7sic7"), ExtResource("3_eu30i"), ExtResource("4_2ndvl"), ExtResource("5_adg58"), ExtResource("6_ryvlx"), ExtResource("7_27se4"), ExtResource("8_rrx7e")])
+moves = Array[ExtResource("1_k5w2a")]([ExtResource("2_7sic7"), ExtResource("3_eu30i"), ExtResource("4_2ndvl"), ExtResource("5_adg58"), ExtResource("6_ryvlx"), ExtResource("10_mx3k3"), ExtResource("8_rrx7e"), ExtResource("7_27se4"), ExtResource("13_oevla"), ExtResource("14_nd1kg"), ExtResource("15_hbv0f"), ExtResource("16_063lg")])

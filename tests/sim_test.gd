@@ -15,6 +15,7 @@ var m
 var p1: Fighter
 var p2: Fighter
 var ctl := Scripted.new()
+var ctl2 := Scripted.new()
 var fails := 0
 
 func check(label: String, ok: bool, extra := "") -> void:
@@ -43,6 +44,102 @@ func approach(target: float) -> void:
 	ctl.dir = 5; step(1)
 
 func state_name(f: Fighter) -> String: return Fighter.State.keys()[f.state]
+
+func wait_until(cond: Callable, limit: int) -> void:
+	var g := 0
+	while not cond.call() and g < limit: step(); g += 1
+
+func milestone4_tests() -> void:
+	var D := DummyController.Mode
+	var dummy: FighterController = p2.controller
+
+	# Counter hit: jab P2 during its roundhouse startup
+	reset(D.STAND); approach(1.0)
+	p2.controller = ctl2
+	ctl2.buttons = InputBuffer.HK; step(3)
+	var hp := p2.health
+	press(InputBuffer.LP); step(6)
+	check("counter hit: +25% damage", p2.health == hp - 38, "hp %d -> %d" % [hp, p2.health])
+	p2.controller = dummy; ctl2.dir = 5; step(40)
+
+	# Combo scaling: second hit of jab -> straight does 90%
+	reset(D.STAND); approach(1.0)
+	hp = p2.health
+	press(InputBuffer.LP); step(5)
+	press(InputBuffer.HP); step(20)
+	check("combo scaling (30 + 80*0.9)", p2.health == hp - 102, "hp %d -> %d" % [hp, p2.health])
+
+	# Sweep knocks down
+	reset(D.STAND); approach(1.0)
+	press(InputBuffer.HK, 2)
+	wait_until(func(): return p2.state == Fighter.State.KNOCKDOWN, 60)
+	check("2HK sweep knocks down", p2.state == Fighter.State.KNOCKDOWN, state_name(p2))
+
+	# Jump-in overhead beats crouch block, loses to stand block
+	for mode in [D.CROUCH_BLOCK, D.STAND_BLOCK]:
+		reset(mode); step(10)
+		p1.position.x = p2.position.x - 2.2
+		hp = p2.health
+		hold(9, 6)
+		wait_until(func(): return p1.position.y > 0.4 and p2.position.x - p1.position.x < 1.4, 60)
+		press(InputBuffer.HK, 9)
+		wait_until(func(): return p1.is_actionable() or p2.state in [Fighter.State.HITSTUN, Fighter.State.BLOCKSTUN], 60)
+		if mode == D.CROUCH_BLOCK:
+			check("jump-in HK beats crouch block (overhead)", p2.health < hp, "hp %d -> %d %s" % [hp, p2.health, state_name(p2)])
+		else:
+			check("jump-in HK is stand-blockable", p2.health == hp and p2.state == Fighter.State.BLOCKSTUN, "hp %d %s" % [p2.health, state_name(p2)])
+		hold(5, 40)
+
+	# Only one air attack per jump
+	reset(D.STAND)
+	hold(8, 8); press(InputBuffer.LK, 8); step(20) # j.LK lasts 19 ticks; still airborne after
+	var still_airborne := p1.position.y > 0.0
+	press(InputBuffer.LK, 8); step(1)
+	check("one air attack per jump", still_airborne and p1.state != Fighter.State.ATTACK, "%s y=%.2f" % [state_name(p1), p1.position.y])
+	hold(5, 60)
+
+	# Throw beats block
+	reset(D.STAND_BLOCK); approach(0.85)
+	hp = p2.health
+	ctl.buttons = InputBuffer.LP | InputBuffer.LK; step(1)
+	step(Fighter.THROW_STARTUP + 2)
+	check("throw grabs a blocking opponent", p2.state == Fighter.State.THROWN, state_name(p2))
+	step(Fighter.THROW_HOLD_FRAMES + 12)
+	check("throw damages and knocks down", p2.health == hp - Fighter.THROW_DAMAGE and p2.state in [Fighter.State.AIR_HIT, Fighter.State.KNOCKDOWN], "hp %d %s" % [p2.health, state_name(p2)])
+	step(120)
+
+	# Throw tech
+	reset(D.STAND); approach(0.85)
+	p2.controller = ctl2
+	hp = p2.health
+	ctl.buttons = InputBuffer.LP | InputBuffer.LK; step(Fighter.THROW_STARTUP + 2)
+	ctl2.buttons = InputBuffer.LP | InputBuffer.LK; step(2)
+	check("throw tech breaks the grab", p1.state == Fighter.State.TECH and p2.state == Fighter.State.TECH and p2.health == hp, "%s / %s" % [state_name(p1), state_name(p2)])
+	p2.controller = dummy; step(40)
+
+	# Throw whiff at range
+	reset(D.STAND)
+	ctl.buttons = InputBuffer.LP | InputBuffer.LK; step(Fighter.THROW_STARTUP + 2)
+	check("throw whiffs at range", p1.state == Fighter.State.THROW and p2.is_actionable(), state_name(p1))
+	step(Fighter.THROW_WHIFF_RECOVERY)
+	check("throw whiff recovers", p1.is_actionable(), state_name(p1))
+
+	# Juggle limit
+	reset(D.STAND)
+	p2._set_state(Fighter.State.AIR_HIT); p2.position.y = 1.0
+	p2.juggle_hits = Fighter.MAX_JUGGLE_HITS
+	check("juggle limit makes airborne fighter unhittable", not p2.overlaps_hurtbox(p2.position + Vector3.UP, 0.5))
+	p2.juggle_hits = 0
+	check("below juggle limit is hittable", p2.overlaps_hurtbox(p2.position + Vector3.UP, 0.5))
+	step(80)
+
+	# Corner pushback: attacker is pushed back when the defender is pinned
+	reset(D.STAND_BLOCK)
+	p2.position = Vector3(p2.bounds_half_extent, 0, 0); p1.position = Vector3(p2.bounds_half_extent - 1.0, 0, 0)
+	step(2)
+	var x0 := p1.position.x
+	press(InputBuffer.HP); step(30)
+	check("corner pushback moves attacker back", p1.position.x < x0 - 0.1, "dx %.2f" % (p1.position.x - x0))
 
 func _initialize() -> void:
 	await process_frame
@@ -89,7 +186,7 @@ func _initialize() -> void:
 	reset(D.STAND_BLOCK); approach(1.1)
 	hp = p2.health
 	press(InputBuffer.LK, 2); step(10)
-	check("sweep (low) beats stand block", p2.health == hp - 40, "hp %d -> %d" % [hp, p2.health])
+	check("low kick (low) beats stand block", p2.health == hp - 35, "hp %d -> %d" % [hp, p2.health])
 
 	# Crouching dodges highs
 	reset(D.CROUCH); approach(1.1)
@@ -149,6 +246,8 @@ func _initialize() -> void:
 	p1.position = Vector3(2, 0, 0); p2.position = Vector3(-2, 0, 0)
 	m.view_dir = Vector3.BACK; step(1)
 	check("P1 on right side faces screen-left", not p1.faces_screen_right())
+
+	milestone4_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)

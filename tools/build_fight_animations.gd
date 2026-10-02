@@ -54,6 +54,11 @@ func _initialize() -> void:
 	lib.add_animation("high_kick", build_high_kick())
 	lib.add_animation("sweep", build_sweep())
 	lib.add_animation("uppercut", build_uppercut())
+	lib.add_animation("spin_sweep", build_spin_sweep())
+	lib.add_animation("jump_punch", build_jump_punch())
+	lib.add_animation("jump_kick", build_jump_kick())
+	lib.add_animation("throw", build_throw())
+	lib.add_animation("thrown", build_thrown())
 	var err := ResourceSaver.save(lib, OUTPUT)
 	print("saved ", OUTPUT, " (", lib.get_animation_list().size(), " clips) err=", err)
 	model.free()
@@ -161,6 +166,74 @@ func build_uppercut() -> Animation:
 	aim(hit, upper, lower, Vector3(side_x, 0.35, 1))
 	aim(hit, lower, hand, Vector3(0, 1, 0.45))
 	return make_animation([[0.0, crouch], [0.10, wind], [0.22, hit], [0.38, hit], [0.70, guard]], false)
+
+
+## Heavy sweep: low, long leg swinging through an arc with the hips. Impact at 0.20 s.
+func build_spin_sweep() -> Animation:
+	var thigh := "thigh_" + rear
+	var calf := "calf_" + rear
+	var foot := "foot_" + rear
+	var turn := 1.0 if rear == "r" else -1.0
+	var keys := [[0.0, crouch]]
+	# The leg sweeps from the rear side, through the front, and past it.
+	var arc := [[0.10, -50.0, -0.6], [0.20, 15.0, 0.0], [0.30, 50.0, 0.5], [0.40, 60.0, 0.6]]
+	for k in arc:
+		var pose := duplicate_pose(crouch)
+		move_bone(pose, "pelvis", Vector3(0, -0.15, 0))
+		rotate_bone(pose, "pelvis", Vector3.UP, turn * k[1])
+		rotate_bone(pose, "spine_01", Vector3.RIGHT, 20.0)
+		var dir := Vector3(-turn * k[2], -0.35, 1.0 - absf(k[2]) * 0.5)
+		aim(pose, thigh, calf, dir)
+		aim(pose, calf, foot, Vector3(dir.x, -0.25, dir.z))
+		keys.append([k[0], pose])
+	keys.append([0.65, crouch])
+	return make_animation(keys, false)
+
+
+## Mid-air tuck with the lead fist driving down-forward. Impact at 0.10 s.
+func build_jump_punch() -> Animation:
+	var air := sample(ual1.get_animation("Jump_Start"), 0.5)
+	air = merge(air, guard, arm_bones())
+	var punch := duplicate_pose(air)
+	rotate_bone(punch, "spine_01", Vector3.RIGHT, 15.0)
+	aim(punch, "upperarm_" + lead, "lowerarm_" + lead, Vector3(0, -0.45, 1))
+	aim(punch, "lowerarm_" + lead, "hand_" + lead, Vector3(0, -0.5, 1))
+	return make_animation([[0.0, air], [0.10, punch], [0.25, punch], [0.4, air]], false)
+
+
+## Flying kick: rear leg extended down-forward, the other tucked. Impact at 0.12 s.
+func build_jump_kick() -> Animation:
+	var air := sample(ual1.get_animation("Jump_Start"), 0.5)
+	air = merge(air, guard, arm_bones())
+	var kick := duplicate_pose(air)
+	rotate_bone(kick, "spine_01", Vector3.RIGHT, -10.0)
+	aim(kick, "thigh_" + rear, "calf_" + rear, Vector3(0, -0.45, 1))
+	aim(kick, "calf_" + rear, "foot_" + rear, Vector3(0, -0.5, 1))
+	return make_animation([[0.0, air], [0.12, kick], [0.30, kick], [0.45, air]], false)
+
+
+## Grab with both arms (0.08 s), then twist and heave (0.25-0.45 s).
+func build_throw() -> Animation:
+	var reach := duplicate_pose(guard)
+	for side in ["l", "r"]:
+		var x := 0.15 if side == "l" else -0.15
+		aim(reach, "upperarm_" + side, "lowerarm_" + side, Vector3(x * 0.5, -0.1, 1))
+		aim(reach, "lowerarm_" + side, "hand_" + side, Vector3(-x, 0.05, 1))
+	rotate_bone(reach, "spine_01", Vector3.RIGHT, 12.0)
+	var heave := duplicate_pose(reach)
+	var turn := 1.0 if rear == "r" else -1.0
+	rotate_bone(heave, "pelvis", Vector3.UP, turn * 35.0)
+	rotate_bone(heave, "spine_02", Vector3.UP, turn * 25.0)
+	rotate_bone(heave, "spine_01", Vector3.RIGHT, -20.0)
+	return make_animation([[0.0, guard], [0.08, reach], [0.25, reach], [0.45, heave],
+		[0.6, heave], [0.85, guard]], false)
+
+
+## Held in a grab: doubled over, arms limp.
+func build_thrown() -> Animation:
+	var held := sample(ual1.get_animation("Hit_Chest"), 0.12)
+	rotate_bone(held, "spine_01", Vector3.RIGHT, 20.0)
+	return make_animation([[0.0, held], [0.5, held]], false)
 
 
 ## Resamples `source` keeping its `keep_bones`, with the rest of the body from the guard.

@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_37bmh"]
+
+[resource]
+script = ExtResource("1_37bmh")
+name = "Jump Hammer"
+input = "j.HP"
+animation = &"fight/jump_punch"
+animation_impact = 0.1
+animation_end = 0.4
+startup = 7
+active = 5
+damage = 75
+hit_level = 3
+hitstun = 20
+blockstun = 14
+hitstop = 8
+knockback = Vector2(1.8, 0)
+hitbox_radius = 0.2
+hitbox_offset = Vector3(-0.15, 1, -0.65)
+camera_intensity = 0.1

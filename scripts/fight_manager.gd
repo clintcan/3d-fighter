@@ -4,11 +4,14 @@ extends Node3D
 ## Milestone 2: P1 vs. a training dummy, endless rounds (KO → reset). Rounds, timer
 ## and the real AI come in later milestones (see CLAUDE.md §9).
 
-signal hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, blocked: bool)
+signal hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult)
+signal throw_landed(attacker: Fighter, defender: Fighter)
 
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const FIGHTER_SCENE := preload("res://scenes/fighter/fighter.tscn")
 const KO_RESET_TICKS := 180
+## Share of a hit's knockback transferred to the attacker when the defender is pinned.
+const CORNER_PUSHBACK := 0.8
 ## Per-tick slerp factor for the logical view direction following the fight axis.
 const VIEW_FOLLOW := 0.08
 
@@ -37,6 +40,7 @@ func _ready() -> void:
 	p2.opponent = p1
 	for fighter in fighters:
 		fighter.knocked_out.connect(_on_knocked_out)
+		fighter.throw_teched.connect(_on_throw_teched)
 
 	hud.setup(p1, p2)
 	_reset_round()
@@ -76,6 +80,7 @@ func _physics_process(_delta: float) -> void:
 	for fighter in fighters:
 		fighter.tick()
 	_resolve_pushboxes()
+	_resolve_throws()
 	_resolve_hits()
 	if ko_timer > 0:
 		ko_timer -= 1
@@ -124,6 +129,27 @@ func _resolve_pushboxes() -> void:
 			a.clamp_to_bounds()
 
 
+## Grabs connect on the throw's startup tick if the opponent is close and throwable.
+## Simultaneous throws break each other.
+func _resolve_throws() -> void:
+	var a := fighters[0]
+	var b := fighters[1]
+	if a.is_throw_grab_frame() and b.is_throw_grab_frame():
+		a.tech_apart()
+		b.tech_apart()
+		hud.note(0, "TECH")
+		hud.note(1, "TECH")
+		return
+	for attacker in fighters:
+		if not attacker.is_throw_grab_frame():
+			continue
+		var defender := attacker.opponent
+		if defender.is_throwable() and _flat(defender.position - attacker.position).length() <= Fighter.THROW_RANGE:
+			attacker.on_throw_grabbed()
+			defender.on_grabbed_by(attacker)
+			throw_landed.emit(attacker, defender)
+
+
 ## Collects all connecting hitboxes first, then applies them, so simultaneous hits trade.
 func _resolve_hits() -> void:
 	var connecting: Array[Fighter] = []
@@ -133,9 +159,14 @@ func _resolve_hits() -> void:
 			connecting.append(attacker)
 	for attacker in connecting:
 		var move := attacker.current_move
-		var blocked := attacker.opponent.receive_hit(attacker, move)
+		var defender := attacker.opponent
+		var result := defender.receive_hit(attacker, move)
 		attacker.on_hit_confirmed()
-		hit_landed.emit(attacker, attacker.opponent, move, blocked)
+		if defender.is_pinned_against_bounds(attacker.forward) and attacker.position.y <= 0.0:
+			attacker.velocity -= attacker.forward * move.knockback.x * CORNER_PUSHBACK
+		if result == Fighter.HitResult.COUNTER:
+			hud.note(fighters.find(attacker), "COUNTER")
+		hit_landed.emit(attacker, defender, move, result)
 
 
 func _on_knocked_out(_loser: Fighter) -> void:
@@ -143,6 +174,10 @@ func _on_knocked_out(_loser: Fighter) -> void:
 	ko_timer = KO_RESET_TICKS
 	for fighter in fighters:
 		fighter.input_locked = true
+
+
+func _on_throw_teched(defender: Fighter) -> void:
+	hud.note(fighters.find(defender), "TECH")
 
 
 func _flat(v: Vector3) -> Vector3:

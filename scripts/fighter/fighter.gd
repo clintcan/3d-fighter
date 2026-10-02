@@ -7,6 +7,8 @@ extends Node3D
 signal health_changed(current: int, maximum: int)
 signal combo_changed(hits: int)
 signal knocked_out(fighter: Fighter)
+## Emitted by the defender who broke a throw.
+signal throw_teched(fighter: Fighter)
 
 enum State {
 	IDLE, WALK_FWD, WALK_BACK, CROUCH,
@@ -15,7 +17,10 @@ enum State {
 	ATTACK,
 	BLOCKSTUN, HITSTUN, AIR_HIT, KNOCKDOWN, GETUP,
 	KO,
+	THROW, THROWN, TECH,
 }
+
+enum HitResult { HIT, BLOCKED, COUNTER }
 
 const DT := 1.0 / 60.0
 const GRAVITY := 20.0
@@ -37,13 +42,39 @@ const JUMP_BACK_SPEED := 2.0
 const BLOCK_PUSHBACK_SCALE := 0.7
 const JUGGLE_MIN_UP_SPEED := 3.0
 
+## Hitting a fighter during their own attack's startup/active frames.
+const COUNTER_DAMAGE_SCALE := 1.25
+const COUNTER_HITSTUN_BONUS := 6
+## Each hit already in the combo reduces damage by this much, down to the minimum.
+const COMBO_SCALING_STEP := 0.1
+const MIN_COMBO_SCALE := 0.3
+## After this many hits while airborne, a juggled fighter can't be hit until they land.
+const MAX_JUGGLE_HITS := 3
+const KNOCKDOWN_POP_SPEED := 2.5
+
+## Throw: LP+LK within THROW_INPUT_WINDOW ticks. Grab checks on THROW_STARTUP.
+const THROW_INPUT_WINDOW := 3
+const THROW_STARTUP := 5
+const THROW_WHIFF_RECOVERY := 22
+const THROW_RANGE := 0.95
+const THROW_HOLD_FRAMES := 30
+const THROW_RECOVERY := 14
+const THROW_DAMAGE := 120
+const THROW_HOLD_DISTANCE := 0.75
+## Defender can break a throw with LP+LK during the first ticks of being held.
+const THROW_TECH_WINDOW := 10
+const TECH_FRAMES := 18
+const TECH_PUSH_SPEED := 2.5
+const NOT_THROWABLE_STATES := [State.JUMP, State.AIR_HIT, State.KNOCKDOWN, State.GETUP, State.KO,
+	State.HITSTUN, State.BLOCKSTUN, State.THROW, State.THROWN, State.TECH]
+
 const BUFFER_WINDOW := 6 # ticks an attack press stays buffered
 const DOUBLE_TAP_WINDOW := 14
 ## Checked heaviest first so a mash of several buttons picks the stronger move.
 const ATTACK_BUTTONS := [InputBuffer.HK, InputBuffer.HP, InputBuffer.LK, InputBuffer.LP]
 const NEUTRAL_STATES := [State.IDLE, State.WALK_FWD, State.WALK_BACK, State.CROUCH]
 const BLOCKING_STATES := [State.IDLE, State.WALK_FWD, State.WALK_BACK, State.CROUCH, State.BLOCKSTUN]
-const INVULNERABLE_STATES := [State.KNOCKDOWN, State.GETUP, State.KO]
+const INVULNERABLE_STATES := [State.KNOCKDOWN, State.GETUP, State.KO, State.THROWN]
 
 var data: CharacterData
 var controller: FighterController
@@ -66,6 +97,10 @@ var velocity := Vector3.ZERO
 var hitstop := 0
 var stun := 0
 var combo_hits := 0 # hits taken in the current combo
+var juggle_hits := 0 # hits taken while airborne in the current combo
+var air_attack_used := false
+## Throw bookkeeping: tick (state_frame) the grab connected, or -1 while reaching/whiffing.
+var throw_grab_frame := -1
 var current_move: MoveData
 var move_has_hit := false
 var sidestep_dir := Vector3.ZERO
@@ -119,6 +154,7 @@ func reset_to(spawn_position: Vector3) -> void:
 	stun = 0
 	current_move = null
 	input_locked = false
+	juggle_hits = 0
 	_set_combo(0)
 	_set_state(State.IDLE)
 	health_changed.emit(health, data.max_health)
@@ -145,7 +181,10 @@ func tick() -> void:
 			_tick_neutral()
 		State.JUMP_SQUAT:
 			_tick_jump_squat()
-		State.JUMP, State.AIR_HIT:
+		State.JUMP:
+			if not air_attack_used:
+				_try_attack(false)
+		State.AIR_HIT:
 			pass # gravity + landing handled in _apply_motion
 		State.LANDING:
 			velocity = Vector3.ZERO
@@ -178,11 +217,27 @@ func tick() -> void:
 				_return_to_neutral()
 		State.KO:
 			pass
+		State.THROW:
+			_tick_throw()
+		State.THROWN:
+			velocity = Vector3.ZERO
+			if state_frame <= THROW_TECH_WINDOW and _throw_pressed():
+				_tech_throw()
+		State.TECH:
+			if state_frame >= TECH_FRAMES:
+				_return_to_neutral()
 	_apply_motion()
 
 
 func _tick_neutral() -> void:
 	face_opponent()
+	if _throw_pressed():
+		input.consume(InputBuffer.LP)
+		input.consume(InputBuffer.LK)
+		velocity = Vector3.ZERO
+		throw_grab_frame = -1
+		_set_state(State.THROW)
+		return
 	if _try_attack(false):
 		return
 	if input.pressed_within(InputBuffer.SIDESTEP, BUFFER_WINDOW):
@@ -231,39 +286,54 @@ func _tick_jump_squat() -> void:
 		7:
 			horizontal = -JUMP_BACK_SPEED
 	velocity = forward * horizontal + Vector3.UP * data.jump_velocity
+	air_attack_used = false
 	_set_state(State.JUMP)
 
 
 func _tick_attack() -> void:
-	velocity = _with_friction(velocity)
+	var airborne := position.y > 0.0
+	if not airborne:
+		velocity = _with_friction(velocity)
 	var frame := state_frame
 	if move_has_hit and frame > current_move.startup and not current_move.cancel_into.is_empty():
 		if _try_attack(true):
 			return
 	if frame >= current_move.total_frames():
-		_return_to_neutral()
+		if airborne:
+			current_move = null
+			_set_state(State.JUMP) # air attack finished; keep falling, no second attack
+		else:
+			_return_to_neutral()
 
 
 ## Starts a buffered attack. With `cancel_only`, only moves listed in the current
 ## move's cancel_into are allowed.
 func _try_attack(cancel_only: bool) -> bool:
 	var crouch := input.dir() <= 3
+	var airborne := state == State.JUMP
 	for button: int in ATTACK_BUTTONS:
 		if not input.pressed_within(button, BUFFER_WINDOW):
 			continue
-		var move := _find_move(button, crouch)
+		var move := _find_move(button, crouch, airborne)
 		if move == null or (cancel_only and move.input not in current_move.cancel_into):
 			continue
 		input.consume(button)
 		current_move = move
 		move_has_hit = false
+		air_attack_used = air_attack_used or airborne
 		_set_state(State.ATTACK, move.input.begins_with("2"))
 		return true
 	return false
 
 
-func _find_move(button: int, crouch: bool) -> MoveData:
+## Air moves use "j." inputs (no fallback). Crouching moves fall back to standing ones.
+func _find_move(button: int, crouch: bool, airborne: bool) -> MoveData:
 	var button_name: String = InputBuffer.BUTTON_NAMES[button]
+	if airborne:
+		for move in data.moves:
+			if move.input == "j." + button_name:
+				return move
+		return null
 	var fallback: MoveData = null
 	for move in data.moves:
 		if crouch and move.input == "2" + button_name:
@@ -286,7 +356,7 @@ func _apply_motion() -> void:
 	var airborne := state in [State.JUMP, State.AIR_HIT] or position.y > 0.0
 	if airborne:
 		velocity.y -= GRAVITY * DT
-	elif state in [State.HITSTUN, State.BLOCKSTUN, State.KNOCKDOWN, State.GETUP, State.KO]:
+	elif state in [State.HITSTUN, State.BLOCKSTUN, State.KNOCKDOWN, State.GETUP, State.KO, State.TECH, State.THROW]:
 		velocity = _with_friction(velocity)
 	position += velocity * DT
 	if position.y <= 0.0 and velocity.y <= 0.0:
@@ -299,8 +369,9 @@ func _apply_motion() -> void:
 
 func _on_landed() -> void:
 	match state:
-		State.JUMP:
+		State.JUMP, State.ATTACK:
 			velocity = Vector3.ZERO
+			current_move = null
 			_set_state(State.LANDING)
 		State.AIR_HIT:
 			_set_state(State.KNOCKDOWN)
@@ -308,6 +379,7 @@ func _on_landed() -> void:
 
 func _return_to_neutral() -> void:
 	current_move = null
+	juggle_hits = 0
 	_set_combo(0)
 	_set_state(State.IDLE)
 
@@ -336,6 +408,8 @@ func get_active_hitbox() -> Dictionary:
 func overlaps_hurtbox(center: Vector3, radius: float) -> bool:
 	if state in INVULNERABLE_STATES:
 		return false
+	if state == State.AIR_HIT and juggle_hits >= MAX_JUGGLE_HITS:
+		return false
 	var top := (CROUCH_HEIGHT if crouching else STAND_HEIGHT) - BODY_RADIUS
 	var a := position + Vector3.UP * BODY_RADIUS
 	var b := position + Vector3.UP * top
@@ -343,8 +417,8 @@ func overlaps_hurtbox(center: Vector3, radius: float) -> bool:
 	return closest.distance_to(center) <= radius + BODY_RADIUS
 
 
-## Applies a hit from `attacker`. Returns true if it was blocked.
-func receive_hit(attacker: Fighter, move: MoveData) -> bool:
+## Applies a hit from `attacker` and reports whether it hit, was blocked, or counter-hit.
+func receive_hit(attacker: Fighter, move: MoveData) -> HitResult:
 	var push_dir := attacker.forward
 	hitstop = move.hitstop
 	if _can_block(move.hit_level):
@@ -353,29 +427,48 @@ func receive_hit(attacker: Fighter, move: MoveData) -> bool:
 		stun = move.blockstun
 		velocity = push_dir * move.knockback.x * BLOCK_PUSHBACK_SCALE / data.weight
 		_flash_color = Color(0.4, 0.7, 1.0)
-		return true
+		return HitResult.BLOCKED
 
+	var counter := state == State.ATTACK and current_move != null \
+			and state_frame <= current_move.startup + current_move.active
 	var airborne := position.y > 0.0 or state in [State.JUMP, State.AIR_HIT]
-	health = maxi(health - move.damage, 0)
-	health_changed.emit(health, data.max_health)
+	if airborne:
+		juggle_hits += 1
+	var scale := maxf(MIN_COMBO_SCALE, 1.0 - COMBO_SCALING_STEP * combo_hits)
+	if counter:
+		scale *= COUNTER_DAMAGE_SCALE
+	_take_damage(roundi(move.damage * scale))
 	_set_combo(combo_hits + 1)
-	_flash_color = Color.WHITE
+	_flash_color = Color(1.0, 0.85, 0.3) if counter else Color.WHITE
 	last_hit_level = move.hit_level
 	current_move = null
 	velocity = push_dir * move.knockback.x / data.weight + Vector3.UP * move.knockback.y
 
 	if health == 0:
-		velocity += push_dir * 1.5 + Vector3.UP * 4.0
-		_set_state(State.KO)
-		knocked_out.emit(self)
+		_knock_out(push_dir)
 	elif airborne or move.launches:
 		velocity.y = maxf(velocity.y, JUGGLE_MIN_UP_SPEED)
+		_set_state(State.AIR_HIT)
+	elif move.knockdown:
+		# Tripped: a small pop, then falls into a knockdown.
+		velocity.y = KNOCKDOWN_POP_SPEED
 		_set_state(State.AIR_HIT)
 	else:
 		var was_crouching := crouching
 		_set_state(State.HITSTUN, was_crouching)
-		stun = move.hitstun
-	return false
+		stun = move.hitstun + (COUNTER_HITSTUN_BONUS if counter else 0)
+	return HitResult.COUNTER if counter else HitResult.HIT
+
+
+func _take_damage(amount: int) -> void:
+	health = maxi(health - amount, 0)
+	health_changed.emit(health, data.max_health)
+
+
+func _knock_out(push_dir: Vector3) -> void:
+	velocity += push_dir * 1.5 + Vector3.UP * 4.0
+	_set_state(State.KO)
+	knocked_out.emit(self)
 
 
 ## Called on the attacker after its hitbox connected (hit or block).
@@ -384,6 +477,79 @@ func on_hit_confirmed() -> void:
 		return
 	move_has_hit = true
 	hitstop = current_move.hitstop
+
+
+## True on the tick a throw's grab checks for a target (FightManager resolves it).
+func is_throw_grab_frame() -> bool:
+	return state == State.THROW and throw_grab_frame < 0 and state_frame == THROW_STARTUP
+
+
+func is_throwable() -> bool:
+	return position.y <= 0.0 and state not in NOT_THROWABLE_STATES
+
+
+## Called on the attacker when its grab connects.
+func on_throw_grabbed() -> void:
+	throw_grab_frame = state_frame
+
+
+## Called on the defender when grabbed: held in front of the attacker.
+func on_grabbed_by(attacker: Fighter) -> void:
+	current_move = null
+	velocity = Vector3.ZERO
+	position = attacker.position + attacker.forward * THROW_HOLD_DISTANCE
+	clamp_to_bounds()
+	face_opponent()
+	_set_state(State.THROWN)
+
+
+## Both fighters break apart. Used for a defender tech and for simultaneous throws.
+func tech_apart() -> void:
+	current_move = null
+	throw_grab_frame = -1
+	velocity = -forward * TECH_PUSH_SPEED
+	_flash_color = Color(0.4, 0.7, 1.0)
+	_set_state(State.TECH)
+
+
+func _tech_throw() -> void:
+	tech_apart()
+	opponent.tech_apart()
+	throw_teched.emit(self)
+
+
+func _tick_throw() -> void:
+	if throw_grab_frame < 0:
+		if state_frame >= THROW_STARTUP + THROW_WHIFF_RECOVERY:
+			_return_to_neutral()
+		return
+	var held_for := state_frame - throw_grab_frame
+	if held_for == THROW_HOLD_FRAMES and opponent.state == State.THROWN:
+		opponent._release_from_throw(self)
+	elif held_for >= THROW_HOLD_FRAMES + THROW_RECOVERY:
+		throw_grab_frame = -1
+		_return_to_neutral()
+
+
+## Thrown: damage, then tossed into a knockdown (no juggles after a throw).
+func _release_from_throw(attacker: Fighter) -> void:
+	var push_dir := attacker.forward
+	_take_damage(THROW_DAMAGE)
+	_set_combo(1)
+	_flash_color = Color.WHITE
+	hitstop = 8
+	attacker.hitstop = 8
+	juggle_hits = MAX_JUGGLE_HITS
+	velocity = push_dir * 2.5 + Vector3.UP * 4.5
+	if health == 0:
+		_knock_out(push_dir)
+	else:
+		_set_state(State.AIR_HIT)
+
+
+func _throw_pressed() -> bool:
+	return input.pressed_within(InputBuffer.LP, THROW_INPUT_WINDOW) \
+			and input.pressed_within(InputBuffer.LK, THROW_INPUT_WINDOW)
 
 
 ## Highs and mids are blocked standing (hold back), lows and mids crouching (hold down-back).
@@ -406,6 +572,12 @@ func faces_screen_right() -> bool:
 
 func is_actionable() -> bool:
 	return state in NEUTRAL_STATES
+
+
+## True if being pushed along `direction` would be stopped by the ring edge.
+func is_pinned_against_bounds(direction: Vector3) -> bool:
+	var limit := bounds_half_extent - 0.01
+	return (direction.x > 0.1 and position.x >= limit) or (direction.x < -0.1 and position.x <= -limit) 			or (direction.z > 0.1 and position.z >= limit) or (direction.z < -0.1 and position.z <= -limit)
 
 
 func clamp_to_bounds() -> void:
@@ -553,6 +725,13 @@ func _animation_request(frozen: bool) -> Array:
 			return [&"ual2/Hit_Knockback", model.clip_length(&"ual2/Hit_Knockback"), 1.0]
 		State.GETUP:
 			return [&"ual2/LayToIdle", lerpf(0.35, model.clip_length(&"ual2/LayToIdle"), f / GETUP_FRAMES), 1.0]
+		State.THROW:
+			# Grab connected: play through the heave. Whiffed: hold the reach.
+			return [&"fight/throw", t if throw_grab_frame >= 0 else minf(t, 0.25), 1.0]
+		State.THROWN:
+			return [&"fight/thrown", 0.0, 1.0]
+		State.TECH:
+			return [&"fight/block_stand", 0.0, 1.0]
 	return [&"fight/guard", -1.0, 1.0]
 
 

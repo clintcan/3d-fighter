@@ -62,10 +62,12 @@ func show_clip(clip: StringName, time: float, speed: float, delta: float) -> voi
 		player.play(clip, BLEND_TIME)
 	if time >= 0.0:
 		# Seek just short of the target and advance onto it, so cross-fades still progress.
+		# Always advance the full delta: near time 0 this overshoots by under a frame, but
+		# advancing 0 would freeze the cross-fade (e.g. static block poses at time 0).
 		var target := minf(time, player.current_animation_length)
 		player.speed_scale = 1.0
 		player.seek(maxf(target - delta, 0.0), false)
-		player.advance(minf(delta, target))
+		player.advance(delta)
 	else:
 		player.speed_scale = speed
 		player.advance(delta)
