@@ -49,6 +49,45 @@ func wait_until(cond: Callable, limit: int) -> void:
 	var g := 0
 	while not cond.call() and g < limit: step(); g += 1
 
+func camera_tests() -> void:
+	var D := DummyController.Mode
+	var cam: ActionCamera = m.camera
+
+	reset(D.STAND)
+	check("camera neutral after reset", cam.intensity == 0.0 and cam.focus == null)
+	approach(1.0)
+	press(InputBuffer.LP); step(6)
+	var after_jab := cam.intensity
+	check("hit raises intensity and focuses the victim", after_jab > 0.1 and cam.focus == p2, "%.2f" % after_jab)
+	step(20); approach(0.85)
+	press(InputBuffer.HP, 2); step(12)
+	check("launcher raises intensity further", cam.intensity > after_jab + 0.3, "%.2f" % cam.intensity)
+	step(120)
+
+	reset(D.STAND_BLOCK); approach(1.0)
+	press(InputBuffer.LP); step(6)
+	check("blocked hit doesn't set focus", cam.focus == null and cam.intensity < 0.1, "%.2f" % cam.intensity)
+
+	# Both fighters must stay in frame at full action strength, even far apart.
+	reset(D.STAND)
+	cam.aspect_override = 16.0 / 9.0 # headless viewport is square
+	p1.position = Vector3(-3.5, 0, 0.5); p2.position = Vector3(3.5, 0, -0.5)
+	p1.reset_physics_interpolation(); p2.reset_physics_interpolation()
+	await physics_frame; await physics_frame # interpolated positions update on real physics frames
+	cam.focus = p2
+	var fitted := cam._fit_strength(1.0)
+	check("frame fit keeps both fighters visible", cam._both_fighters_visible(cam._compute_targets(fitted)), "strength %.2f" % fitted)
+	p1.position = Vector3(-0.4, 0, 0); p2.position = Vector3(0.4, 0, 0)
+	p1.reset_physics_interpolation(); p2.reset_physics_interpolation()
+	await physics_frame; await physics_frame # interpolated positions update on real physics frames
+	check("close range allows full action strength", cam._fit_strength(1.0) > 0.9, "%.2f" % cam._fit_strength(1.0))
+
+	cam.mode = ActionCamera.Mode.OFF
+	cam._add_trauma(1.0)
+	check("Off mode suppresses shake", cam._trauma == 0.0)
+	cam.mode = ActionCamera.Mode.FULL
+	reset(D.STAND)
+
 func milestone4_tests() -> void:
 	var D := DummyController.Mode
 	var dummy: FighterController = p2.controller
@@ -248,6 +287,7 @@ func _initialize() -> void:
 	check("P1 on right side faces screen-left", not p1.faces_screen_right())
 
 	milestone4_tests()
+	await camera_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)

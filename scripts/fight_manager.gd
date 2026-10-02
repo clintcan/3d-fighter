@@ -193,6 +193,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		match event.physical_keycode:
 			KEY_F1:
 				dummy.cycle_mode()
+			KEY_F3:
+				camera.cycle_mode()
 			KEY_F2:
 				debug_draw = not debug_draw
 				for fighter in fighters:
@@ -205,5 +207,5 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _update_debug_text() -> void:
-	hud.set_debug_text("F1 Dummy: %s  ·  F2 Hurtboxes: %s  ·  F5 Reset  ·  Esc Back" % [
-		dummy.mode_name(), "On" if debug_draw else "Off"])
+	hud.set_debug_text("F1 Dummy: %s  ·  F2 Hurtboxes: %s  ·  F3 Action Cam: %s  ·  F5 Reset  ·  Esc Back" % [
+		dummy.mode_name(), "On" if debug_draw else "Off", camera.mode_name()])
