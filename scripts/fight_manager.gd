@@ -1,15 +1,27 @@
 extends Node3D
 ## Fight scene root. Owns the fixed-order 60 Hz simulation:
 ##   view → input → fighter tick → pushbox → hits
-## P1 vs. the CPU (AIController, or a training dummy via F1). Endless rounds for now
-## (KO → reset); rounds and the timer come in milestone 8 (see CLAUDE.md §9).
+## P1 vs. the CPU (AIController, or a training dummy via F1), best of 3 rounds.
+## Round flow (INTRO → FIGHT → ROUND_OVER → … → MATCH_OVER) also runs on the tick, so
+## timers are frame-exact and pausing freezes everything.
 
 signal hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult)
 signal throw_landed(attacker: Fighter, defender: Fighter)
+signal round_ended(winner: Fighter, reason: String)
+
+enum Phase { INTRO, FIGHT, ROUND_OVER, MATCH_OVER }
 
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
+const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const FIGHTER_SCENE := preload("res://scenes/fighter/fighter.tscn")
-const KO_RESET_TICKS := 180
+const TICKS_PER_SECOND := 60
+## "ROUND N" shows from the start of the intro; "FIGHT!" at the end, when input unlocks.
+const INTRO_TICKS := 110
+const ROUND_OVER_TICKS := 210
+## Winner switches to the victory pose this long after the round ends.
+const VICTORY_POSE_DELAY := 70
+## After this many rounds a tie on round wins is a draw game.
+const MAX_ROUNDS := 5
 ## Share of a hit's knockback transferred to the attacker when the defender is pinned.
 const CORNER_PUSHBACK := 0.8
 ## Per-tick slerp factor for the logical view direction following the fight axis.
@@ -24,8 +36,16 @@ var ai: AIController
 var dummy: DummyController
 ## -1 = AI controls P2, otherwise a DummyController.Mode.
 var cpu_mode := -1
-var ko_timer := -1
 var debug_draw := false
+
+var phase: Phase = Phase.INTRO
+var phase_ticks := 0
+var round_number := 1
+var round_wins: Array[int] = [0, 0]
+var timer_ticks := 0
+var round_winner: Fighter
+## Fighters knocked out this tick (both, for a double K.O.); resolved after the tick.
+var _knocked_out: Array[Fighter] = []
 
 @onready var camera: ActionCamera = $ActionCamera
 @onready var hud: FightHud = $HUD
@@ -47,9 +67,13 @@ func _ready() -> void:
 		fighter.knocked_out.connect(_on_knocked_out)
 		fighter.throw_teched.connect(_on_throw_teched)
 
-	hud.setup(p1, p2)
-	_reset_round()
+	hud.setup(p1, p2, GameState.ROUNDS_TO_WIN)
+	hud.rematch_pressed.connect(start_match)
+	hud.restart_pressed.connect(start_match)
+	hud.character_select_pressed.connect(_go_to.bind(CHARACTER_SELECT_SCENE))
+	hud.main_menu_pressed.connect(_go_to.bind(MAIN_MENU_SCENE))
 	camera.setup(self)
+	start_match()
 	_update_debug_text()
 
 
@@ -62,8 +86,118 @@ func _spawn_fighter(character: CharacterData, controller: FighterController) -> 
 	return fighter
 
 
+# --- Match / round flow ----------------------------------------------------------
+
+func start_match() -> void:
+	get_tree().paused = false
+	round_number = 1
+	round_wins = [0, 0]
+	hud.set_round_wins(round_wins)
+	hud.hide_result()
+	_start_round()
+
+
+func _start_round() -> void:
+	_reset_round()
+	phase = Phase.INTRO
+	phase_ticks = 0
+	timer_ticks = GameState.ROUND_TIME_SECONDS * TICKS_PER_SECOND
+	hud.set_timer(GameState.ROUND_TIME_SECONDS)
+	for fighter in fighters:
+		fighter.input_locked = true
+	var final := round_wins[0] == GameState.ROUNDS_TO_WIN - 1 and round_wins[1] == GameState.ROUNDS_TO_WIN - 1
+	hud.announce("FINAL ROUND" if final else "ROUND %d" % round_number)
+
+
+## Skips the intro (tests, debug).
+func start_fight_immediately() -> void:
+	phase = Phase.FIGHT
+	phase_ticks = 0
+	hud.announce("")
+	for fighter in fighters:
+		fighter.input_locked = false
+
+
+func _tick_round() -> void:
+	phase_ticks += 1
+	match phase:
+		Phase.INTRO:
+			if phase_ticks >= INTRO_TICKS:
+				start_fight_immediately()
+				hud.announce("FIGHT!", "", true)
+		Phase.FIGHT:
+			if not _knocked_out.is_empty():
+				_end_round_by_ko()
+			else:
+				timer_ticks -= 1
+				hud.set_timer(ceili(timer_ticks / float(TICKS_PER_SECOND)))
+				if timer_ticks <= 0:
+					_end_round_by_time()
+		Phase.ROUND_OVER:
+			if phase_ticks == VICTORY_POSE_DELAY and round_winner:
+				round_winner.victory = true
+			if phase_ticks >= ROUND_OVER_TICKS:
+				_after_round()
+	_knocked_out.clear()
+
+
+func _end_round_by_ko() -> void:
+	if _knocked_out.size() >= 2:
+		_finish_round(null, "DOUBLE K.O.")
+	else:
+		_finish_round(_knocked_out[0].opponent, "K.O.")
+
+
+## Time out: higher remaining health (as a share of max) wins.
+func _end_round_by_time() -> void:
+	var a := fighters[0].health / float(fighters[0].data.max_health)
+	var b := fighters[1].health / float(fighters[1].data.max_health)
+	_finish_round(null if is_equal_approx(a, b) else (fighters[0] if a > b else fighters[1]), "TIME")
+
+
+func _finish_round(winner: Fighter, reason: String) -> void:
+	phase = Phase.ROUND_OVER
+	phase_ticks = 0
+	round_winner = winner
+	for fighter in fighters:
+		fighter.input_locked = true
+	var sub := ""
+	if winner:
+		round_wins[fighters.find(winner)] += 1
+		hud.set_round_wins(round_wins)
+		if winner.health == winner.data.max_health:
+			sub = "PERFECT"
+	else:
+		sub = "DRAW"
+	hud.announce(reason, sub, true)
+	round_ended.emit(winner, reason)
+
+
+func _after_round() -> void:
+	var p1_won := round_wins[0] >= GameState.ROUNDS_TO_WIN
+	var p2_won := round_wins[1] >= GameState.ROUNDS_TO_WIN
+	if p1_won or p2_won or round_number >= MAX_ROUNDS:
+		phase = Phase.MATCH_OVER
+		phase_ticks = 0
+		var text := "DRAW GAME"
+		if round_wins[0] != round_wins[1]:
+			var winner := fighters[0] if round_wins[0] > round_wins[1] else fighters[1]
+			winner.victory = true
+			text = "%s WINS" % winner.data.display_name.to_upper()
+		hud.announce(text, "", true)
+		hud.show_result()
+	else:
+		round_number += 1
+		_start_round()
+
+
+func _go_to(scene: String) -> void:
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	get_tree().change_scene_to_file(scene)
+
+
 func _reset_round() -> void:
-	ko_timer = -1
 	ai.reset()
 	fighters[0].reset_to(stage.p1_spawn.global_position)
 	fighters[1].reset_to(stage.p2_spawn.global_position)
@@ -88,10 +222,7 @@ func _physics_process(_delta: float) -> void:
 	_resolve_pushboxes()
 	_resolve_throws()
 	_resolve_hits()
-	if ko_timer > 0:
-		ko_timer -= 1
-		if ko_timer == 0:
-			_reset_round()
+	_tick_round()
 
 
 ## Keeps the camera side-on to the fight axis, turning toward whichever perpendicular is
@@ -178,11 +309,9 @@ func _resolve_hits() -> void:
 		hit_landed.emit(attacker, defender, move, result)
 
 
-func _on_knocked_out(_loser: Fighter) -> void:
-	hud.announce("K.O.")
-	ko_timer = KO_RESET_TICKS
-	for fighter in fighters:
-		fighter.input_locked = true
+func _on_knocked_out(loser: Fighter) -> void:
+	if phase == Phase.FIGHT:
+		_knocked_out.append(loser)
 
 
 func _on_throw_teched(defender: Fighter) -> void:
@@ -196,8 +325,10 @@ func _flat(v: Vector3) -> Vector3:
 # --- Debug / scene input ------------------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("pause"):
-		get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE)
+	if event.is_action_pressed("pause") and phase != Phase.MATCH_OVER:
+		get_tree().paused = true
+		hud.show_pause()
+		get_viewport().set_input_as_handled()
 	elif event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_F1:
@@ -212,7 +343,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				for fighter in fighters:
 					fighter.debug_draw = debug_draw
 			KEY_F5:
-				_reset_round()
+				start_match()
 			_:
 				return
 		_update_debug_text()
@@ -233,5 +364,5 @@ func _cycle_cpu_mode() -> void:
 
 func _update_debug_text() -> void:
 	var cpu := "AI" if cpu_mode < 0 else "Dummy " + dummy.mode_name()
-	hud.set_debug_text("F1 CPU: %s  ·  F4 AI: %s  ·  F2 Hurtboxes: %s  ·  F3 Action Cam: %s  ·  F5 Reset  ·  Esc Back" % [
+	hud.set_debug_text("F1 CPU: %s  ·  F4 AI: %s  ·  F2 Hurtboxes: %s  ·  F3 Action Cam: %s  ·  F5 Restart  ·  Esc Pause" % [
 		cpu, ai.difficulty_name(), "On" if debug_draw else "Off", camera.mode_name()])

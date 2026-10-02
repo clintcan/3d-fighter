@@ -108,6 +108,8 @@ var current_move: MoveData
 var move_has_hit := false
 var sidestep_dir := Vector3.ZERO
 var debug_draw := false
+## Set by FightManager on the round/match winner: shows the victory pose when idle.
+var victory := false
 var last_hit_level: MoveData.HitLevel = MoveData.HitLevel.MID
 ## Skinned character model, or null for a graybox capsule.
 var model: FighterModel
@@ -166,6 +168,7 @@ func reset_to(spawn_position: Vector3) -> void:
 	throw_grab_frame = -1
 	sidestep_dir = Vector3.ZERO
 	last_hit_level = MoveData.HitLevel.MID
+	victory = false
 	_set_combo(0)
 	_set_state(State.IDLE)
 	health_changed.emit(health, data.max_health)
@@ -760,6 +763,8 @@ func _animation_request(frozen: bool) -> Array:
 			return [&"fight/thrown", 0.0, 1.0]
 		State.TECH:
 			return [&"fight/block_stand", 0.0, 1.0]
+	if victory:
+		return [&"ual2/Idle_FoldArms", -1.0, 1.0]
 	return [&"fight/guard", -1.0, 1.0]
 
 

@@ -35,7 +35,8 @@ func dist() -> float:
 	return Vector2(p2.position.x - p1.position.x, p2.position.z - p1.position.z).length()
 
 func reset(mode: int) -> void:
-	m._reset_round(); p2.controller = m.dummy; m.dummy.mode = mode; ctl.dir = 5; step(2)
+	m.start_match(); m.start_fight_immediately()
+	p2.controller = m.dummy; m.dummy.mode = mode; ctl.dir = 5; step(2)
 
 func approach(target: float) -> void:
 	ctl.dir = 6
@@ -253,8 +254,8 @@ func _initialize() -> void:
 	reset(D.STAND); approach(1.1)
 	p2.health = 10
 	press(InputBuffer.LP); step(6)
-	check("KO on lethal hit", p2.state == Fighter.State.KO and m.ko_timer > 0, state_name(p2))
-	step(m.KO_RESET_TICKS + 1)
+	check("KO on lethal hit", p2.state == Fighter.State.KO and m.phase == m.Phase.ROUND_OVER, state_name(p2))
+	step(m.ROUND_OVER_TICKS + 1)
 	check("round resets after KO", p2.health == p2.data.max_health and p2.is_actionable() and absf(p2.position.x - 2.0) < 0.01, "hp %d, %s" % [p2.health, state_name(p2)])
 
 	# Sidestep (away from camera = -Z) rotates the fight axis and the view follows
@@ -289,6 +290,7 @@ func _initialize() -> void:
 	milestone4_tests()
 	await camera_tests()
 	ai_tests()
+	round_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -339,7 +341,7 @@ func _ai_match(seed1: int, seed2: int, ticks: int) -> Dictionary:
 	var ai1 := AIController.new(AIController.Difficulty.NORMAL, seed1)
 	var ai2 := AIController.new(AIController.Difficulty.NORMAL, seed2)
 	ai1.attach(p1); ai2.attach(p2)
-	m._reset_round()
+	m.start_match(); m.start_fight_immediately()
 	p1.controller = ai1; p2.controller = ai2
 	var stats := {hits = 0, blocks = 0, kos = 0, in_bounds = true}
 	var on_hit := func(_a, _d, _m, r):
@@ -357,3 +359,40 @@ func _ai_match(seed1: int, seed2: int, ticks: int) -> Dictionary:
 	p1.knocked_out.disconnect(on_ko); p2.knocked_out.disconnect(on_ko)
 	stats.state = "%d/%d %s %s" % [p1.health, p2.health, p1.position.snappedf(0.001), p2.position.snappedf(0.001)]
 	return stats
+
+func round_tests() -> void:
+	p1.controller = ctl
+	p2.controller = m.dummy
+	m.dummy.mode = DummyController.Mode.STAND
+	m.start_match()
+	check("round intro locks input", m.phase == m.Phase.INTRO and p1.input_locked and m.round_number == 1)
+	step(m.INTRO_TICKS)
+	check("FIGHT! unlocks input", m.phase == m.Phase.FIGHT and not p1.input_locked)
+	var t0: int = m.timer_ticks
+	step(60)
+	check("round timer counts down", t0 - m.timer_ticks == 60, "%d" % (t0 - m.timer_ticks))
+
+	# KO wins the round, then round 2 starts with full health.
+	approach(1.1)
+	p2.health = 10
+	press(InputBuffer.LP); step(6)
+	check("KO awards the round", m.phase == m.Phase.ROUND_OVER and m.round_wins == [1, 0], "%s %s" % [m.Phase.keys()[m.phase], m.round_wins])
+	step(m.ROUND_OVER_TICKS)
+	check("next round starts", m.phase == m.Phase.INTRO and m.round_number == 2 and p2.health == p2.data.max_health)
+
+	# Time out: more health (as a share of max) wins; second win ends the match.
+	step(m.INTRO_TICKS)
+	p2.health = p2.data.max_health / 2
+	m.timer_ticks = 2
+	step(3)
+	check("time out goes to the healthier fighter", m.round_wins == [2, 0], "%s" % [m.round_wins])
+	step(m.ROUND_OVER_TICKS)
+	check("two round wins end the match", m.phase == m.Phase.MATCH_OVER and p1.victory)
+
+	# Double K.O. is a draw round.
+	m.start_match(); m.start_fight_immediately()
+	p1.health = 0; p2.health = 0
+	p1._knock_out(Vector3.LEFT); p2._knock_out(Vector3.RIGHT)
+	step(1)
+	check("double K.O. is a draw", m.phase == m.Phase.ROUND_OVER and m.round_wins == [0, 0] and m.round_winner == null)
+	m.start_match()
