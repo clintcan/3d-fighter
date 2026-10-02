@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_j565v"]
+
+[resource]
+script = ExtResource("1_j565v")
+name = "Mid Kick"
+input = "LK"
+animation = &"mid_kick"
+startup = 7
+recovery = 14
+hitstun = 17
+blockstun = 12
+knockback = Vector2(1.8, 0)
+hitbox_radius = 0.18
+hitbox_offset = Vector3(0, 0.9, -0.9)
+cancel_into = Array[String](["HP"])

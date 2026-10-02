@@ -10,6 +10,7 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 @export var animation: StringName
 
 @export_group("Timing")
+## Ticks after the press before the hitbox appears.
 @export var startup: int = 5
 @export var active: int = 3
 @export var recovery: int = 10
@@ -25,9 +26,11 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 @export var launches: bool = false
 
 @export_group("Hitbox")
+## Sphere hitbox. Offset is in the fighter's local space (-Z = toward opponent), or
+## relative to `hitbox_bone` once skeletal models are in.
 @export var hitbox_bone: StringName
-@export var hitbox_size: Vector3 = Vector3(0.25, 0.25, 0.25)
-@export var hitbox_offset: Vector3 = Vector3.ZERO
+@export var hitbox_radius: float = 0.15
+@export var hitbox_offset: Vector3 = Vector3(0, 1.4, -0.8)
 
 @export_group("Flow")
 ## Move inputs this move can be cancelled into during its active/recovery frames.

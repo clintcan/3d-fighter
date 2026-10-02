@@ -1,6 +1,14 @@
 [gd_resource type="Resource" script_class="CharacterData" format=3]
 
 [ext_resource type="Script" path="res://scripts/character_data.gd" id="1_char"]
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_qdmbc"]
+[ext_resource type="Resource" path="res://data/moves/jab.tres" id="2_3gnou"]
+[ext_resource type="Resource" path="res://data/moves/straight.tres" id="3_nr18t"]
+[ext_resource type="Resource" path="res://data/moves/mid_kick.tres" id="4_8alh3"]
+[ext_resource type="Resource" path="res://data/moves/roundhouse.tres" id="5_iif4c"]
+[ext_resource type="Resource" path="res://data/moves/crouch_jab.tres" id="6_osouf"]
+[ext_resource type="Resource" path="res://data/moves/sweep.tres" id="7_euedg"]
+[ext_resource type="Resource" path="res://data/moves/uppercut.tres" id="8_pe4wy"]
 
 [resource]
 script = ExtResource("1_char")
@@ -8,10 +16,5 @@ id = &"kenji"
 display_name = "Kenji"
 archetype = "Balanced"
 description = "An all-rounder with solid pokes and reliable combos. Medium speed, medium damage."
-select_order = 0
 placeholder_color = Color(0.2, 0.45, 0.9, 1)
-max_health = 1000
-walk_speed = 2.0
-back_walk_speed = 1.6
-dash_speed = 6.0
-weight = 1.0
+moves = Array[ExtResource("1_qdmbc")]([ExtResource("2_3gnou"), ExtResource("3_nr18t"), ExtResource("4_8alh3"), ExtResource("5_iif4c"), ExtResource("6_osouf"), ExtResource("7_euedg"), ExtResource("8_pe4wy")])

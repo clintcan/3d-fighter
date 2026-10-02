@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_mfavu"]
+
+[resource]
+script = ExtResource("1_mfavu")
+name = "Sweep"
+input = "2LK"
+animation = &"sweep"
+startup = 7
+recovery = 16
+damage = 40
+hit_level = 2
+hitstun = 16
+blockstun = 12
+hitbox_radius = 0.18
+hitbox_offset = Vector3(0, 0.25, -1)

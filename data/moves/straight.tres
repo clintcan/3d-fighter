@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_fehyj"]
+
+[resource]
+script = ExtResource("1_fehyj")
+name = "Straight"
+input = "HP"
+animation = &"straight"
+startup = 9
+recovery = 18
+damage = 80
+hit_level = 0
+hitstun = 20
+blockstun = 14
+hitstop = 8
+knockback = Vector2(2.5, 0)
+hitbox_radius = 0.18
+hitbox_offset = Vector3(0, 1.4, -0.95)
+camera_intensity = 0.1

@@ -1,6 +1,14 @@
 [gd_resource type="Resource" script_class="CharacterData" format=3]
 
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_0tygf"]
 [ext_resource type="Script" path="res://scripts/character_data.gd" id="1_char"]
+[ext_resource type="Resource" path="res://data/moves/jab.tres" id="2_0wr6o"]
+[ext_resource type="Resource" path="res://data/moves/straight.tres" id="3_fjqyu"]
+[ext_resource type="Resource" path="res://data/moves/mid_kick.tres" id="4_is8na"]
+[ext_resource type="Resource" path="res://data/moves/roundhouse.tres" id="5_028q6"]
+[ext_resource type="Resource" path="res://data/moves/crouch_jab.tres" id="6_qvjh0"]
+[ext_resource type="Resource" path="res://data/moves/sweep.tres" id="7_ad3l7"]
+[ext_resource type="Resource" path="res://data/moves/uppercut.tres" id="8_f2d5q"]
 
 [resource]
 script = ExtResource("1_char")
@@ -15,3 +23,4 @@ walk_speed = 2.6
 back_walk_speed = 2.0
 dash_speed = 7.5
 weight = 0.85
+moves = Array[ExtResource("1_0tygf")]([ExtResource("2_0wr6o"), ExtResource("3_fjqyu"), ExtResource("4_is8na"), ExtResource("5_028q6"), ExtResource("6_qvjh0"), ExtResource("7_ad3l7"), ExtResource("8_f2d5q")])
