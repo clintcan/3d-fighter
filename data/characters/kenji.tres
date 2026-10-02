@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"kenji"
+display_name = "Kenji"
+archetype = "Balanced"
+description = "An all-rounder with solid pokes and reliable combos. Medium speed, medium damage."
+select_order = 0
+placeholder_color = Color(0.2, 0.45, 0.9, 1)
+max_health = 1000
+walk_speed = 2.0
+back_walk_speed = 1.6
+dash_speed = 6.0
+weight = 1.0

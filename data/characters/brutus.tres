@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="1_char"]
+
+[resource]
+script = ExtResource("1_char")
+id = &"brutus"
+display_name = "Brutus"
+archetype = "Power"
+description = "Slow, heavy hitter. Every connected blow hurts, and he shrugs off knockback."
+select_order = 2
+placeholder_color = Color(0.95, 0.6, 0.15, 1)
+max_health = 1150
+walk_speed = 1.5
+back_walk_speed = 1.2
+dash_speed = 4.5
+weight = 1.3

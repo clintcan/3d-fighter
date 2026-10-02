@@ -1,0 +1,168 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/stages/stage.gd" id="1_stage"]
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
+sky_top_color = Color(0.12, 0.14, 0.22, 1)
+sky_horizon_color = Color(0.35, 0.33, 0.38, 1)
+ground_bottom_color = Color(0.05, 0.05, 0.06, 1)
+ground_horizon_color = Color(0.35, 0.33, 0.38, 1)
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMat")
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 3
+tonemap_mode = 2
+glow_enabled = true
+
+[sub_resource type="StandardMaterial3D" id="MatCanvas"]
+albedo_color = Color(0.82, 0.8, 0.74, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="MatApron"]
+albedo_color = Color(0.15, 0.2, 0.45, 1)
+
+[sub_resource type="StandardMaterial3D" id="MatPost"]
+albedo_color = Color(0.7, 0.7, 0.72, 1)
+metallic = 0.8
+roughness = 0.3
+
+[sub_resource type="StandardMaterial3D" id="MatRope"]
+albedo_color = Color(0.85, 0.1, 0.1, 1)
+
+[sub_resource type="StandardMaterial3D" id="MatFloor"]
+albedo_color = Color(0.12, 0.12, 0.13, 1)
+
+[sub_resource type="BoxMesh" id="CanvasMesh"]
+material = SubResource("MatCanvas")
+size = Vector3(9, 0.1, 9)
+
+[sub_resource type="BoxMesh" id="ApronMesh"]
+material = SubResource("MatApron")
+size = Vector3(9.2, 1, 9.2)
+
+[sub_resource type="CylinderMesh" id="PostMesh"]
+material = SubResource("MatPost")
+top_radius = 0.08
+bottom_radius = 0.08
+height = 1.6
+
+[sub_resource type="BoxMesh" id="RopeMeshX"]
+material = SubResource("MatRope")
+size = Vector3(8.8, 0.05, 0.05)
+
+[sub_resource type="BoxMesh" id="RopeMeshZ"]
+material = SubResource("MatRope")
+size = Vector3(0.05, 0.05, 8.8)
+
+[sub_resource type="PlaneMesh" id="ArenaFloorMesh"]
+material = SubResource("MatFloor")
+size = Vector2(60, 60)
+
+[sub_resource type="BoxShape3D" id="RingShape"]
+size = Vector3(9, 1, 9)
+
+[node name="Ring" type="Node3D"]
+script = ExtResource("1_stage")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.383, 0.321, 0, 0.643, 0.766, -0.5, -0.663, 0.557, 0, 8, 0)
+shadow_enabled = true
+
+[node name="P1Spawn" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, 0)
+
+[node name="P2Spawn" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 0)
+
+[node name="ArenaFloor" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
+mesh = SubResource("ArenaFloorMesh")
+
+[node name="Apron" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.55, 0)
+mesh = SubResource("ApronMesh")
+
+[node name="Canvas" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+mesh = SubResource("CanvasMesh")
+
+[node name="RingCollision" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="RingCollision"]
+shape = SubResource("RingShape")
+
+[node name="Posts" type="Node3D" parent="."]
+
+[node name="Post1" type="MeshInstance3D" parent="Posts"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4, 0.8, -4.4)
+mesh = SubResource("PostMesh")
+
+[node name="Post2" type="MeshInstance3D" parent="Posts"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4, 0.8, 4.4)
+mesh = SubResource("PostMesh")
+
+[node name="Post3" type="MeshInstance3D" parent="Posts"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.4, 0.8, -4.4)
+mesh = SubResource("PostMesh")
+
+[node name="Post4" type="MeshInstance3D" parent="Posts"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.4, 0.8, 4.4)
+mesh = SubResource("PostMesh")
+
+[node name="Ropes" type="Node3D" parent="."]
+
+[node name="Rope1" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -4.4)
+mesh = SubResource("RopeMeshX")
+
+[node name="Rope2" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 4.4)
+mesh = SubResource("RopeMeshX")
+
+[node name="Rope3" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4, 0.5, 0)
+mesh = SubResource("RopeMeshZ")
+
+[node name="Rope4" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.4, 0.5, 0)
+mesh = SubResource("RopeMeshZ")
+
+[node name="Rope5" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, -4.4)
+mesh = SubResource("RopeMeshX")
+
+[node name="Rope6" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 4.4)
+mesh = SubResource("RopeMeshX")
+
+[node name="Rope7" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4, 0.95, 0)
+mesh = SubResource("RopeMeshZ")
+
+[node name="Rope8" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.4, 0.95, 0)
+mesh = SubResource("RopeMeshZ")
+
+[node name="Rope9" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, -4.4)
+mesh = SubResource("RopeMeshX")
+
+[node name="Rope10" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 4.4)
+mesh = SubResource("RopeMeshX")
+
+[node name="Rope11" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4, 1.4, 0)
+mesh = SubResource("RopeMeshZ")
+
+[node name="Rope12" type="MeshInstance3D" parent="Ropes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.4, 1.4, 0)
+mesh = SubResource("RopeMeshZ")
