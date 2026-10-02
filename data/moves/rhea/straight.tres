@@ -1,22 +1,22 @@
 [gd_resource type="Resource" script_class="MoveData" format=3]
 
-[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_fehyj"]
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_lqn62"]
 
 [resource]
-script = ExtResource("1_fehyj")
+script = ExtResource("1_lqn62")
 name = "Straight"
 input = "HP"
 animation = &"ual1/Punch_Cross"
 animation_impact = 0.28
 animation_end = 0.85
-startup = 9
+startup = 8
 recovery = 18
-damage = 80
+damage = 68
 hit_level = 0
 hitstun = 20
 blockstun = 14
-hitstop = 8
-knockback = Vector2(2.5, 0)
+hitstop = 7
+knockback = Vector2(2.25, 0)
 hitbox_radius = 0.18
 hitbox_offset = Vector3(0.1, 1.36, -0.7)
 camera_intensity = 0.1

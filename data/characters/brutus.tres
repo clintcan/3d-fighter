@@ -3,20 +3,23 @@
 [ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Buzzed.gltf" id="1_2ndvl"]
 [ext_resource type="Script" path="res://scripts/character_data.gd" id="1_char"]
 [ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_k5w2a"]
-[ext_resource type="Resource" path="res://data/moves/jab.tres" id="2_7sic7"]
 [ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Beard.gltf" id="2_adg58"]
-[ext_resource type="Resource" path="res://data/moves/straight.tres" id="3_eu30i"]
 [ext_resource type="PackedScene" path="res://assets/characters/base/Superhero_Male_FullBody.gltf" id="3_ryvlx"]
-[ext_resource type="Resource" path="res://data/moves/mid_kick.tres" id="4_2ndvl"]
-[ext_resource type="Resource" path="res://data/moves/roundhouse.tres" id="5_adg58"]
-[ext_resource type="Resource" path="res://data/moves/crouch_jab.tres" id="6_ryvlx"]
-[ext_resource type="Resource" path="res://data/moves/sweep.tres" id="7_27se4"]
-[ext_resource type="Resource" path="res://data/moves/uppercut.tres" id="8_rrx7e"]
-[ext_resource type="Resource" path="res://data/moves/low_kick.tres" id="10_mx3k3"]
-[ext_resource type="Resource" path="res://data/moves/jump_jab.tres" id="13_oevla"]
-[ext_resource type="Resource" path="res://data/moves/jump_hammer.tres" id="14_nd1kg"]
-[ext_resource type="Resource" path="res://data/moves/jump_kick.tres" id="15_hbv0f"]
-[ext_resource type="Resource" path="res://data/moves/flying_kick.tres" id="16_063lg"]
+[ext_resource type="Resource" path="res://data/moves/brutus/jab.tres" id="5_nd1kg"]
+[ext_resource type="Resource" path="res://data/moves/brutus/straight.tres" id="6_hbv0f"]
+[ext_resource type="Resource" path="res://data/moves/brutus/mid_kick.tres" id="7_063lg"]
+[ext_resource type="Resource" path="res://data/moves/brutus/roundhouse.tres" id="8_kraql"]
+[ext_resource type="Resource" path="res://data/moves/brutus/crouch_jab.tres" id="9_ipor7"]
+[ext_resource type="Resource" path="res://data/moves/brutus/low_kick.tres" id="10_5kvhg"]
+[ext_resource type="Resource" path="res://data/moves/brutus/uppercut.tres" id="11_3usi0"]
+[ext_resource type="Resource" path="res://data/moves/brutus/sweep.tres" id="12_gxjex"]
+[ext_resource type="Resource" path="res://data/moves/brutus/jump_jab.tres" id="13_utyi1"]
+[ext_resource type="Resource" path="res://data/moves/brutus/jump_hammer.tres" id="14_t86aj"]
+[ext_resource type="Resource" path="res://data/moves/brutus/jump_kick.tres" id="15_eqvia"]
+[ext_resource type="Resource" path="res://data/moves/brutus/flying_kick.tres" id="16_iqvcx"]
+[ext_resource type="Resource" path="res://data/moves/brutus/overhead_smash.tres" id="17_6h21u"]
+[ext_resource type="Resource" path="res://data/moves/brutus/heavy_boot.tres" id="18_ga23w"]
+[ext_resource type="Texture2D" path="res://assets/ui/portraits/brutus.png" id="19_hbv0f"]
 
 [resource]
 script = ExtResource("1_char")
@@ -25,6 +28,7 @@ display_name = "Brutus"
 archetype = "Power"
 description = "Slow, heavy hitter. Every connected blow hurts, and he shrugs off knockback."
 select_order = 2
+portrait = ExtResource("19_hbv0f")
 model_scene = ExtResource("3_ryvlx")
 hair_scenes = Array[PackedScene]([ExtResource("1_2ndvl"), ExtResource("2_adg58")])
 model_scale = 1.08
@@ -34,5 +38,9 @@ max_health = 1150
 walk_speed = 1.5
 back_walk_speed = 1.2
 dash_speed = 4.5
+jump_velocity = 5.6
 weight = 1.3
-moves = Array[ExtResource("1_k5w2a")]([ExtResource("2_7sic7"), ExtResource("3_eu30i"), ExtResource("4_2ndvl"), ExtResource("5_adg58"), ExtResource("6_ryvlx"), ExtResource("10_mx3k3"), ExtResource("8_rrx7e"), ExtResource("7_27se4"), ExtResource("13_oevla"), ExtResource("14_nd1kg"), ExtResource("15_hbv0f"), ExtResource("16_063lg")])
+throw_damage = 160
+power_rating = 0.95
+speed_rating = 0.25
+moves = Array[ExtResource("1_k5w2a")]([ExtResource("5_nd1kg"), ExtResource("6_hbv0f"), ExtResource("7_063lg"), ExtResource("8_kraql"), ExtResource("9_ipor7"), ExtResource("10_5kvhg"), ExtResource("11_3usi0"), ExtResource("12_gxjex"), ExtResource("13_utyi1"), ExtResource("14_t86aj"), ExtResource("15_eqvia"), ExtResource("16_iqvcx"), ExtResource("17_6h21u"), ExtResource("18_ga23w")])

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_r5t30"]
+
+[resource]
+script = ExtResource("1_r5t30")
+name = "Mid Kick"
+input = "LK"
+animation = &"fight/front_kick"
+startup = 6
+recovery = 14
+damage = 43
+hitstun = 17
+blockstun = 12
+hitstop = 5
+knockback = Vector2(1.6199999, 0)
+hitbox_radius = 0.18
+hitbox_offset = Vector3(0.05, 1, -0.9)
+cancel_into = Array[String](["HP"])

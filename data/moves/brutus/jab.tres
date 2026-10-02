@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_vbdp1"]
+
+[resource]
+script = ExtResource("1_vbdp1")
+name = "Jab"
+input = "LP"
+animation = &"ual1/Punch_Jab"
+animation_end = 0.62
+startup = 6
+active = 2
+recovery = 8
+damage = 39
+hit_level = 0
+hitstun = 14
+hitstop = 7
+hitbox_offset = Vector3(0, 1.4, -0.78)
+cancel_into = Array[String](["LP", "HP", "2LP"])

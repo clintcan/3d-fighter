@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_fx02c"]
+
+[resource]
+script = ExtResource("1_fx02c")
+name = "Heavy Boot"
+input = "6HK"
+animation = &"fight/front_kick"
+startup = 12
+active = 4
+recovery = 22
+damage = 100
+hitstun = 22
+blockstun = 16
+hitstop = 11
+knockback = Vector2(4.5, 0)
+hitbox_radius = 0.22
+hitbox_offset = Vector3(0.05, 1, -0.92)
+camera_intensity = 0.2

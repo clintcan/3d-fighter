@@ -11,15 +11,15 @@ enum Difficulty { EASY, NORMAL, HARD }
 const DIFFICULTY_NAMES := ["Easy", "Normal", "Hard"]
 const PROFILES := {
 	Difficulty.EASY: {
-		reaction_frames = 22, decision_interval = 16, block_chance = 0.25, punish_chance = 0.2,
+		reaction_frames = 22, block_reaction_frames = 12, decision_interval = 16, block_chance = 0.25, punish_chance = 0.2,
 		anti_air_chance = 0.2, combo_drop_chance = 0.5, aggression = 0.35,
 	},
 	Difficulty.NORMAL: {
-		reaction_frames = 14, decision_interval = 10, block_chance = 0.55, punish_chance = 0.5,
+		reaction_frames = 14, block_reaction_frames = 7, decision_interval = 10, block_chance = 0.55, punish_chance = 0.5,
 		anti_air_chance = 0.45, combo_drop_chance = 0.25, aggression = 0.55,
 	},
 	Difficulty.HARD: {
-		reaction_frames = 8, decision_interval = 6, block_chance = 0.8, punish_chance = 0.85,
+		reaction_frames = 8, block_reaction_frames = 4, decision_interval = 6, block_chance = 0.8, punish_chance = 0.85,
 		anti_air_chance = 0.75, combo_drop_chance = 0.05, aggression = 0.75,
 	},
 }
@@ -36,6 +36,9 @@ const WAKEUP_SPACING := 1.4
 
 var difficulty: Difficulty = Difficulty.NORMAL
 var reaction_frames := 14
+## Blocking reads attack startups faster than general decisions (players block partly
+## on anticipation), so it uses its own, shorter delay.
+var block_reaction_frames := 7
 var decision_interval := 10
 var block_chance := 0.55
 var punish_chance := 0.5
@@ -53,6 +56,7 @@ var _plan: Array = []
 var _step_ticks_left := 0
 ## Attack instance (move + start tick) already rolled for blocking, and the outcome.
 var _rolled_attack := ""
+var _rolled_punish := ""
 var _blocking := false
 var _block_dir := 4
 var _moves: Dictionary = {} # input string -> MoveData, filled by attach()
@@ -79,17 +83,19 @@ func reset() -> void:
 	_plan.clear()
 	_step_ticks_left = 0
 	_rolled_attack = ""
+	_rolled_punish = ""
 	_blocking = false
 
 
 func read(fighter: Fighter) -> int:
 	_tick += 1
 	_remember(fighter.opponent)
-	var seen := _perceived()
+	var seen := _perceived(reaction_frames)
 	var dist := _distance(fighter, seen)
+	var seen_for_block := _perceived(block_reaction_frames)
 
 	# Reactive defense overrides any plan.
-	if _wants_block(fighter, seen, dist):
+	if _wants_block(fighter, seen_for_block, _distance(fighter, seen_for_block)):
 		_plan.clear()
 		_step_ticks_left = 0
 		return InputBuffer.pack(_block_dir, 0)
@@ -115,19 +121,26 @@ func _remember(opponent: Fighter) -> void:
 		move = opponent.current_move,
 		position = opponent.position,
 		velocity = opponent.velocity,
+		crouching = opponent.crouching,
 		start_tick = _tick - opponent.state_frame,
 	})
-	if _seen_history.size() > reaction_frames + 1:
+	if _seen_history.size() > maxi(reaction_frames, block_reaction_frames) + 1:
 		_seen_history.pop_front()
 
 
-func _perceived() -> Dictionary:
-	return _seen_history[0]
+## Opponent snapshot from `frames_ago` ticks back (or the oldest available).
+func _perceived(frames_ago: int) -> Dictionary:
+	return _seen_history[maxi(0, _seen_history.size() - 1 - frames_ago)]
 
 
 func _distance(fighter: Fighter, seen: Dictionary) -> float:
 	var delta: Vector3 = seen.position - fighter.position
 	return Vector2(delta.x, delta.z).length()
+
+
+func _attack_id(seen: Dictionary) -> String:
+	var move: MoveData = seen.move
+	return "%s@%d" % [move.resource_path if move else "", seen.start_tick]
 
 
 func _attack_phase(seen: Dictionary) -> String:
@@ -152,7 +165,7 @@ func _wants_block(fighter: Fighter, seen: Dictionary, dist: float) -> bool:
 	var move: MoveData = seen.move
 	if dist > reach(move) + 0.4:
 		return false
-	var attack_id := "%s@%d" % [move.resource_path, seen.start_tick]
+	var attack_id := _attack_id(seen)
 	if attack_id != _rolled_attack:
 		_rolled_attack = attack_id
 		_blocking = _rng.randf() < block_chance
@@ -170,8 +183,12 @@ func _wants_block(fighter: Fighter, seen: Dictionary, dist: float) -> bool:
 func _react(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 	match seen.state:
 		Fighter.State.ATTACK:
-			if _attack_phase(seen) == "recovery" and _rng.randf() < punish_chance * 0.15:
-				_punish(fighter, dist)
+			# Roll once per whiffed/blocked attack, as soon as its recovery is seen.
+			var attack_id := _attack_id(seen)
+			if _attack_phase(seen) == "recovery" and attack_id != _rolled_punish:
+				_rolled_punish = attack_id
+				if _rng.randf() < punish_chance:
+					_punish(fighter, dist, seen.crouching)
 		Fighter.State.AIR_HIT:
 			if dist < 1.5 and seen.position.y < 1.4:
 				_queue_press(HK if _rng.randf() < 0.5 else HP)
@@ -181,10 +198,16 @@ func _react(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 				_queue_press(HP, 2) # uppercut
 
 
-func _punish(fighter: Fighter, dist: float) -> void:
+## Highs whiff over a crouching target, so crouchers get a mid or a low.
+func _punish(fighter: Fighter, dist: float, target_crouching: bool) -> void:
 	var launcher := _move("2HP")
 	if launcher and dist <= reach(launcher) and _rng.randf() < 0.6:
 		_queue_press(HP, 2)
+	elif target_crouching:
+		if dist <= reach(_move("LK")):
+			_queue_press(LK)
+		elif dist <= reach(_move("2LK")):
+			_queue_press(LK, 2)
 	elif dist <= reach(_move("LP")):
 		_queue_string()
 	elif dist <= reach(_move("HK")):
@@ -201,9 +224,10 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 				_plan.append([6, 0, 6])
 			return
 		Fighter.State.ATTACK:
-			if _attack_phase(seen) == "recovery" and _rng.randf() < punish_chance:
-				_punish(fighter, dist)
-				return
+			if _attack_phase(seen) == "recovery":
+				_react(fighter, seen, dist)
+				if not _plan.is_empty():
+					return
 		Fighter.State.AIR_HIT:
 			_react(fighter, seen, dist)
 			return
@@ -220,6 +244,7 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 		options = [
 			[3.0, func() -> void: _plan.append([6, 0, _rng.randi_range(6, 14)])],
 			[2.0 * aggression, func() -> void: _queue_poke(dist)],
+			[1.2 * aggression if _signature_in_range(dist) else 0.0, func() -> void: _queue_press(HP, 6)],
 			[1.5 * aggression, func() -> void: _queue_jump_in()],
 			[1.0, func() -> void: _queue_sidestep()],
 			[0.6, func() -> void: _queue_backdash()],
@@ -276,6 +301,12 @@ func _queue_poke(dist: float) -> void:
 	_plan.append([6, 0, 8])
 
 
+## The forward+HP signature move, if this character has one that reaches.
+func _signature_in_range(dist: float) -> bool:
+	var move := _move("6HP")
+	return move != null and dist <= reach(move)
+
+
 func _queue_dash() -> void:
 	_plan.append_array([[6, 0, 2], [5, 0, 2], [6, 0, 1], [5, 0, 12]])
 
@@ -326,8 +357,10 @@ func attach(fighter: Fighter) -> void:
 		_moves[move.input] = move
 
 
-## Distance (center to center) at which a move's hitbox can touch a standing opponent.
+## Distance (center to center) at which a move's hitbox can touch a standing opponent,
+## including how far a lunge slides the attacker.
 static func reach(move: MoveData) -> float:
 	if move == null:
 		return 0.0
-	return absf(move.hitbox_offset.z) + move.hitbox_radius + Fighter.BODY_RADIUS
+	var slide := move.lunge * move.lunge / (2.0 * Fighter.GROUND_FRICTION)
+	return absf(move.hitbox_offset.z) + move.hitbox_radius + Fighter.BODY_RADIUS + slide

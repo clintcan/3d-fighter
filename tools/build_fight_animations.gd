@@ -59,6 +59,7 @@ func _initialize() -> void:
 	lib.add_animation("jump_kick", build_jump_kick())
 	lib.add_animation("throw", build_throw())
 	lib.add_animation("thrown", build_thrown())
+	lib.add_animation("rushing_hook", build_in_place([ual2.get_animation("Melee_Hook"), ual2.get_animation("Melee_Hook_Rec")]))
 	var err := ResourceSaver.save(lib, OUTPUT)
 	print("saved ", OUTPUT, " (", lib.get_animation_list().size(), " clips) err=", err)
 	model.free()
@@ -234,6 +235,29 @@ func build_thrown() -> Animation:
 	var held := sample(ual1.get_animation("Hit_Chest"), 0.12)
 	rotate_bone(held, "spine_01", Vector3.RIGHT, 20.0)
 	return make_animation([[0.0, held], [0.5, held]], false)
+
+
+## Chains clips and pins the pelvis horizontally, so travel baked into the animation
+## can be done by gameplay (MoveData.lunge) instead. Prints the removed travel.
+func build_in_place(clips: Array) -> Animation:
+	var keys := []
+	var offset := 0.0
+	var anchor := Vector3.INF
+	var max_travel := 0.0
+	for clip: Animation in clips:
+		var t := 0.0
+		while t <= clip.length + 0.001:
+			var pose := sample(clip, t)
+			var pelvis := global_origin(pose, "pelvis")
+			if anchor == Vector3.INF:
+				anchor = pelvis
+			max_travel = maxf(max_travel, pelvis.z - anchor.z)
+			move_bone(pose, "pelvis", Vector3(anchor.x - pelvis.x, 0.0, anchor.z - pelvis.z))
+			keys.append([offset + t, pose])
+			t += 1.0 / SAMPLE_FPS
+		offset += clip.length + 1.0 / SAMPLE_FPS
+	print("in-place clip: removed up to %.2f m of forward travel" % max_travel)
+	return make_animation(keys, false)
 
 
 ## Resamples `source` keeping its `keep_bones`, with the rest of the body from the guard.

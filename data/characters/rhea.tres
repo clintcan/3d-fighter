@@ -4,19 +4,22 @@
 [ext_resource type="PackedScene" path="res://assets/characters/base/Superhero_Female_FullBody.gltf" id="1_0wr6o"]
 [ext_resource type="Script" path="res://scripts/character_data.gd" id="1_char"]
 [ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Buns.gltf" id="1_is8na"]
-[ext_resource type="Resource" path="res://data/moves/jab.tres" id="2_0wr6o"]
 [ext_resource type="PackedScene" path="res://assets/characters/hair/Eyebrows_Female.gltf" id="2_028q6"]
-[ext_resource type="Resource" path="res://data/moves/straight.tres" id="3_fjqyu"]
-[ext_resource type="Resource" path="res://data/moves/mid_kick.tres" id="4_is8na"]
-[ext_resource type="Resource" path="res://data/moves/roundhouse.tres" id="5_028q6"]
-[ext_resource type="Resource" path="res://data/moves/crouch_jab.tres" id="6_qvjh0"]
-[ext_resource type="Resource" path="res://data/moves/sweep.tres" id="7_ad3l7"]
-[ext_resource type="Resource" path="res://data/moves/uppercut.tres" id="8_f2d5q"]
-[ext_resource type="Resource" path="res://data/moves/low_kick.tres" id="10_2b23f"]
-[ext_resource type="Resource" path="res://data/moves/jump_jab.tres" id="13_4321v"]
-[ext_resource type="Resource" path="res://data/moves/jump_hammer.tres" id="14_pcrmm"]
-[ext_resource type="Resource" path="res://data/moves/jump_kick.tres" id="15_1sqe6"]
-[ext_resource type="Resource" path="res://data/moves/flying_kick.tres" id="16_v8o8g"]
+[ext_resource type="Resource" path="res://data/moves/rhea/jab.tres" id="5_pcrmm"]
+[ext_resource type="Resource" path="res://data/moves/rhea/straight.tres" id="6_1sqe6"]
+[ext_resource type="Resource" path="res://data/moves/rhea/mid_kick.tres" id="7_v8o8g"]
+[ext_resource type="Resource" path="res://data/moves/rhea/roundhouse.tres" id="8_qbp22"]
+[ext_resource type="Resource" path="res://data/moves/rhea/crouch_jab.tres" id="9_iffgu"]
+[ext_resource type="Resource" path="res://data/moves/rhea/low_kick.tres" id="10_hpof3"]
+[ext_resource type="Resource" path="res://data/moves/rhea/uppercut.tres" id="11_0kpmu"]
+[ext_resource type="Resource" path="res://data/moves/rhea/sweep.tres" id="12_loo3t"]
+[ext_resource type="Resource" path="res://data/moves/rhea/jump_jab.tres" id="13_u5vpa"]
+[ext_resource type="Resource" path="res://data/moves/rhea/jump_hammer.tres" id="14_v5xfu"]
+[ext_resource type="Resource" path="res://data/moves/rhea/jump_kick.tres" id="15_lok5t"]
+[ext_resource type="Resource" path="res://data/moves/rhea/flying_kick.tres" id="16_enack"]
+[ext_resource type="Resource" path="res://data/moves/rhea/rushing_hook.tres" id="17_u317i"]
+[ext_resource type="Resource" path="res://data/moves/rhea/step_kick.tres" id="18_v0bkd"]
+[ext_resource type="Texture2D" path="res://assets/ui/portraits/rhea.png" id="19_1sqe6"]
 
 [resource]
 script = ExtResource("1_char")
@@ -25,6 +28,7 @@ display_name = "Rhea"
 archetype = "Rushdown"
 description = "Lightning-fast pressure fighter. Quick jabs and relentless offense, but takes hits hard."
 select_order = 1
+portrait = ExtResource("19_1sqe6")
 model_scene = ExtResource("1_0wr6o")
 hair_scenes = Array[PackedScene]([ExtResource("1_is8na"), ExtResource("2_028q6")])
 hair_color = Color(0.5, 0.16, 0.08, 1)
@@ -33,5 +37,9 @@ max_health = 900
 walk_speed = 2.6
 back_walk_speed = 2.0
 dash_speed = 7.5
+jump_velocity = 6.4
 weight = 0.85
-moves = Array[ExtResource("1_0tygf")]([ExtResource("2_0wr6o"), ExtResource("3_fjqyu"), ExtResource("4_is8na"), ExtResource("5_028q6"), ExtResource("6_qvjh0"), ExtResource("10_2b23f"), ExtResource("8_f2d5q"), ExtResource("7_ad3l7"), ExtResource("13_4321v"), ExtResource("14_pcrmm"), ExtResource("15_1sqe6"), ExtResource("16_v8o8g")])
+throw_damage = 100
+power_rating = 0.35
+speed_rating = 0.9
+moves = Array[ExtResource("1_0tygf")]([ExtResource("5_pcrmm"), ExtResource("6_1sqe6"), ExtResource("7_v8o8g"), ExtResource("8_qbp22"), ExtResource("9_iffgu"), ExtResource("10_hpof3"), ExtResource("11_0kpmu"), ExtResource("12_loo3t"), ExtResource("13_u5vpa"), ExtResource("14_v5xfu"), ExtResource("15_lok5t"), ExtResource("16_enack"), ExtResource("17_u317i"), ExtResource("18_v0bkd")])

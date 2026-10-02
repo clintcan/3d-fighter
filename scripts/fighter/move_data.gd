@@ -5,7 +5,8 @@ extends Resource
 enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 
 @export var name: String
-## Input notation: "LP", "HP", "LK", "HK", "2LP" (crouching), "j.LP" (airborne), later "236P".
+## Input notation: "LP", "HP", "LK", "HK", "2LP" (crouching), "6HP" / "4HP" (forward /
+## back + button), "j.LP" (airborne). Later: motion inputs like "236P".
 @export var input: String
 ## Clip as "library/name", e.g. "ual1/Punch_Jab" or "fight/front_kick".
 @export var animation: StringName
@@ -31,6 +32,8 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 @export var launches: bool = false
 ## Grounded hit trips the defender into a knockdown (sweeps).
 @export var knockdown: bool = false
+## Forward speed (m/s) given to the attacker when the move starts; friction slows it.
+@export var lunge: float = 0.0
 
 @export_group("Hitbox")
 ## Sphere hitbox. Offset is in the fighter's local space (-Z = toward opponent), or

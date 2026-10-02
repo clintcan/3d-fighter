@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_rk8fr"]
+
+[resource]
+script = ExtResource("1_rk8fr")
+name = "Advancing Straight"
+input = "6HP"
+animation = &"ual1/Punch_Cross"
+animation_impact = 0.28
+animation_end = 0.85
+startup = 12
+recovery = 18
+damage = 90
+hit_level = 0
+hitstun = 21
+blockstun = 16
+hitstop = 9
+knockback = Vector2(2.8, 0)
+lunge = 4.5
+hitbox_radius = 0.2
+hitbox_offset = Vector3(0.1, 1.36, -0.7)
+camera_intensity = 0.15

@@ -1,9 +1,9 @@
 [gd_resource type="Resource" script_class="MoveData" format=3]
 
-[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_mfavu"]
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_5rl5b"]
 
 [resource]
-script = ExtResource("1_mfavu")
+script = ExtResource("1_5rl5b")
 name = "Sweep"
 input = "2HK"
 animation = &"fight/spin_sweep"

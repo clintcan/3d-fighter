@@ -33,6 +33,10 @@ extends Resource
 @export var jump_velocity: float = 6.0
 ## Scales knockback received. Heavier characters get pushed less.
 @export var weight: float = 1.0
+@export var throw_damage: int = 120
+## 0..1 ratings shown as bars on the character select screen.
+@export_range(0.0, 1.0) var power_rating := 0.5
+@export_range(0.0, 1.0) var speed_rating := 0.5
 
 @export_group("Moves")
 @export var moves: Array[MoveData] = []

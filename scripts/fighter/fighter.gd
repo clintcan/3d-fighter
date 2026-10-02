@@ -59,7 +59,6 @@ const THROW_WHIFF_RECOVERY := 22
 const THROW_RANGE := 0.95
 const THROW_HOLD_FRAMES := 30
 const THROW_RECOVERY := 14
-const THROW_DAMAGE := 120
 const THROW_HOLD_DISTANCE := 0.75
 ## Defender can break a throw with LP+LK during the first ticks of being held.
 const THROW_TECH_WINDOW := 10
@@ -325,12 +324,12 @@ func _tick_attack() -> void:
 ## Starts a buffered attack. With `cancel_only`, only moves listed in the current
 ## move's cancel_into are allowed.
 func _try_attack(cancel_only: bool) -> bool:
-	var crouch := input.dir() <= 3
+	var dir := input.dir()
 	var airborne := state == State.JUMP
 	for button: int in ATTACK_BUTTONS:
 		if not input.pressed_within(button, BUFFER_WINDOW):
 			continue
-		var move := _find_move(button, crouch, airborne)
+		var move := _find_move(button, dir, airborne)
 		if move == null or (cancel_only and move.input not in current_move.cancel_into):
 			continue
 		input.consume(button)
@@ -338,25 +337,35 @@ func _try_attack(cancel_only: bool) -> bool:
 		move_has_hit = false
 		air_attack_used = air_attack_used or airborne
 		_set_state(State.ATTACK, move.input.begins_with("2"))
+		if move.lunge > 0.0 and not airborne:
+			velocity = forward * move.lunge
 		return true
 	return false
 
 
-## Air moves use "j." inputs (no fallback). Crouching moves fall back to standing ones.
-func _find_move(button: int, crouch: bool, airborne: bool) -> MoveData:
+## Picks the move for a button given the held direction (numpad, facing-relative).
+## Air moves use "j." inputs only. On the ground: down/down-diagonals → "2", forward →
+## "6", back → "4"; each falls back to the plain standing move.
+func _find_move(button: int, dir: int, airborne: bool) -> MoveData:
 	var button_name: String = InputBuffer.BUTTON_NAMES[button]
 	if airborne:
-		for move in data.moves:
-			if move.input == "j." + button_name:
-				return move
-		return null
-	var fallback: MoveData = null
+		return _move_for_input("j." + button_name)
+	var prefix := ""
+	if dir <= 3:
+		prefix = "2"
+	elif dir == 6:
+		prefix = "6"
+	elif dir == 4:
+		prefix = "4"
+	var move := _move_for_input(prefix + button_name) if prefix != "" else null
+	return move if move else _move_for_input(button_name)
+
+
+func _move_for_input(input_name: String) -> MoveData:
 	for move in data.moves:
-		if crouch and move.input == "2" + button_name:
+		if move.input == input_name:
 			return move
-		if move.input == button_name:
-			fallback = move
-	return fallback
+	return null
 
 
 func _start_sidestep(toward_camera: bool) -> void:
@@ -565,7 +574,7 @@ func _tick_throw() -> void:
 ## Thrown: damage, then tossed into a knockdown (no juggles after a throw).
 func _release_from_throw(attacker: Fighter) -> void:
 	var push_dir := attacker.forward
-	_take_damage(THROW_DAMAGE)
+	_take_damage(attacker.data.throw_damage)
 	_set_combo(1)
 	_flash_color = Color.WHITE
 	hitstop = 8

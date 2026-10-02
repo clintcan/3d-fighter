@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_cnkh3"]
+
+[resource]
+script = ExtResource("1_cnkh3")
+name = "Step Kick"
+input = "6LK"
+animation = &"fight/front_kick"
+startup = 7
+recovery = 12
+damage = 40
+hitstun = 16
+blockstun = 11
+hitstop = 5
+knockback = Vector2(1.4, 0)
+lunge = 3.5
+hitbox_radius = 0.18
+hitbox_offset = Vector3(0.05, 1, -0.9)
+cancel_into = Array[String](["6HP", "LP"])

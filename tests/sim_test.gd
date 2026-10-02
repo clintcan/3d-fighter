@@ -145,7 +145,7 @@ func milestone4_tests() -> void:
 	step(Fighter.THROW_STARTUP + 2)
 	check("throw grabs a blocking opponent", p2.state == Fighter.State.THROWN, state_name(p2))
 	step(Fighter.THROW_HOLD_FRAMES + 12)
-	check("throw damages and knocks down", p2.health == hp - Fighter.THROW_DAMAGE and p2.state in [Fighter.State.AIR_HIT, Fighter.State.KNOCKDOWN], "hp %d %s" % [p2.health, state_name(p2)])
+	check("throw damages and knocks down", p2.health == hp - p1.data.throw_damage and p2.state in [Fighter.State.AIR_HIT, Fighter.State.KNOCKDOWN], "hp %d %s" % [p2.health, state_name(p2)])
 	step(120)
 
 	# Throw tech
@@ -183,6 +183,10 @@ func milestone4_tests() -> void:
 
 func _initialize() -> void:
 	await process_frame
+	# Fixed matchup: per-character frame data makes timings depend on who's fighting.
+	var gs = root.get_node("GameState")
+	gs.player_character = gs.roster[0] # Kenji
+	gs.cpu_character = gs.roster[2] # Brutus
 	change_scene_to_file("res://scenes/fight.tscn")
 	await process_frame
 	await process_frame
@@ -291,6 +295,7 @@ func _initialize() -> void:
 	await camera_tests()
 	ai_tests()
 	round_tests()
+	character_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -302,7 +307,7 @@ func ai_tests() -> void:
 	var ai := AIController.new(AIController.Difficulty.HARD, 7)
 	ai.attach(p2)
 	reset(D.STAND); p2.controller = ai; ai.reset()
-	ai.reaction_frames = 2; ai.block_chance = 1.0; ai.punish_chance = 0.0
+	ai.reaction_frames = 2; ai.block_reaction_frames = 2; ai.block_chance = 1.0; ai.punish_chance = 0.0
 	ai.anti_air_chance = 0.0; ai.decision_interval = 100000
 	approach(1.1)
 	var hp := p2.health
@@ -396,3 +401,48 @@ func round_tests() -> void:
 	step(1)
 	check("double K.O. is a draw", m.phase == m.Phase.ROUND_OVER and m.round_wins == [0, 0] and m.round_winner == null)
 	m.start_match()
+
+func character_tests() -> void:
+	var D := DummyController.Mode
+	var roster: Array = root.get_node("GameState").roster
+	var kenji: CharacterData = roster[0]
+	var rhea: CharacterData = roster[1]
+	var brutus: CharacterData = roster[2]
+	var startup := func(c: CharacterData, input: String) -> int:
+		for mv in c.moves:
+			if mv.input == input: return mv.startup
+		return -1
+	check("Rhea is faster than Brutus (jab startup)", startup.call(rhea, "LP") < startup.call(kenji, "LP") and startup.call(kenji, "LP") < startup.call(brutus, "LP"),
+		"%d / %d / %d" % [startup.call(rhea, "LP"), startup.call(kenji, "LP"), startup.call(brutus, "LP")])
+	check("each character has signature moves", startup.call(kenji, "6HP") > 0 and startup.call(rhea, "6HP") > 0 and startup.call(brutus, "6HP") > 0)
+	check("throw damage differs by character", brutus.throw_damage > kenji.throw_damage and kenji.throw_damage > rhea.throw_damage)
+
+	# Forward + HP picks the signature move and lunges; plain HP is still the straight.
+	reset(D.STAND)
+	var x0 := p1.position.x
+	press(InputBuffer.HP, 6); step(1)
+	check("6HP selects Advancing Straight", p1.current_move != null and p1.current_move.name == "Advancing Straight", p1.current_move.name if p1.current_move else "none")
+	step(12)
+	check("lunge carries the attacker forward", p1.position.x - x0 > 0.6, "%.2f m" % (p1.position.x - x0))
+	step(40)
+	press(InputBuffer.HP); step(1)
+	check("plain HP is still the Straight", p1.current_move != null and p1.current_move.name == "Straight")
+	step(40)
+
+	# Brutus's Overhead Smash beats a crouch block and knocks down.
+	reset(D.STAND)
+	var p1_dummy := DummyController.new()
+	p1_dummy.mode = DummyController.Mode.CROUCH_BLOCK
+	p1.controller = p1_dummy
+	p2.controller = ctl2
+	p2.position.x = p1.position.x + 1.1
+	p1.reset_physics_interpolation(); p2.reset_physics_interpolation()
+	step(10)
+	var hp := p1.health
+	ctl2.dir = 6; ctl2.buttons = InputBuffer.HP; step(1); ctl2.dir = 5
+	wait_until(func(): return p1.state in [Fighter.State.AIR_HIT, Fighter.State.KNOCKDOWN, Fighter.State.BLOCKSTUN], 40)
+	check("Overhead Smash beats crouch block", p1.health < hp and p1.state != Fighter.State.BLOCKSTUN, "hp %d -> %d %s" % [hp, p1.health, state_name(p1)])
+	wait_until(func(): return p1.state == Fighter.State.KNOCKDOWN, 60)
+	check("Overhead Smash knocks down", p1.state == Fighter.State.KNOCKDOWN, state_name(p1))
+	p1.controller = ctl
+	reset(D.STAND)

@@ -3,20 +3,23 @@
 [ext_resource type="Texture2D" path="res://assets/characters/base/T_Superhero_Male_Light.png" id="1_8alh3"]
 [ext_resource type="Script" path="res://scripts/character_data.gd" id="1_char"]
 [ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_qdmbc"]
-[ext_resource type="Resource" path="res://data/moves/jab.tres" id="2_3gnou"]
 [ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_SimpleParted.gltf" id="2_iif4c"]
-[ext_resource type="Resource" path="res://data/moves/straight.tres" id="3_nr18t"]
 [ext_resource type="PackedScene" path="res://assets/characters/base/Superhero_Male_FullBody.gltf" id="3_osouf"]
-[ext_resource type="Resource" path="res://data/moves/mid_kick.tres" id="4_8alh3"]
-[ext_resource type="Resource" path="res://data/moves/roundhouse.tres" id="5_iif4c"]
-[ext_resource type="Resource" path="res://data/moves/crouch_jab.tres" id="6_osouf"]
-[ext_resource type="Resource" path="res://data/moves/sweep.tres" id="7_euedg"]
-[ext_resource type="Resource" path="res://data/moves/uppercut.tres" id="8_pe4wy"]
-[ext_resource type="Resource" path="res://data/moves/low_kick.tres" id="10_ro7ub"]
-[ext_resource type="Resource" path="res://data/moves/jump_jab.tres" id="13_udcyu"]
-[ext_resource type="Resource" path="res://data/moves/jump_hammer.tres" id="14_5a4ip"]
-[ext_resource type="Resource" path="res://data/moves/jump_kick.tres" id="15_e40xy"]
-[ext_resource type="Resource" path="res://data/moves/flying_kick.tres" id="16_bthns"]
+[ext_resource type="Resource" path="res://data/moves/kenji/jab.tres" id="5_5a4ip"]
+[ext_resource type="Resource" path="res://data/moves/kenji/straight.tres" id="6_e40xy"]
+[ext_resource type="Resource" path="res://data/moves/kenji/mid_kick.tres" id="7_bthns"]
+[ext_resource type="Resource" path="res://data/moves/kenji/roundhouse.tres" id="8_ynpm3"]
+[ext_resource type="Resource" path="res://data/moves/kenji/crouch_jab.tres" id="9_yj4mt"]
+[ext_resource type="Resource" path="res://data/moves/kenji/low_kick.tres" id="10_65oi5"]
+[ext_resource type="Resource" path="res://data/moves/kenji/uppercut.tres" id="11_jc7cg"]
+[ext_resource type="Resource" path="res://data/moves/kenji/sweep.tres" id="12_hp42r"]
+[ext_resource type="Resource" path="res://data/moves/kenji/jump_jab.tres" id="13_26eyd"]
+[ext_resource type="Resource" path="res://data/moves/kenji/jump_hammer.tres" id="14_xn3v5"]
+[ext_resource type="Resource" path="res://data/moves/kenji/jump_kick.tres" id="15_ffpqg"]
+[ext_resource type="Resource" path="res://data/moves/kenji/flying_kick.tres" id="16_h8qr8"]
+[ext_resource type="Resource" path="res://data/moves/kenji/advancing_straight.tres" id="17_p7x8d"]
+[ext_resource type="Resource" path="res://data/moves/kenji/snap_kick.tres" id="18_eengp"]
+[ext_resource type="Texture2D" path="res://assets/ui/portraits/kenji.png" id="19_e40xy"]
 
 [resource]
 script = ExtResource("1_char")
@@ -24,9 +27,12 @@ id = &"kenji"
 display_name = "Kenji"
 archetype = "Balanced"
 description = "An all-rounder with solid pokes and reliable combos. Medium speed, medium damage."
+portrait = ExtResource("19_e40xy")
 model_scene = ExtResource("3_osouf")
 hair_scenes = Array[PackedScene]([ExtResource("2_iif4c")])
 body_albedo = ExtResource("1_8alh3")
 hair_color = Color(0.09, 0.07, 0.06, 1)
 placeholder_color = Color(0.2, 0.45, 0.9, 1)
-moves = Array[ExtResource("1_qdmbc")]([ExtResource("2_3gnou"), ExtResource("3_nr18t"), ExtResource("4_8alh3"), ExtResource("5_iif4c"), ExtResource("6_osouf"), ExtResource("10_ro7ub"), ExtResource("8_pe4wy"), ExtResource("7_euedg"), ExtResource("13_udcyu"), ExtResource("14_5a4ip"), ExtResource("15_e40xy"), ExtResource("16_bthns")])
+power_rating = 0.55
+speed_rating = 0.55
+moves = Array[ExtResource("1_qdmbc")]([ExtResource("5_5a4ip"), ExtResource("6_e40xy"), ExtResource("7_bthns"), ExtResource("8_ynpm3"), ExtResource("9_yj4mt"), ExtResource("10_65oi5"), ExtResource("11_jc7cg"), ExtResource("12_hp42r"), ExtResource("13_26eyd"), ExtResource("14_xn3v5"), ExtResource("15_ffpqg"), ExtResource("16_h8qr8"), ExtResource("17_p7x8d"), ExtResource("18_eengp")])

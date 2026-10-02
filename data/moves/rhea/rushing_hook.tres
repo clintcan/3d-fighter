@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_43vkr"]
+
+[resource]
+script = ExtResource("1_43vkr")
+name = "Rushing Hook"
+input = "6HP"
+animation = &"fight/rushing_hook"
+animation_impact = 0.28
+startup = 10
+recovery = 20
+damage = 70
+hitstun = 20
+blockstun = 14
+hitstop = 8
+knockback = Vector2(2.5, 0)
+lunge = 4.0
+hitbox_radius = 0.22
+hitbox_offset = Vector3(-0.15, 0.72, -0.95)
+camera_intensity = 0.15
