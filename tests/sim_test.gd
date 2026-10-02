@@ -296,6 +296,7 @@ func _initialize() -> void:
 	ai_tests()
 	round_tests()
 	character_tests()
+	fx_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -446,3 +447,11 @@ func character_tests() -> void:
 	check("Overhead Smash knocks down", p1.state == Fighter.State.KNOCKDOWN, state_name(p1))
 	p1.controller = ctl
 	reset(D.STAND)
+
+func fx_tests() -> void:
+	reset(DummyController.Mode.STAND)
+	approach(1.0)
+	var before: int = m.fx.spawned
+	press(InputBuffer.LP); step(6)
+	check("hits spawn effects", m.fx.spawned > before, "%d -> %d" % [before, m.fx.spawned])
+	check("audio buses exist", AudioServer.get_bus_index("Music") > 0 and AudioServer.get_bus_index("SFX") > 0 and AudioServer.get_bus_index("Voice") > 0)

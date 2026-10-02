@@ -9,6 +9,10 @@ signal combo_changed(hits: int)
 signal knocked_out(fighter: Fighter)
 ## Emitted by the defender who broke a throw.
 signal throw_teched(fighter: Fighter)
+## Cosmetic hooks for sound/effects (FightFx). Emitted from the tick; never read back.
+signal attack_started(move: MoveData)
+signal landed_hard(fighter: Fighter)
+signal throw_impact(defender: Fighter)
 
 enum State {
 	IDLE, WALK_FWD, WALK_BACK, CROUCH,
@@ -339,6 +343,7 @@ func _try_attack(cancel_only: bool) -> bool:
 		_set_state(State.ATTACK, move.input.begins_with("2"))
 		if move.lunge > 0.0 and not airborne:
 			velocity = forward * move.lunge
+		attack_started.emit(move)
 		return true
 	return false
 
@@ -400,6 +405,9 @@ func _on_landed() -> void:
 			_set_state(State.LANDING)
 		State.AIR_HIT:
 			_set_state(State.KNOCKDOWN)
+			landed_hard.emit(self)
+		State.KO:
+			landed_hard.emit(self)
 
 
 func _return_to_neutral() -> void:
@@ -575,6 +583,7 @@ func _tick_throw() -> void:
 func _release_from_throw(attacker: Fighter) -> void:
 	var push_dir := attacker.forward
 	_take_damage(attacker.data.throw_damage)
+	throw_impact.emit(self)
 	_set_combo(1)
 	_flash_color = Color.WHITE
 	hitstop = 8

@@ -11,7 +11,6 @@ var roster: Array[CharacterData] = []
 var player_character: CharacterData
 var cpu_character: CharacterData
 var stage_path: String = DEFAULT_STAGE
-var ai_difficulty: AIController.Difficulty = AIController.Difficulty.NORMAL
 ## Seeds the CPU's decisions; the same seed and inputs replay the same match.
 var match_seed := 1
 

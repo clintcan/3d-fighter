@@ -24,6 +24,8 @@ var _focused: CharacterData
 
 
 func _ready() -> void:
+	Audio.music(&"menu")
+	Audio.voice("choose_your_character")
 	_build_preview_stage()
 	for character in GameState.roster:
 		roster_box.add_child(_make_portrait_button(character))
@@ -45,6 +47,7 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
+		Audio.sfx(&"ui_back", -4.0)
 		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
 
 

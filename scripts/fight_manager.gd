@@ -44,6 +44,7 @@ var round_number := 1
 var round_wins: Array[int] = [0, 0]
 var timer_ticks := 0
 var round_winner: Fighter
+var fx: FightFx
 ## Fighters knocked out this tick (both, for a double K.O.); resolved after the tick.
 var _knocked_out: Array[Fighter] = []
 
@@ -56,7 +57,7 @@ func _ready() -> void:
 	stage = (load(GameState.stage_path) as PackedScene).instantiate() as Stage
 	add_child(stage)
 
-	ai = AIController.new(GameState.ai_difficulty, GameState.match_seed)
+	ai = AIController.new(Settings.ai_difficulty, GameState.match_seed)
 	dummy = DummyController.new()
 	var p1 := _spawn_fighter(GameState.player_character, PlayerController.new("p1_"))
 	var p2 := _spawn_fighter(GameState.cpu_character, ai)
@@ -73,6 +74,12 @@ func _ready() -> void:
 	hud.character_select_pressed.connect(_go_to.bind(CHARACTER_SELECT_SCENE))
 	hud.main_menu_pressed.connect(_go_to.bind(MAIN_MENU_SCENE))
 	camera.setup(self)
+	camera.mode = Settings.camera_mode
+	fx = FightFx.new()
+	fx.name = "FightFx"
+	add_child(fx)
+	fx.setup(self)
+	Audio.music(&"fight")
 	start_match()
 	_update_debug_text()
 
@@ -107,6 +114,7 @@ func _start_round() -> void:
 		fighter.input_locked = true
 	var final := round_wins[0] == GameState.ROUNDS_TO_WIN - 1 and round_wins[1] == GameState.ROUNDS_TO_WIN - 1
 	hud.announce("FINAL ROUND" if final else "ROUND %d" % round_number)
+	Audio.voice("final_round" if final else "round_%d" % clampi(round_number, 1, 5))
 
 
 ## Skips the intro (tests, debug).
@@ -125,6 +133,8 @@ func _tick_round() -> void:
 			if phase_ticks >= INTRO_TICKS:
 				start_fight_immediately()
 				hud.announce("FIGHT!", "", true)
+				Audio.voice("fight")
+				Audio.sfx(&"bell", -6.0)
 		Phase.FIGHT:
 			if not _knocked_out.is_empty():
 				_end_round_by_ko()
@@ -170,6 +180,13 @@ func _finish_round(winner: Fighter, reason: String) -> void:
 	else:
 		sub = "DRAW"
 	hud.announce(reason, sub, true)
+	Audio.sfx(&"bell", -3.0)
+	if reason == "TIME":
+		Audio.voice("time")
+	elif sub == "PERFECT":
+		Audio.voice("flawless_victory")
+	elif sub == "DRAW":
+		Audio.voice("its_a_tie")
 	round_ended.emit(winner, reason)
 
 
@@ -180,10 +197,13 @@ func _after_round() -> void:
 		phase = Phase.MATCH_OVER
 		phase_ticks = 0
 		var text := "DRAW GAME"
+		var line := "its_a_tie"
 		if round_wins[0] != round_wins[1]:
 			var winner := fighters[0] if round_wins[0] > round_wins[1] else fighters[1]
 			winner.victory = true
 			text = "%s WINS" % winner.data.display_name.to_upper()
+			line = "you_win" if winner == fighters[0] else "you_lose"
+		Audio.voice(line)
 		hud.announce(text, "", true)
 		hud.show_result()
 	else:
@@ -335,9 +355,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				_cycle_cpu_mode()
 			KEY_F4:
 				ai.set_difficulty(((ai.difficulty + 1) % AIController.Difficulty.size()) as AIController.Difficulty)
-				GameState.ai_difficulty = ai.difficulty
+				Settings.ai_difficulty = ai.difficulty
+				Settings.save_settings()
 			KEY_F3:
 				camera.cycle_mode()
+				Settings.camera_mode = camera.mode
+				Settings.save_settings()
 			KEY_F2:
 				debug_draw = not debug_draw
 				for fighter in fighters:

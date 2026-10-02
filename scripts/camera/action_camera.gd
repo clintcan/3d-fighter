@@ -54,6 +54,10 @@ const MODE_SCALES := [0.0, 0.5, 1.0]
 @export var trauma_decay := 1.6
 @export var shake_frequency := 25.0
 
+## Momentary FOV narrowing on heavy hits (degrees at full punch), decaying quickly.
+@export var fov_punch_degrees := 3.0
+@export var fov_punch_decay := 6.0
+
 @export_group("KO slow motion")
 @export var ko_time_scale := 0.3
 @export var ko_slowmo_seconds := 0.6
@@ -73,6 +77,8 @@ var _base_position := Vector3.ZERO
 var _look_target := Vector3.ZERO
 var _noise := FastNoiseLite.new()
 var _noise_time := 0.0
+var _fov_punch := 0.0
+var _base_fov := 45.0
 
 
 func setup(fight_manager: Node) -> void:
@@ -92,11 +98,13 @@ func snap() -> void:
 	intensity = 0.0
 	_strength = 0.0
 	_trauma = 0.0
+	_fov_punch = 0.0
 	focus = null
 	Engine.time_scale = 1.0
 	var targets := _compute_targets(0.0)
 	_base_position = targets.position
 	_look_target = targets.look
+	_base_fov = targets.fov
 	fov = targets.fov
 	_apply_transform(0.0, 0.0)
 
@@ -120,7 +128,9 @@ func _process(scaled_delta: float) -> void:
 	var t := 1.0 - exp(-follow_speed * delta)
 	_base_position = _base_position.lerp(targets.position, t)
 	_look_target = _look_target.lerp(targets.look, t)
-	fov = lerpf(fov, targets.fov, t)
+	_fov_punch = move_toward(_fov_punch, 0.0, fov_punch_decay * delta)
+	_base_fov = lerpf(_base_fov, targets.fov, t)
+	fov = _base_fov - fov_punch_degrees * _fov_punch
 
 	_trauma = move_toward(_trauma, 0.0, trauma_decay * delta)
 	_noise_time += delta * shake_frequency
@@ -144,6 +154,8 @@ func _on_hit_landed(_attacker: Fighter, defender: Fighter, move: MoveData, resul
 		gain += launch_gain
 	intensity = minf(intensity + gain, 1.0)
 	_add_trauma(clampf((move.hitstop - 4) * 0.06, 0.0, 0.5))
+	if move.hitstop >= 8 or result == Fighter.HitResult.COUNTER:
+		_fov_punch = MODE_SCALES[mode]
 
 
 func _on_throw_landed(_attacker: Fighter, defender: Fighter) -> void:
@@ -156,6 +168,7 @@ func _on_knocked_out(loser: Fighter) -> void:
 	focus = loser
 	intensity = 1.0
 	_add_trauma(0.7)
+	_fov_punch = MODE_SCALES[mode]
 	if mode != Mode.OFF:
 		Engine.time_scale = ko_time_scale
 		get_tree().create_timer(ko_slowmo_seconds, true, false, true).timeout.connect(

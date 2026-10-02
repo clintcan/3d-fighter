@@ -20,6 +20,8 @@ var player: AnimationPlayer
 var _body: Node3D
 var _clip: StringName
 var _contacts := {} # bone index -> rest height above the sole
+var _flash_material: StandardMaterial3D
+var _flash_tween: Tween
 
 
 func build(data: CharacterData) -> void:
@@ -82,6 +84,22 @@ func _keep_feet_above_floor() -> void:
 	for bone: int in _contacts:
 		lowest = minf(lowest, skeleton.get_bone_global_pose(bone).origin.y - _contacts[bone])
 	_body.position.y = maxf(-lowest, 0.0)
+
+
+## Brief additive color flash over the whole character (hit/block feedback).
+func flash(color: Color, duration: float) -> void:
+	if _flash_material == null:
+		_flash_material = StandardMaterial3D.new()
+		_flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_flash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_flash_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
+			mesh.material_overlay = _flash_material
+	if _flash_tween:
+		_flash_tween.kill()
+	_flash_material.albedo_color = Color(color, 0.4)
+	_flash_tween = create_tween()
+	_flash_tween.tween_property(_flash_material, "albedo_color:a", 0.0, duration)
 
 
 func _attach_skinned(scene: PackedScene) -> void:
