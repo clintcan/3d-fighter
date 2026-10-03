@@ -318,6 +318,7 @@ func _initialize() -> void:
 	await loading_tests()
 	await valka_tests()
 	await temple_tests()
+	await scores_credits_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -1093,3 +1094,37 @@ func temple_tests() -> void:
 	check("Temple: loads with the standard bounds and combat works", m.stage.name == "Temple" and m.stage.bounds_half_extent == 3.6
 		and p2.health == hp - 30, "hp %d -> %d" % [hp, p2.health])
 	gs.stage_path = gs.DEFAULT_STAGE
+
+
+func scores_credits_tests() -> void:
+	var gs = root.get_node("GameState")
+	var real_path: String = ArcadeRun.save_path
+	ArcadeRun.save_path = "user://arcade_test.cfg" # never touch the player's real records
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(ArcadeRun.save_path))
+	var run := ArcadeRun.create(gs.roster[0], gs.roster, 1, 4, gs.arcade_arenas(), gs.DOJO_STAGE)
+	run.score = 123456; run.ticks = 60 * 125; run.continues = 2; run.perfects = 3; run.cleared = true
+	check("Best scores: a record is saved", run.record_best())
+	var best := ArcadeRun.best_run(gs.roster[0])
+	check("Best scores: saved with its details", best.score == 123456 and best.ticks == 7500 and best.continues == 2
+		and best.perfects == 3 and best.cleared and best.stages == gs.roster.size(), str(best))
+	run.score = 1000
+	check("Best scores: a lower score doesn't replace it", not run.record_best() and ArcadeRun.best_score(gs.roster[0]) == 123456)
+	var old := ConfigFile.new() # a record saved before details were kept
+	old.load(ArcadeRun.save_path)
+	old.set_value("best", String(gs.roster[1].id), 77777)
+	old.save(ArcadeRun.save_path)
+	var legacy := ArcadeRun.best_run(gs.roster[1])
+	check("Best scores: old score-only records still load", legacy.score == 77777 and not legacy.has("ticks"), str(legacy))
+	change_scene_to_file("res://scenes/best_scores.tscn")
+	await process_frame; await process_frame
+	check("Best scores screen: a row per fighter", current_scene._rows.size() == gs.roster.size())
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(ArcadeRun.save_path))
+	ArcadeRun.save_path = real_path
+
+	change_scene_to_file("res://scenes/credits.tscn")
+	await process_frame; await process_frame
+	var roll: CreditsRoll = current_scene._roll
+	var y0 := roll.position.y
+	for i in 30: await process_frame
+	check("Credits screen: the roll scrolls and credits the creator", roll.rolling and roll.position.y < y0
+		and CreditsRoll.CREDITS.any(func(e): return e[1] == "Clint Christopher Canada"))

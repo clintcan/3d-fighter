@@ -6,30 +6,10 @@ extends Control
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const GOLD := Color(1.0, 0.82, 0.3)
 const AUTO_CREDITS_SECONDS := 8.0
-const CREDITS_SPEED := 90.0 # pixels per second
-const CREDITS := [
-	["3D FIGHTER", ""],
-	["", ""],
-	["Made with", "Godot Engine (MIT License)"],
-	["", ""],
-	["Characters & animations", "Quaternius: Universal Base Characters,\nUniversal Animation Library 1 & 2 (CC0)"],
-	["Stage lighting & textures", "Poly Haven: \"Basement Boxing Ring\" HDRI by Sergej\nMajboroda; Terlenka, Fabric Leather 02,\nConcrete Floor Worn 001 (CC0)"],
-	["Dojo textures", "Poly Haven: Tatami Mat, Hinoki Planks, Japanese Cedar Planks\n(Charlotte Baglioni, Rico Cilliers), Dark Wood (Dario Barresi,\nDimitrios Savva, Rico Cilliers), White Plaster 02 (Rob Tuytel) (CC0)"],
-	["Music", "\"Heavy Battle 2\" and \"Space Battle\" by MintoDog, \"Determination\"\nby HydroGene, \"Midnight Drive\" by congusbongus,\n\"Boss_Koto\" by G_P (OpenGameArt, CC0)"],
-	["Fighter voices", "\"Male Grunt/Yelling sounds\" by HaelDB, \"Female Hurt\nGrunts & Groans\" by AuraVoice (OpenGameArt, CC0)"],
-	["Sound effects & announcer", "Kenney: Impact Sounds, Interface Sounds,\nVoiceover Pack: Fighter (CC0)"],
-	["Rooftop skyline", "Poly Haven: \"Shanghai Bund\" HDRI by Greg Zaal (CC0)"],
-	["Temple", "Poly Haven: \"Belfast Sunset\" sky (Greg Zaal, Dimitrios Savva,\nJarod Guest), Monastery Stone Floor (Amal Kumar), Japanese Stone\nWall, Gravel Floor 03, Grey Roof Tiles (CC0)"],
-	["Made for this project", "Ring, arena, dojo, rooftop, temple and crowds, fight and special-move\nanimations, portraits, swing, energy and super sounds"],
-	["", ""],
-	["THANKS FOR PLAYING!", ""],
-]
 
 var _run: ArcadeRun
 var _results: Control
-var _credits: VBoxContainer
-var _rolling := false
-var _done := false
+var _credits: CreditsRoll
 var _time := 0.0
 var _record_label: Label
 
@@ -99,13 +79,8 @@ func _process(delta: float) -> void:
 	_time += delta
 	if _record_label:
 		_record_label.modulate.a = 0.6 + 0.4 * sin(_time * 6.0)
-	if _run.cleared and not _rolling and not _done and _time >= AUTO_CREDITS_SECONDS:
+	if _run.cleared and _credits == null and _time >= AUTO_CREDITS_SECONDS:
 		_start_credits()
-	if _rolling:
-		_credits.position.y -= CREDITS_SPEED * delta
-		if _credits.position.y + _credits.size.y < get_viewport_rect().size.y * 0.5:
-			_rolling = false # the last line (THANKS FOR PLAYING) rests mid-screen
-			_done = true
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -120,22 +95,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _start_credits() -> void:
 	_results.visible = false
-	_rolling = true
-	_credits = VBoxContainer.new()
-	_credits.add_theme_constant_override("separation", 34)
-	_credits.custom_minimum_size.x = get_viewport_rect().size.x
-	for entry in CREDITS:
-		if entry[0] == "" and entry[1] == "":
-			var gap := Control.new()
-			gap.custom_minimum_size.y = 60
-			_credits.add_child(gap)
-			continue
-		var big: bool = entry[1] == ""
-		_credits.add_child(_label(entry[0], 72 if big else 30, GOLD if big else Color(0.65, 0.7, 0.8), true))
-		if not big:
-			_credits.add_child(_label(entry[1], 34, Color.WHITE, true))
+	_credits = CreditsRoll.new()
 	add_child(_credits)
-	_credits.position = Vector2(0, get_viewport_rect().size.y)
+	_credits.start()
 
 
 func _finish() -> void:

@@ -99,4 +99,8 @@ Made with [Godot Engine](https://godotengine.org).
 
 ## License
 
-The code is © 2026 Clint Christopher Canada, released under the [MIT License](LICENSE). Third-party assets keep their own licenses (all CC0; see [assets/CREDITS.md](assets/CREDITS.md)).
+© 2026 Clint Christopher Canada.
+
+- **Code:** [MIT License](LICENSE).
+- **Original assets** (stages, generated animations, portraits, key art, synthesized sounds): [CC BY 4.0](LICENSE-ASSETS.md).
+- **Third-party assets:** keep their own licenses (all CC0); see [assets/CREDITS.md](assets/CREDITS.md).

@@ -101,5 +101,9 @@ All third-party assets are CC0 (public domain), credited with thanks:
 - Sound effects & announcer: Kenney - Impact Sounds, Interface Sounds,
   Voiceover Pack: Fighter - https://kenney.nl
 
-Ring, arena, crowd, additional fight animations, portraits and swing sounds
-were created for this project.
+Stages, crowds, additional fight and special-move animations, portraits,
+key art and synthesized sounds were created for this project.
+
+LICENSE: code (c) 2026 Clint Christopher Canada, MIT License. Original
+assets (c) 2026 Clint Christopher Canada, CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/). Third-party assets: CC0.

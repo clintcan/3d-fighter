@@ -2,6 +2,8 @@ extends Control
 
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const OPTIONS_SCENE := "res://scenes/options.tscn"
+const BEST_SCORES_SCENE := "res://scenes/best_scores.tscn"
+const CREDITS_SCENE := "res://scenes/credits.tscn"
 
 @onready var start_button: Button = %StartButton
 @onready var arcade_button: Button = %ArcadeButton
@@ -9,6 +11,8 @@ const OPTIONS_SCENE := "res://scenes/options.tscn"
 @onready var options_button: Button = %OptionsButton
 @onready var versus_button: Button = %VersusButton
 @onready var training_button: Button = %TrainingButton
+@onready var best_scores_button: Button = %BestScoresButton
+@onready var credits_button: Button = %CreditsButton
 
 
 const WALLPAPER := "res://assets/ui/wallpaper.png"
@@ -26,6 +30,8 @@ func _ready() -> void:
 	training_button.pressed.connect(_start.bind(GameState.Mode.TRAINING))
 	quit_button.pressed.connect(_on_quit_pressed)
 	options_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(OPTIONS_SCENE))
+	best_scores_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(BEST_SCORES_SCENE))
+	credits_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(CREDITS_SCENE))
 	start_button.grab_focus()
 	Audio.music(&"menu")
 	# `3DFighter.exe -- --smoke-test` jumps straight into a fight (packaging checks).

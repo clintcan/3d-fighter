@@ -11,7 +11,10 @@ extends RefCounted
 ## bonus (up to 5,000 at full health) and 10,000 for a perfect, plus 10,000 × stage
 ## number per stage cleared. A continue replays the stage from its starting score.
 
-const SAVE_PATH := "user://arcade.cfg"
+## Best scores per character: [best] <id> = score (the original format, still read),
+## [details] <id> = {ticks, continues, perfects, stages, cleared} for the best run.
+## A static var so tests can point it at a scratch file.
+static var save_path := "user://arcade.cfg"
 const POINTS_PER_DAMAGE := 10
 const TIME_BONUS_PER_SECOND := 100
 const LIFE_BONUS := 5000
@@ -105,23 +108,42 @@ func restart_stage(use_continue: bool) -> void:
 
 
 func clear_time_text() -> String:
-	var seconds := ticks / 60
-	return "%d:%02d" % [seconds / 60, seconds % 60]
+	return time_text(ticks)
 
 
 static func best_score(character: CharacterData) -> int:
+	return int(best_run(character).get("score", 0))
+
+
+## The character's best run: {score, ticks, continues, perfects, stages, cleared}, or {}
+## if none. Records saved before details were kept have only the score.
+static func best_run(character: CharacterData) -> Dictionary:
 	var config := ConfigFile.new()
-	if config.load(SAVE_PATH) != OK:
-		return 0
-	return int(config.get_value("best", String(character.id), 0))
+	if config.load(save_path) != OK:
+		return {}
+	var id := String(character.id)
+	if not config.has_section_key("best", id):
+		return {}
+	var run: Dictionary = config.get_value("details", id, {}).duplicate()
+	run.score = int(config.get_value("best", id, 0))
+	return run
 
 
-## Saves the score if it beats the best for this character. Returns true on a record.
+## Saves the run if its score beats the best for this character. Returns true on a record.
 func record_best() -> bool:
 	if score <= best_score(player):
 		return false
 	var config := ConfigFile.new()
-	config.load(SAVE_PATH)
+	config.load(save_path)
 	config.set_value("best", String(player.id), score)
-	config.save(SAVE_PATH)
+	config.set_value("details", String(player.id), {
+		ticks = ticks, continues = continues, perfects = perfects,
+		stages = stages.size() if cleared else stage, cleared = cleared,
+	})
+	config.save(save_path)
 	return true
+
+
+static func time_text(fight_ticks: int) -> String:
+	var seconds := fight_ticks / 60
+	return "%d:%02d" % [seconds / 60, seconds % 60]
