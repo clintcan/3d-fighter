@@ -5,6 +5,7 @@ const CHARACTER_DIR := "res://data/characters/"
 const DEFAULT_STAGE := "res://scenes/stages/ring.tscn"
 const DOJO_STAGE := "res://scenes/stages/dojo.tscn"
 const ROOFTOP_STAGE := "res://scenes/stages/rooftop.tscn"
+const TEMPLE_STAGE := "res://scenes/stages/temple.tscn"
 ## Selectable stages: scene, display name, select-screen thumbnail (rendered by
 ## tools/render_stage_thumbs.gd) and a one-line description.
 const STAGES := [
@@ -14,6 +15,8 @@ const STAGES := [
 		blurb = "Tatami, paper screens and a hall full of students."},
 	{path = ROOFTOP_STAGE, name = "Rooftop", thumb = "res://assets/ui/stages/rooftop.png",
 		blurb = "A helipad high above the city lights."},
+	{path = TEMPLE_STAGE, name = "Temple", thumb = "res://assets/ui/stages/temple.png",
+		blurb = "A mountain courtyard at sunset, under falling blossom."},
 ]
 
 const ROUNDS_TO_WIN := 2

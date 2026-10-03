@@ -26,6 +26,7 @@ const MUSIC := {
 	&"fight": "fight_heavy_battle_2",
 	&"dojo": "fight_dojo_determination",
 	&"rooftop": "fight_rooftop_midnight_drive",
+	&"temple": "fight_temple_boss_koto",
 }
 const SFX_VOICES := 16
 const MUSIC_FADE := 1.2

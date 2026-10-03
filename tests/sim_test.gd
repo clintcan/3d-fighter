@@ -317,6 +317,7 @@ func _initialize() -> void:
 	await showcase_tests()
 	await loading_tests()
 	await valka_tests()
+	await temple_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -806,8 +807,9 @@ func stage_tests() -> void:
 
 	# Arcade stages: alternate arenas, boss in the dojo.
 	var run := ArcadeRun.create(gs.roster[0], gs.roster, 1, 9, gs.arcade_arenas(), gs.DOJO_STAGE)
-	check("Arcade: ring, rooftop, then the boss in the dojo", run.stages[0].stage_path == gs.DEFAULT_STAGE
-		and run.stages[1].stage_path == gs.ROOFTOP_STAGE and run.stages[-1].stage_path == gs.DOJO_STAGE)
+	check("Arcade: ring, rooftop, temple, then the boss in the dojo", run.stages[0].stage_path == gs.DEFAULT_STAGE
+		and run.stages[1].stage_path == gs.ROOFTOP_STAGE and run.stages[2].stage_path == gs.TEMPLE_STAGE
+		and run.stages[-1].stage_path == gs.DOJO_STAGE)
 	# The rooftop: loads, fights, and its sky shader compiles.
 	gs.stage_path = gs.ROOFTOP_STAGE
 	change_scene_to_file("res://scenes/fight.tscn")
@@ -829,7 +831,7 @@ func polish_tests() -> void:
 	gs.mode = gs.Mode.VS_CPU
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 	# Each stage brings its own music.
-	for entry in [[gs.DOJO_STAGE, &"dojo"], [gs.ROOFTOP_STAGE, &"rooftop"], [gs.DEFAULT_STAGE, &"fight"]]:
+	for entry in [[gs.DOJO_STAGE, &"dojo"], [gs.ROOFTOP_STAGE, &"rooftop"], [gs.TEMPLE_STAGE, &"temple"], [gs.DEFAULT_STAGE, &"fight"]]:
 		gs.stage_path = entry[0]
 		change_scene_to_file("res://scenes/fight.tscn")
 		await process_frame; await process_frame
@@ -1072,3 +1074,22 @@ func valka_tests() -> void:
 	step(m.SUPER_FREEZE_TICKS + 60)
 	check("Thunder Valkyrie: super grab through a block", p2.health == hp - 330 and p1.meter == 0, "hp %d -> %d" % [hp, p2.health])
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+
+
+func temple_tests() -> void:
+	var gs = root.get_node("GameState")
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+	gs.stage_path = gs.TEMPLE_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	reset(DummyController.Mode.STAND); approach(1.1)
+	var hp := p2.health
+	press(InputBuffer.LP); step(6)
+	check("Temple: loads with the standard bounds and combat works", m.stage.name == "Temple" and m.stage.bounds_half_extent == 3.6
+		and p2.health == hp - 30, "hp %d -> %d" % [hp, p2.health])
+	gs.stage_path = gs.DEFAULT_STAGE

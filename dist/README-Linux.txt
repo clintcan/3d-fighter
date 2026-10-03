@@ -1,4 +1,4 @@
-3D FIGHTER  -  v0.2.0 (prototype)  -  macOS
+3D FIGHTER  -  v0.2.0 (prototype)  -  Linux
 ===========================================
 
 A one-on-one 3D fighting game inspired by Street Fighter and Tekken, with a
@@ -6,13 +6,18 @@ dynamic action camera that moves in on the fighter taking the hits.
 
 HOW TO PLAY
 -----------
-1. Unzip, and (optionally) drag 3DFighter.app into your Applications folder.
-2. Double-click to play. The app is signed and notarized by Apple, so it opens
-   like any other app (macOS may ask once to confirm it was downloaded from
-   the internet; click "Open").
+Extract anywhere and run the game:
 
-Requirements: macOS 11 Big Sur or newer, Apple Silicon (M1 or later) or an
-Intel Mac with Metal-capable graphics. Runs natively on both.
+    tar -xzf 3DFighter-*-linux.tar.gz
+    cd 3DFighter
+    ./3DFighter.x86_64
+
+No installation needed. If your file manager extracted it and the game
+won't start, make it executable first:  chmod +x 3DFighter.x86_64
+
+Requirements: 64-bit Linux (x86_64, glibc 2.31+ - e.g. Ubuntu 20.04+,
+Fedora 32+, SteamOS 3 / Steam Deck), a GPU with Vulkan support and
+up-to-date drivers (Mesa 22+ or the NVIDIA proprietary driver).
 
 CONTROLS            Keyboard          Gamepad
 --------            --------          -------
@@ -75,7 +80,6 @@ or + K (Rhea) for the character's super. Valka's super is a command grab. Sidest
 
 Options (main menu): music / effects / announcer volume, action camera
 (Off / Subtle / Full), CPU difficulty (Easy / Normal / Hard), fullscreen.
-On older Intel Macs, setting the Action Camera to "Subtle" can help performance.
 
 CREDITS
 -------

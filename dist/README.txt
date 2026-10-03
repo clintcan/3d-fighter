@@ -29,8 +29,8 @@ Gamepad 1 is Player 1 and Gamepad 2 is Player 2 (swap in Options).
 On the character select screen each player picks in turn with
 Light Punch (select) and Heavy Punch (back).
 
-STAGES: after picking fighters, choose the Boxing Ring, the Dojo, the Rooftop
-or Random.
+STAGES: after picking fighters, choose the Boxing Ring, the Dojo, the Rooftop,
+the Temple or Random.
 
 ARCADE - choose "Arcade" in the main menu
 Fight your way up a ladder of CPU opponents to the final boss: your own
@@ -86,9 +86,12 @@ All third-party assets are CC0 (public domain), credited with thanks:
   - https://polyhaven.com; Dojo: Tatami Mat, Hinoki Planks, Japanese Cedar
   Planks (Charlotte Baglioni, Rico Cilliers), Dark Wood (Dario Barresi,
   Dimitrios Savva, Rico Cilliers), White Plaster 02 (Rob Tuytel);
-  Rooftop skyline: "Shanghai Bund" HDRI by Greg Zaal
+  Rooftop skyline: "Shanghai Bund" HDRI by Greg Zaal; Temple: "Belfast Sunset"
+  sky (Greg Zaal, Dimitrios Savva, Jarod Guest), Monastery Stone Floor (Amal
+  Kumar), Japanese Stone Wall, Gravel Floor 03, Grey Roof Tiles
 - Music: "Heavy Battle 2" and "Space Battle" by MintoDog; "Determination" by
-  HydroGene (dojo); "Midnight Drive" by congusbongus (rooftop)
+  HydroGene (dojo); "Midnight Drive" by congusbongus (rooftop); "Boss_Koto"
+  by G_P (temple)
   - https://opengameart.org
 - Fighter voices: "Male Grunt/Yelling sounds" by HaelDB, "Female Hurt Grunts &
   Groans" by AuraVoice - https://opengameart.org
