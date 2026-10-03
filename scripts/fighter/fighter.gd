@@ -121,6 +121,8 @@ var last_hit_level: MoveData.HitLevel = MoveData.HitLevel.MID
 var model: FighterModel
 ## Alternate costume (mirror match P2).
 var alt := false
+## Training mode: health never drops below 1, so there are no K.O.s.
+var immortal := false
 
 var _flash_color := Color.WHITE
 var _material: StandardMaterial3D
@@ -501,7 +503,7 @@ func receive_hit(attacker: Fighter, move: MoveData) -> HitResult:
 
 
 func _take_damage(amount: int) -> void:
-	health = maxi(health - amount, 0)
+	health = maxi(health - amount, 1 if immortal else 0)
 	health_changed.emit(health, data.max_health)
 
 

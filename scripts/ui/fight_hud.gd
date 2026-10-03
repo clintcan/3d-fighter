@@ -68,9 +68,10 @@ func _ready() -> void:
 	%PauseMenuButton.pressed.connect(func() -> void: main_menu_pressed.emit())
 
 
-func setup(p1: Fighter, p2: Fighter, rounds_to_win: int, versus: bool = false) -> void:
-	p1_name.text = "%s (P1)" % p1.data.display_name if versus else p1.data.display_name
-	p2_name.text = "%s (%s)" % [p2.data.display_name, "P2" if versus else "CPU"]
+## `p2_tag` labels P2: "CPU", "P2" (versus, which also tags P1) or "Dummy".
+func setup(p1: Fighter, p2: Fighter, rounds_to_win: int, p2_tag: String = "CPU") -> void:
+	p1_name.text = "%s (P1)" % p1.data.display_name if p2_tag == "P2" else p1.data.display_name
+	p2_name.text = "%s (%s)" % [p2.data.display_name, p2_tag]
 	_bind_health(p1, p1_health, p1_trail)
 	_bind_health(p2, p2_health, p2_trail)
 	# A combo is shown on the attacker's side, so P2's hits taken appear under P1.
@@ -105,6 +106,11 @@ func announce(text: String, sub: String = "", pop: bool = false) -> void:
 		if text == "FIGHT!":
 			_announce_tween.tween_interval(0.5)
 			_announce_tween.tween_property(center_label, "modulate:a", 0.0, 0.25)
+
+
+func set_timer_text(text: String) -> void:
+	timer_label.text = text
+	timer_label.modulate = Color.WHITE
 
 
 func set_timer(seconds: int) -> void:

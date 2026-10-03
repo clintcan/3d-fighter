@@ -29,6 +29,17 @@ Gamepad 1 is Player 1 and Gamepad 2 is Player 2 (swap in Options).
 On the character select screen each player picks in turn with
 Light Punch (select) and Heavy Punch (back).
 
+TRAINING - choose "Training" in the main menu
+Pick your fighter, then the training dummy. Endless health, no timer.
+Tab (gamepad Back): training menu - dummy stance (stand / crouch / jump /
+  CPU / playback), guard (none / block all / after first hit / random),
+  health refill, frame data, input history, hitboxes.
+Backspace (gamepad L3): reset positions.
+F6: record the dummy - you control it for up to 10 seconds; F6 again to stop.
+F7: play the recording back on a loop (on / off).
+Frame data shows each attack's startup, active and recovery frames and
+the measured frame advantage on hit or block.
+
 Block: hold back (standing) or down-back (crouching).
 Dash: tap forward twice. Backdash: tap back twice.
 Throw: Light Punch + Light Kick together, up close.

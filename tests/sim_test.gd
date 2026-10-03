@@ -298,6 +298,7 @@ func _initialize() -> void:
 	character_tests()
 	fx_tests()
 	await versus_tests()
+	await training_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -502,4 +503,59 @@ func versus_tests() -> void:
 	change_scene_to_file("res://scenes/fight.tscn")
 	await process_frame; await process_frame
 	check("mirror match gives P2 the alternate look", current_scene.fighters[1].alt and not current_scene.fighters[0].alt)
+	gs.mode = gs.Mode.VS_CPU
+
+func training_tests() -> void:
+	var gs = root.get_node("GameState")
+	gs.mode = gs.Mode.TRAINING
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2] # Kenji vs Brutus
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl; ctl.dir = 5
+	var tm: TrainingMode = m.get_node("TrainingMode")
+	tm._player_controller = ctl
+	var dc := p2.controller as TrainingDummyController
+	check("Training: dummy controller, fight starts without intro", dc != null and m.phase == m.Phase.FIGHT and not p1.input_locked)
+
+	# Endless: the dummy can't be knocked out, and health refills after the combo.
+	step(2); approach(1.1)
+	p2.health = 5
+	press(InputBuffer.LP); step(8)
+	check("Training: dummy survives a lethal hit", p2.health == 1 and p2.state != Fighter.State.KO and m.phase == m.Phase.FIGHT, "hp %d, %s" % [p2.health, state_name(p2)])
+	check("Training: input history logs the jab", tm.history.any(func(e): return ((e[0] >> InputBuffer.BUTTON_SHIFT) & InputBuffer.LP) != 0))
+	wait_until(func() -> bool: return not tm.last_frame_data.is_empty(), 60)
+	check("Training: jab frame data measured (+5 on hit)", tm.last_frame_data.get("advantage") == "+5" and tm.last_frame_data.get("startup") == 5,
+		str(tm.last_frame_data))
+	step(TrainingMode.REFILL_DELAY_TICKS + 30)
+	check("Training: health refills", p2.health == p2.data.max_health, "hp %d" % p2.health)
+
+	# Guard "Block All" picks the right height.
+	dc.guard = TrainingDummyController.Guard.ALL
+	var hp := p2.health
+	press(InputBuffer.LK, 2); step(10)
+	check("Training: Block All crouch-blocks a low", p2.health == hp and p2.state == Fighter.State.BLOCKSTUN and p2.crouching, "hp %d, %s" % [p2.health, state_name(p2)])
+	step(40)
+	press(InputBuffer.LP); step(8)
+	check("Training: Block All stand-blocks a high", p2.health == hp and p2.state == Fighter.State.BLOCKSTUN and not p2.crouching, "hp %d, %s" % [p2.health, state_name(p2)])
+	dc.guard = TrainingDummyController.Guard.NONE
+	step(40)
+
+	# Record: P1's inputs drive the dummy (P1 stands still), then loop on playback.
+	tm.reset_positions(); step(2)
+	var p1x := p1.position.x
+	var p2x := p2.position.x
+	tm.start_recording()
+	hold(4, 30) # back, relative to the dummy's facing: away from P1
+	tm.stop_recording()
+	check("Training: recording moves the dummy, not P1", p2.position.x > p2x + 0.3 and absf(p1.position.x - p1x) < 0.01,
+		"dummy dx %.2f, P1 dx %.2f" % [p2.position.x - p2x, p1.position.x - p1x])
+	check("Training: recording saved and playing back", dc.recording.size() == 30 and dc.stance == TrainingDummyController.Stance.PLAYBACK and p1.controller == ctl,
+		"%d ticks, %s" % [dc.recording.size(), dc.stance_name()])
+	tm.reset_positions(); step(2)
+	p2x = p2.position.x
+	hold(5, 28)
+	check("Training: playback replays the recording", p2.position.x > p2x + 0.3, "dx %.2f" % (p2.position.x - p2x))
 	gs.mode = gs.Mode.VS_CPU

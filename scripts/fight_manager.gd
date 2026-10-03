@@ -9,6 +9,8 @@ extends Node3D
 signal hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult)
 signal throw_landed(attacker: Fighter, defender: Fighter)
 signal round_ended(winner: Fighter, reason: String)
+## Emitted at the end of every simulation tick (training tools measure frame data here).
+signal ticked
 
 enum Phase { INTRO, FIGHT, ROUND_OVER, MATCH_OVER }
 
@@ -67,7 +69,11 @@ func _ready() -> void:
 	ai = AIController.new(Settings.ai_difficulty, GameState.match_seed)
 	dummy = DummyController.new()
 	var p1 := _spawn_fighter(GameState.player_character, PlayerController.new("p1_"))
-	var p2_controller: FighterController = PlayerController.new("p2_") if is_versus() else ai
+	var p2_controller: FighterController = ai
+	if is_versus():
+		p2_controller = PlayerController.new("p2_")
+	elif is_training():
+		p2_controller = TrainingDummyController.new()
 	# Mirror match: P2 wears the alternate look so the two fighters can be told apart.
 	var mirror := GameState.p2_character == GameState.player_character
 	var p2 := _spawn_fighter(GameState.p2_character, p2_controller, mirror)
@@ -78,7 +84,7 @@ func _ready() -> void:
 		fighter.knocked_out.connect(_on_knocked_out)
 		fighter.throw_teched.connect(_on_throw_teched)
 
-	hud.setup(p1, p2, GameState.ROUNDS_TO_WIN, is_versus())
+	hud.setup(p1, p2, GameState.ROUNDS_TO_WIN, "P2" if is_versus() else "Dummy" if is_training() else "CPU")
 	hud.rematch_pressed.connect(start_match)
 	hud.restart_pressed.connect(start_match)
 	hud.character_select_pressed.connect(_go_to.bind(CHARACTER_SELECT_SCENE))
@@ -90,6 +96,11 @@ func _ready() -> void:
 	add_child(fx)
 	fx.setup(self)
 	Audio.music(&"fight")
+	if is_training():
+		var training := TrainingMode.new()
+		training.name = "TrainingMode"
+		add_child(training)
+		training.setup(self)
 	start_match()
 	_update_debug_text()
 	if "--smoke-test" in OS.get_cmdline_user_args():
@@ -99,6 +110,10 @@ func _ready() -> void:
 
 func is_versus() -> bool:
 	return GameState.mode == GameState.Mode.VERSUS
+
+
+func is_training() -> bool:
+	return GameState.mode == GameState.Mode.TRAINING
 
 
 func _spawn_fighter(character: CharacterData, controller: FighterController, alt_look: bool = false) -> Fighter:
@@ -121,6 +136,11 @@ func start_match() -> void:
 	hud.hide_result()
 	hud.end_cinematic()
 	_start_round()
+	if is_training():
+		for fighter in fighters:
+			fighter.immortal = true
+		start_fight_immediately()
+		hud.set_timer_text("∞")
 
 
 func _start_round() -> void:
@@ -131,6 +151,8 @@ func _start_round() -> void:
 	hud.set_timer(GameState.ROUND_TIME_SECONDS)
 	for fighter in fighters:
 		fighter.input_locked = true
+	if is_training():
+		return # no round call-outs; start_match skips straight to the fight
 	var final := round_wins[0] == GameState.ROUNDS_TO_WIN - 1 and round_wins[1] == GameState.ROUNDS_TO_WIN - 1
 	hud.announce("FINAL ROUND" if final else "ROUND %d" % round_number)
 	Audio.voice("final_round" if final else "round_%d" % clampi(round_number, 1, 5))
@@ -155,7 +177,9 @@ func _tick_round() -> void:
 				Audio.voice("fight")
 				Audio.sfx(&"bell", -6.0)
 		Phase.FIGHT:
-			if not _knocked_out.is_empty():
+			if is_training():
+				pass # endless: no timer, no K.O.
+			elif not _knocked_out.is_empty():
 				_end_round_by_ko()
 			else:
 				timer_ticks -= 1
@@ -282,6 +306,7 @@ func _physics_process(_delta: float) -> void:
 	_resolve_throws()
 	_resolve_hits()
 	_tick_round()
+	ticked.emit()
 
 
 ## Keeps the camera side-on to the fight axis, turning toward whichever perpendicular is
@@ -390,9 +415,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
-			KEY_F1 when not is_versus():
+			KEY_F1 when GameState.mode == GameState.Mode.VS_CPU:
 				_cycle_cpu_mode()
-			KEY_F4 when not is_versus():
+			KEY_F4 when GameState.mode == GameState.Mode.VS_CPU:
 				ai.set_difficulty(((ai.difficulty + 1) % AIController.Difficulty.size()) as AIController.Difficulty)
 				Settings.ai_difficulty = ai.difficulty
 				Settings.save_settings()
@@ -425,6 +450,9 @@ func _cycle_cpu_mode() -> void:
 
 
 func _update_debug_text() -> void:
+	if is_training():
+		hud.set_debug_text("") # training shows its own status line
+		return
 	if not OS.is_debug_build():
 		hud.set_debug_text("") # release builds: no debug overlay or debug keys
 		return

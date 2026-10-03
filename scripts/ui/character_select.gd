@@ -4,8 +4,10 @@ extends Control
 ## Vs CPU: pick with any device; the CPU opponent is random.
 ## Versus: P1 then P2 pick in turn, each with their own controls (up/down to move,
 ## Light Punch to confirm, Heavy Punch to go back), then the VS screen.
+## Training: pick your fighter, then the training dummy, then straight into the fight.
 
 const VS_SCENE := "res://scenes/vs_screen.tscn"
+const FIGHT_SCENE := "res://scenes/fight.tscn"
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const TURNTABLE_SPEED := 0.5 # rad/s
 const HEALTH_SCALE := 1200.0 # max_health shown as a full bar
@@ -19,6 +21,7 @@ const HEALTH_SCALE := 1200.0 # max_health shown as a full bar
 @onready var speed_bar: ProgressBar = %SpeedBar
 @onready var health_bar: ProgressBar = %HealthBar
 @onready var signature_label: Label = %SignatureLabel
+@onready var title_label: Label = $Margin/VBox/Title
 
 const PLAYER_COLORS := [Color(0.35, 0.6, 1.0), Color(1.0, 0.4, 0.35)]
 
@@ -31,6 +34,8 @@ var _picking := 0 # 0 = P1 choosing, 1 = P2 choosing
 var _cursor := 0
 var _p1_pick := -1
 var _styles: Array = [] # per button: [normal, focused]
+# Training: true once the player's fighter is chosen and the dummy is being picked
+var _picking_dummy := false
 
 
 func _ready() -> void:
@@ -67,7 +72,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _versus:
 		_versus_input(event)
 	elif event.is_action_pressed("ui_cancel"):
-		_back_to_menu()
+		if _picking_dummy:
+			Audio.sfx(&"ui_back", -4.0)
+			_picking_dummy = false
+			title_label.text = "SELECT YOUR FIGHTER"
+			get_viewport().set_input_as_handled()
+		else:
+			_back_to_menu()
 
 
 func _back_to_menu() -> void:
@@ -94,7 +105,13 @@ func _versus_input(event: InputEvent) -> void:
 		else:
 			_back_to_menu()
 	elif event.is_action_pressed("ui_cancel"):
-		_back_to_menu()
+		if _picking_dummy:
+			Audio.sfx(&"ui_back", -4.0)
+			_picking_dummy = false
+			title_label.text = "SELECT YOUR FIGHTER"
+			get_viewport().set_input_as_handled()
+		else:
+			_back_to_menu()
 
 
 func _move_cursor(step: int, count: int) -> void:
@@ -240,6 +257,15 @@ func _show_details(character: CharacterData) -> void:
 
 
 func _select(character: CharacterData) -> void:
+	if GameState.mode == GameState.Mode.TRAINING:
+		if not _picking_dummy:
+			GameState.player_character = character
+			_picking_dummy = true
+			title_label.text = "SELECT TRAINING DUMMY"
+			return
+		GameState.p2_character = character
+		get_tree().change_scene_to_file(FIGHT_SCENE)
+		return
 	GameState.player_character = character
 	GameState.p2_character = GameState.pick_random_cpu()
 	get_tree().change_scene_to_file(VS_SCENE)

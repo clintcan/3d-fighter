@@ -7,10 +7,11 @@ const DEFAULT_STAGE := "res://scenes/stages/ring.tscn"
 const ROUNDS_TO_WIN := 2
 const ROUND_TIME_SECONDS := 99
 
-enum Mode { VS_CPU, VERSUS }
+enum Mode { VS_CPU, VERSUS, TRAINING }
 
 var roster: Array[CharacterData] = []
-## VS_CPU: P2 is the AI. VERSUS: P2 is a second local player.
+## VS_CPU: P2 is the AI. VERSUS: P2 is a second local player. TRAINING: P2 is the
+## training dummy (see scripts/training/training_mode.gd).
 var mode: Mode = Mode.VS_CPU
 var player_character: CharacterData
 ## P2's character (the CPU in VS_CPU mode, the second player in VERSUS).

@@ -34,6 +34,11 @@ func push(packed: int) -> void:
 	_frames[_frame % SIZE] = packed
 
 
+## The newest packed input.
+func current() -> int:
+	return _at(0)
+
+
 func dir(ago: int = 0) -> int:
 	return _at(ago) & 0xF
 
