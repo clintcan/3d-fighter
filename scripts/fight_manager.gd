@@ -20,6 +20,8 @@ enum Phase { INTRO, FIGHT, ROUND_OVER, MATCH_OVER }
 
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
+const VS_SCENE := "res://scenes/vs_screen.tscn"
+const ARCADE_END_SCENE := "res://scenes/arcade_end.tscn"
 const FIGHTER_SCENE := preload("res://scenes/fighter/fighter.tscn")
 const TICKS_PER_SECOND := 60
 ## "ROUND N" shows from the start of the intro; "FIGHT!" at the end, when input unlocks.
@@ -65,6 +67,8 @@ var _knocked_out: Array[Fighter] = []
 var freeze_ticks := 0
 ## World position of the latest hit (for effects; projectiles hit away from the body).
 var last_hit_point := Vector3.ZERO
+## Arcade: whether P1 won the match that just ended.
+var _arcade_won := false
 
 @onready var camera: ActionCamera = $ActionCamera
 @onready var hud: FightHud = $HUD
@@ -96,10 +100,14 @@ func _ready() -> void:
 		fighter.super_started.connect(_on_super_started)
 
 	hud.setup(p1, p2, GameState.ROUNDS_TO_WIN, "P2" if is_versus() else "Dummy" if is_training() else "CPU")
-	hud.rematch_pressed.connect(start_match)
+	if is_arcade():
+		var stage_entry := GameState.arcade.current()
+		ai.set_difficulty(stage_entry.difficulty)
+		hud.p2_name.text = "%s (%s)" % [GameState.arcade.opponent_title(), "BOSS" if stage_entry.boss else "CPU"]
+	hud.rematch_pressed.connect(_on_rematch_pressed)
 	hud.restart_pressed.connect(start_match)
 	hud.character_select_pressed.connect(_go_to.bind(CHARACTER_SELECT_SCENE))
-	hud.main_menu_pressed.connect(_go_to.bind(MAIN_MENU_SCENE))
+	hud.main_menu_pressed.connect(_on_main_menu_pressed)
 	camera.setup(self)
 	camera.mode = Settings.camera_mode
 	fx = FightFx.new()
@@ -127,6 +135,10 @@ func is_training() -> bool:
 	return GameState.mode == GameState.Mode.TRAINING
 
 
+func is_arcade() -> bool:
+	return GameState.is_arcade()
+
+
 func _spawn_fighter(character: CharacterData, controller: FighterController, alt_look: bool = false) -> Fighter:
 	var fighter := FIGHTER_SCENE.instantiate() as Fighter
 	fighter.setup(character, controller, alt_look)
@@ -148,6 +160,9 @@ func start_match() -> void:
 	hud.end_cinematic()
 	for fighter in fighters:
 		fighter.add_meter(-fighter.meter) # meter carries between rounds, not matches
+	if is_arcade():
+		GameState.arcade.restart_stage(false) # a restarted stage starts from its own score
+		hud.set_score(GameState.arcade.score)
 	_start_round()
 	if is_training():
 		for fighter in fighters:
@@ -164,6 +179,8 @@ func _start_round() -> void:
 	hud.set_timer(GameState.ROUND_TIME_SECONDS)
 	for fighter in fighters:
 		fighter.input_locked = true
+	if is_arcade() and GameState.arcade.current().boss:
+		fighters[1].add_meter(Fighter.MAX_METER) # the boss starts every round with a super ready
 	if is_training():
 		return # no round call-outs; start_match skips straight to the fight
 	var final := round_wins[0] == GameState.ROUNDS_TO_WIN - 1 and round_wins[1] == GameState.ROUNDS_TO_WIN - 1
@@ -195,6 +212,8 @@ func _tick_round() -> void:
 			elif not _knocked_out.is_empty():
 				_end_round_by_ko()
 			else:
+				if is_arcade():
+					GameState.arcade.ticks += 1
 				timer_ticks -= 1
 				hud.set_timer(ceili(timer_ticks / float(TICKS_PER_SECOND)))
 				if timer_ticks <= 0:
@@ -242,6 +261,14 @@ func _finish_round(winner: Fighter, reason: String) -> void:
 		hud.set_round_wins(round_wins)
 		if winner.health == winner.data.max_health:
 			sub = "PERFECT"
+		if is_arcade() and winner == fighters[0]:
+			var bonus := GameState.arcade.add_round_bonus(ceili(timer_ticks / float(TICKS_PER_SECOND)),
+				winner.health / float(winner.data.max_health))
+			var lines := ["TIME BONUS   %d" % bonus.time, "LIFE BONUS   %d" % bonus.life]
+			if bonus.perfect > 0:
+				lines.append("PERFECT   %d" % bonus.perfect)
+			hud.show_bonus(lines)
+			hud.set_score(GameState.arcade.score)
 	else:
 		sub = "DRAW"
 	hud.announce(reason, sub, true)
@@ -261,6 +288,8 @@ func _after_round() -> void:
 	if p1_won or p2_won or round_number >= MAX_ROUNDS:
 		phase = Phase.MATCH_OVER
 		phase_ticks = 0
+		if is_arcade():
+			_arcade_match_over(round_wins[0] > round_wins[1])
 		if round_wins[0] != round_wins[1]:
 			_start_victory(fighters[0] if round_wins[0] > round_wins[1] else fighters[1])
 		else:
@@ -285,6 +314,43 @@ func _start_victory(winner: Fighter) -> void:
 		Audio.voice_sequence(["player_%d" % (fighters.find(winner) + 1), "winner"])
 	else:
 		Audio.voice("you_win" if winner == fighters[0] else "you_lose")
+
+
+# --- Arcade -----------------------------------------------------------------------
+
+## Stage won: clear points and on to the next stage; lost (or drawn): offer a continue.
+func _arcade_match_over(p1_won: bool) -> void:
+	var run := GameState.arcade
+	_arcade_won = p1_won
+	if p1_won:
+		var points := run.clear_stage()
+		hud.show_bonus(["STAGE CLEAR   %d" % points])
+		hud.set_score(run.score)
+		hud.configure_result("See Ending" if run.cleared else "Next Stage", "", "Quit")
+	else:
+		hud.configure_result("Continue", "", "Give Up")
+
+
+func _on_rematch_pressed() -> void:
+	if not is_arcade():
+		start_match()
+	elif GameState.arcade.cleared:
+		_go_to(ARCADE_END_SCENE)
+	elif _arcade_won:
+		GameState.apply_arcade_stage()
+		_go_to(VS_SCENE)
+	else:
+		GameState.arcade.restart_stage(true)
+		start_match()
+
+
+## The result menu's last button ends an Arcade run on the results screen; the pause
+## menu's "Main Menu" abandons it.
+func _on_main_menu_pressed() -> void:
+	if is_arcade() and phase == Phase.MATCH_OVER:
+		_go_to(ARCADE_END_SCENE)
+	else:
+		_go_to(MAIN_MENU_SCENE)
 
 
 func _go_to(scene: String) -> void:
@@ -446,6 +512,9 @@ func _resolve_hits() -> void:
 		var push_dir := projectile.direction if projectile else attacker.forward
 		var health_before := defender.health
 		var result := defender.receive_hit(attacker, move, push_dir, hit[3])
+		if is_arcade() and attacker == fighters[0]:
+			GameState.arcade.add_damage(health_before - defender.health)
+			hud.set_score(GameState.arcade.score)
 		if projectile:
 			_remove_projectile(attacker)
 		else:
@@ -524,8 +593,8 @@ func _cycle_cpu_mode() -> void:
 
 
 func _update_debug_text() -> void:
-	if is_training():
-		hud.set_debug_text("") # training shows its own status line
+	if is_training() or is_arcade():
+		hud.set_debug_text("") # training shows its own status line; arcade its score
 		return
 	if not OS.is_debug_build():
 		hud.set_debug_text("") # release builds: no debug overlay or debug keys

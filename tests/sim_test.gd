@@ -310,6 +310,7 @@ func _initialize() -> void:
 	await character_specials_tests()
 	await versus_tests()
 	await training_tests()
+	await arcade_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -695,3 +696,65 @@ func character_specials_tests() -> void:
 			wait_until(func() -> bool: return p2.state == Fighter.State.AIR_HIT, 40)
 			check("Brutus: Earthquake hits low through a standing block", p2.state == Fighter.State.AIR_HIT, state_name(p2))
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+
+
+func arcade_tests() -> void:
+	var gs = root.get_node("GameState")
+	var kenji: CharacterData = gs.roster[0]
+	var run := ArcadeRun.create(kenji, gs.roster, AIController.Difficulty.NORMAL, 3)
+	var opponents := run.stages.map(func(e: Dictionary) -> CharacterData: return e.character)
+	check("Arcade: ladder = every other fighter, then the shadow boss", run.stages.size() == gs.roster.size()
+		and not opponents.slice(0, -1).has(kenji) and run.stages[-1].boss and opponents[-1] == kenji, str(opponents.map(func(c): return c.display_name)))
+	check("Arcade: difficulty rises, boss on Hard", run.stages[0].difficulty == AIController.Difficulty.EASY
+		and run.stages[1].difficulty == AIController.Difficulty.NORMAL and run.stages[-1].difficulty == AIController.Difficulty.HARD)
+	var bonus := run.add_round_bonus(50, 1.0)
+	check("Arcade: round bonus (time + life + perfect)", bonus.total == 5000 + 5000 + 10000 and run.perfects == 1, str(bonus))
+	run.clear_stage()
+	check("Arcade: stage clear points and next stage", run.score == 20000 + 10000 and run.stage == 1 and run.stage_start_score == run.score, str(run.score))
+	run.add_damage(50)
+	run.restart_stage(true)
+	check("Arcade: a continue replays the stage from its starting score", run.score == 30000 and run.continues == 1)
+
+	# A real stage: score from damage, round bonuses, then "Next Stage".
+	gs.mode = gs.Mode.ARCADE
+	gs.start_arcade(kenji)
+	var first: Dictionary = gs.arcade.current()
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	check("Arcade: CPU difficulty comes from the ladder", m.ai.difficulty == first.difficulty and p2.data == first.character)
+	for round_index in 2:
+		m.start_fight_immediately()
+		p2.controller = m.dummy; m.dummy.mode = DummyController.Mode.STAND
+		approach(1.1)
+		var before: int = gs.arcade.score
+		p2.health = 10
+		press(InputBuffer.LP); step(8)
+		check("Arcade: round %d won, damage + bonus scored" % (round_index + 1), m.phase in [m.Phase.ROUND_OVER, m.Phase.MATCH_OVER] and gs.arcade.score > before + 100,
+			"score %d -> %d" % [before, gs.arcade.score])
+		step(m.ROUND_OVER_TICKS + 1)
+	check("Arcade: match won -> stage 2, Next Stage", m.phase == m.Phase.MATCH_OVER and gs.arcade.stage == 1
+		and m.hud.get_node("%RematchButton").text == "Next Stage" and not m.hud.get_node("%ResultSelectButton").visible)
+	m._on_rematch_pressed()
+	check("Arcade: next stage sets the next opponent", gs.p2_character == gs.arcade.current().character)
+	await process_frame; await process_frame
+
+	# Losing offers a continue, which restarts the stage.
+	gs.arcade.stage = gs.arcade.stages.size() - 1
+	gs.apply_arcade_stage()
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	check("Arcade: the boss is the shadow (alt look) with a full meter", m.fighters[1].alt and m.fighters[1].meter == Fighter.MAX_METER and m.ai.difficulty == AIController.Difficulty.HARD)
+	m.phase = m.Phase.MATCH_OVER
+	m._arcade_match_over(false)
+	var continues: int = gs.arcade.continues
+	check("Arcade: a loss offers Continue / Give Up", m.hud.get_node("%RematchButton").text == "Continue" and m.hud.get_node("%ResultMenuButton").text == "Give Up")
+	m._on_rematch_pressed()
+	check("Arcade: Continue restarts the stage and counts", gs.arcade.continues == continues + 1 and m.phase == m.Phase.INTRO)
+	gs.arcade = null
+	gs.mode = gs.Mode.VS_CPU

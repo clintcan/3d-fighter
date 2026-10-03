@@ -54,6 +54,9 @@ var _meter_labels: Array[Label] = []
 var _super_dim: ColorRect
 var _super_label: Label
 var _super_tween: Tween
+var _score_label: Label
+var _bonus_label: Label
+var _bonus_tween: Tween
 
 
 func _ready() -> void:
@@ -71,6 +74,7 @@ func _ready() -> void:
 	_set_letterbox(0.0)
 	_build_super_flash()
 	_build_meters()
+	_build_score()
 	%RematchButton.pressed.connect(func() -> void: rematch_pressed.emit())
 	%ResultSelectButton.pressed.connect(func() -> void: character_select_pressed.emit())
 	%ResultMenuButton.pressed.connect(func() -> void: main_menu_pressed.emit())
@@ -157,6 +161,61 @@ func note(player_index: int, text: String) -> void:
 
 func set_debug_text(text: String) -> void:
 	debug_label.text = text
+
+
+# --- Arcade -----------------------------------------------------------------------
+
+func set_score(value: int) -> void:
+	_score_label.visible = true
+	_score_label.text = "SCORE  %07d" % value
+
+
+## Bonus breakdown in the lower middle of the screen, fading out after a moment.
+func show_bonus(lines: Array) -> void:
+	_bonus_label.text = "\n".join(lines)
+	if _bonus_tween:
+		_bonus_tween.kill()
+	_bonus_label.modulate.a = 1.0
+	_bonus_tween = create_tween()
+	_bonus_tween.tween_interval(2.6)
+	_bonus_tween.tween_property(_bonus_label, "modulate:a", 0.0, 0.5)
+
+
+## Relabels the result menu (Arcade): an empty label hides that button.
+func configure_result(primary: String, middle: String, last: String) -> void:
+	for pair in [[%RematchButton, primary], [%ResultSelectButton, middle], [%ResultMenuButton, last]]:
+		var button: Button = pair[0]
+		button.visible = pair[1] != ""
+		if pair[1] != "":
+			button.text = pair[1]
+
+
+func _build_score() -> void:
+	_score_label = Label.new()
+	_score_label.add_theme_font_size_override("font_size", 28)
+	_score_label.add_theme_constant_override("outline_size", 8)
+	_score_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_score_label.add_theme_color_override("font_color", METER_FULL_COLOR)
+	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_score_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_score_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_score_label.offset_top = 128
+	_score_label.visible = false
+	_score_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_score_label)
+	_bonus_label = Label.new()
+	_bonus_label.add_theme_font_size_override("font_size", 40)
+	_bonus_label.add_theme_constant_override("outline_size", 10)
+	_bonus_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_bonus_label.add_theme_color_override("font_color", METER_FULL_COLOR)
+	_bonus_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bonus_label.anchor_left = 0.0
+	_bonus_label.anchor_right = 1.0
+	_bonus_label.anchor_top = 0.62
+	_bonus_label.anchor_bottom = 0.62
+	_bonus_label.modulate.a = 0.0
+	_bonus_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_bonus_label)
 
 
 # --- Super meter & super flash -----------------------------------------------------
@@ -285,6 +344,7 @@ func end_cinematic() -> void:
 	%Top.modulate.a = 1.0
 	debug_label.modulate.a = 1.0
 	_meter_root.modulate.a = 1.0
+	_score_label.modulate.a = 1.0
 	(center_label.get_parent() as Control).size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	$Margin.add_theme_constant_override("margin_bottom", 30)
 	center_label.add_theme_font_size_override("font_size", 140)
@@ -302,6 +362,7 @@ func _animate_cinematic(amount: float) -> void:
 	_cinematic_tween.tween_property(%Top, "modulate:a", 0.0, 0.35)
 	_cinematic_tween.tween_property(debug_label, "modulate:a", 0.0, 0.35)
 	_cinematic_tween.tween_property(_meter_root, "modulate:a", 0.0, 0.35)
+	_cinematic_tween.tween_property(_score_label, "modulate:a", 0.0, 0.35)
 
 
 ## 0..1: bars cover 11% of the screen height each at 1.

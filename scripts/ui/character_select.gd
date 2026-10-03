@@ -5,6 +5,7 @@ extends Control
 ## Versus: P1 then P2 pick in turn, each with their own controls (up/down to move,
 ## Light Punch to confirm, Heavy Punch to go back), then the VS screen.
 ## Training: pick your fighter, then the training dummy, then straight into the fight.
+## Arcade: pick your fighter; the ladder of opponents is generated (GameState.arcade).
 
 const VS_SCENE := "res://scenes/vs_screen.tscn"
 const FIGHT_SCENE := "res://scenes/fight.tscn"
@@ -268,6 +269,10 @@ func _select(character: CharacterData) -> void:
 			return
 		GameState.p2_character = character
 		get_tree().change_scene_to_file(FIGHT_SCENE)
+		return
+	if GameState.mode == GameState.Mode.ARCADE:
+		GameState.start_arcade(character)
+		get_tree().change_scene_to_file(VS_SCENE)
 		return
 	GameState.player_character = character
 	GameState.p2_character = GameState.pick_random_cpu()

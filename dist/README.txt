@@ -29,6 +29,13 @@ Gamepad 1 is Player 1 and Gamepad 2 is Player 2 (swap in Options).
 On the character select screen each player picks in turn with
 Light Punch (select) and Heavy Punch (back).
 
+ARCADE - choose "Arcade" in the main menu
+Fight your way up a ladder of CPU opponents to the final boss: your own
+shadow, who starts every round with a full super meter. Score points for
+damage, time left, health left and perfect rounds; lose and you can
+continue (the stage restarts). Clear it to see your results, your best
+score for that fighter, and the credits.
+
 TRAINING - choose "Training" in the main menu
 Pick your fighter, then the training dummy. Endless health, no timer.
 Tab (gamepad Back): training menu - dummy stance (stand / crouch / jump /
