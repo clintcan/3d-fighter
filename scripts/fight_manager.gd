@@ -1,7 +1,8 @@
 extends Node3D
 ## Fight scene root. Owns the fixed-order 60 Hz simulation:
 ##   view → input → fighter tick → pushbox → hits
-## P1 vs. the CPU (AIController, or a training dummy via F1), best of 3 rounds.
+## P1 vs. the CPU (AIController, or a training dummy via F1) or, in Versus mode, a second
+## local player. Best of 3 rounds.
 ## Round flow (INTRO → FIGHT → ROUND_OVER → … → MATCH_OVER) also runs on the tick, so
 ## timers are frame-exact and pausing freezes everything.
 
@@ -66,7 +67,10 @@ func _ready() -> void:
 	ai = AIController.new(Settings.ai_difficulty, GameState.match_seed)
 	dummy = DummyController.new()
 	var p1 := _spawn_fighter(GameState.player_character, PlayerController.new("p1_"))
-	var p2 := _spawn_fighter(GameState.cpu_character, ai)
+	var p2_controller: FighterController = PlayerController.new("p2_") if is_versus() else ai
+	# Mirror match: P2 wears the alternate look so the two fighters can be told apart.
+	var mirror := GameState.p2_character == GameState.player_character
+	var p2 := _spawn_fighter(GameState.p2_character, p2_controller, mirror)
 	ai.attach(p2)
 	p1.opponent = p2
 	p2.opponent = p1
@@ -74,7 +78,7 @@ func _ready() -> void:
 		fighter.knocked_out.connect(_on_knocked_out)
 		fighter.throw_teched.connect(_on_throw_teched)
 
-	hud.setup(p1, p2, GameState.ROUNDS_TO_WIN)
+	hud.setup(p1, p2, GameState.ROUNDS_TO_WIN, is_versus())
 	hud.rematch_pressed.connect(start_match)
 	hud.restart_pressed.connect(start_match)
 	hud.character_select_pressed.connect(_go_to.bind(CHARACTER_SELECT_SCENE))
@@ -93,9 +97,13 @@ func _ready() -> void:
 		round_ended.connect(func(_w: Fighter, reason: String) -> void: print("SMOKE TEST: round ended (%s)" % reason))
 
 
-func _spawn_fighter(character: CharacterData, controller: FighterController) -> Fighter:
+func is_versus() -> bool:
+	return GameState.mode == GameState.Mode.VERSUS
+
+
+func _spawn_fighter(character: CharacterData, controller: FighterController, alt_look: bool = false) -> Fighter:
 	var fighter := FIGHTER_SCENE.instantiate() as Fighter
-	fighter.setup(character, controller)
+	fighter.setup(character, controller, alt_look)
 	fighter.bounds_half_extent = stage.bounds_half_extent
 	add_child(fighter)
 	fighters.append(fighter)
@@ -162,7 +170,10 @@ func _tick_round() -> void:
 		Phase.MATCH_OVER:
 			if match_winner:
 				if phase_ticks == VICTORY_TITLE_TICKS:
-					hud.announce("%s WINS" % match_winner.data.display_name.to_upper(), "", true)
+					if is_versus():
+						hud.announce("PLAYER %d WINS" % (fighters.find(match_winner) + 1), match_winner.data.display_name.to_upper(), true)
+					else:
+						hud.announce("%s WINS" % match_winner.data.display_name.to_upper(), "", true)
 				elif phase_ticks == VICTORY_RESULT_TICKS:
 					hud.show_result()
 	_knocked_out.clear()
@@ -233,7 +244,10 @@ func _start_victory(winner: Fighter) -> void:
 	camera.start_victory(winner)
 	hud.announce("")
 	hud.start_cinematic()
-	Audio.voice("you_win" if winner == fighters[0] else "you_lose")
+	if is_versus():
+		Audio.voice_sequence(["player_%d" % (fighters.find(winner) + 1), "winner"])
+	else:
+		Audio.voice("you_win" if winner == fighters[0] else "you_lose")
 
 
 func _go_to(scene: String) -> void:
@@ -376,9 +390,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
-			KEY_F1:
+			KEY_F1 when not is_versus():
 				_cycle_cpu_mode()
-			KEY_F4:
+			KEY_F4 when not is_versus():
 				ai.set_difficulty(((ai.difficulty + 1) % AIController.Difficulty.size()) as AIController.Difficulty)
 				Settings.ai_difficulty = ai.difficulty
 				Settings.save_settings()
@@ -413,6 +427,10 @@ func _cycle_cpu_mode() -> void:
 func _update_debug_text() -> void:
 	if not OS.is_debug_build():
 		hud.set_debug_text("") # release builds: no debug overlay or debug keys
+		return
+	if is_versus():
+		hud.set_debug_text("VERSUS  ·  F2 Hurtboxes: %s  ·  F3 Action Cam: %s  ·  F5 Restart  ·  Esc Pause" % [
+			"On" if debug_draw else "Off", camera.mode_name()])
 		return
 	var cpu := "AI" if cpu_mode < 0 else "Dummy " + dummy.mode_name()
 	hud.set_debug_text("F1 CPU: %s  ·  F4 AI: %s  ·  F2 Hurtboxes: %s  ·  F3 Action Cam: %s  ·  F5 Restart  ·  Esc Pause" % [

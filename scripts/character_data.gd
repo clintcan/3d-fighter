@@ -20,6 +20,9 @@ extends Resource
 @export var model_scale: float = 1.0
 ## Tint for hair/eyebrow materials (the free Quaternius hair textures are greyscale).
 @export var hair_color: Color = Color.WHITE
+## Alternate look for mirror matches (P2 picks the same character).
+@export var alt_body_albedo: Texture2D
+@export var alt_hair_color: Color = Color.WHITE
 ## Match-win animations ("library/clip"); one is picked at random.
 @export var victory_animations: Array[StringName] = []
 ## Tint used for graybox stand-ins and UI until real models/portraits exist.

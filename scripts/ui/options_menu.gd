@@ -10,6 +10,7 @@ const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 @onready var camera_option: OptionButton = %CameraOption
 @onready var difficulty_option: OptionButton = %DifficultyOption
 @onready var fullscreen_check: CheckButton = %FullscreenCheck
+@onready var swap_pads_check: CheckButton = %SwapPadsCheck
 
 
 func _ready() -> void:
@@ -24,6 +25,7 @@ func _ready() -> void:
 	camera_option.selected = Settings.camera_mode
 	difficulty_option.selected = Settings.ai_difficulty
 	fullscreen_check.button_pressed = Settings.fullscreen
+	swap_pads_check.button_pressed = Settings.swap_pads
 
 	music_slider.value_changed.connect(func(v: float) -> void: _change(&"music_volume", v))
 	sfx_slider.value_changed.connect(func(v: float) -> void:
@@ -33,6 +35,7 @@ func _ready() -> void:
 	camera_option.item_selected.connect(func(i: int) -> void: _change(&"camera_mode", i))
 	difficulty_option.item_selected.connect(func(i: int) -> void: _change(&"ai_difficulty", i))
 	fullscreen_check.toggled.connect(func(on: bool) -> void: _change(&"fullscreen", on))
+	swap_pads_check.toggled.connect(func(on: bool) -> void: _change(&"swap_pads", on))
 	%BackButton.pressed.connect(_back)
 	music_slider.grab_focus()
 

@@ -7,9 +7,14 @@ const DEFAULT_STAGE := "res://scenes/stages/ring.tscn"
 const ROUNDS_TO_WIN := 2
 const ROUND_TIME_SECONDS := 99
 
+enum Mode { VS_CPU, VERSUS }
+
 var roster: Array[CharacterData] = []
+## VS_CPU: P2 is the AI. VERSUS: P2 is a second local player.
+var mode: Mode = Mode.VS_CPU
 var player_character: CharacterData
-var cpu_character: CharacterData
+## P2's character (the CPU in VS_CPU mode, the second player in VERSUS).
+var p2_character: CharacterData
 var stage_path: String = DEFAULT_STAGE
 ## Seeds the CPU's decisions; the same seed and inputs replay the same match.
 var match_seed := 1
@@ -43,5 +48,5 @@ func pick_random_cpu() -> CharacterData:
 func ensure_selections() -> void:
 	if player_character == null and not roster.is_empty():
 		player_character = roster[0]
-	if cpu_character == null:
-		cpu_character = pick_random_cpu()
+	if p2_character == null:
+		p2_character = pick_random_cpu()

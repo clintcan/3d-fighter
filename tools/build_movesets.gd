@@ -35,7 +35,8 @@ const CHARACTERS := {
 		startup = 0, damage = 1.0, knockback = 1.0, hitstop = 0,
 		stats = {max_health = 1000, walk_speed = 2.0, back_walk_speed = 1.6, dash_speed = 6.0,
 			jump_velocity = 6.0, weight = 1.0, throw_damage = 120, power_rating = 0.55, speed_rating = 0.55,
-			victory_animations = [&"fight/victory_bow", &"fight/victory_fist_pump"]},
+			victory_animations = [&"fight/victory_bow", &"fight/victory_fist_pump"],
+			alt_body_albedo = "res://assets/characters/base/T_Superhero_Male_Dark.png", alt_hair_color = Color(0.55, 0.38, 0.18)},
 		signatures = {
 			"advancing_straight": ["Advancing Straight", "6HP", &"ual1/Punch_Cross", 0.28, 0.85, 12, 3, 18, 90, H.HIGH, 21, 16, 9, Vector2(2.8, 0), Vector3(0.1, 1.36, -0.70), 0.2, {lunge = 4.5, camera_intensity = 0.15}],
 			"snap_kick": ["Snap Kick", "6LK", &"fight/front_kick", 0.20, 0.0, 5, 2, 14, 40, H.MID, 15, 11, 5, Vector2(1.4, 0), Vector3(0.05, 1.0, -1.0), 0.18, {cancel_into = ["HP", "6HP"]}],
@@ -45,7 +46,8 @@ const CHARACTERS := {
 		startup = -1, damage = 0.85, knockback = 0.9, hitstop = -1,
 		stats = {max_health = 900, walk_speed = 2.6, back_walk_speed = 2.0, dash_speed = 7.5,
 			jump_velocity = 6.4, weight = 0.85, throw_damage = 100, power_rating = 0.35, speed_rating = 0.9,
-			victory_animations = [&"fight/victory_point", &"fight/victory_fist_pump"]},
+			victory_animations = [&"fight/victory_point", &"fight/victory_fist_pump"],
+			alt_body_albedo = "res://assets/characters/base/T_Superhero_Female_Light_BaseColor.png", alt_hair_color = Color(0.07, 0.07, 0.1)},
 		signatures = {
 			"rushing_hook": ["Rushing Hook", "6HP", &"fight/rushing_hook", 0.28, 0.0, 10, 3, 20, 70, H.MID, 20, 14, 8, Vector2(2.5, 0), Vector3(-0.15, 0.72, -0.95), 0.22, {lunge = 4.0, camera_intensity = 0.15}],
 			"step_kick": ["Step Kick", "6LK", &"fight/front_kick", 0.20, 0.0, 7, 3, 12, 40, H.MID, 16, 11, 5, Vector2(1.4, 0), Vector3(0.05, 1.0, -1.0), 0.18, {lunge = 3.5, cancel_into = ["6HP", "LP"]}],
@@ -55,7 +57,8 @@ const CHARACTERS := {
 		startup = 2, damage = 1.3, knockback = 1.25, hitstop = 2,
 		stats = {max_health = 1150, walk_speed = 1.5, back_walk_speed = 1.2, dash_speed = 4.5,
 			jump_velocity = 5.6, weight = 1.3, throw_damage = 160, power_rating = 0.95, speed_rating = 0.25,
-			victory_animations = [&"fight/victory_flex", &"fight/victory_fist_pump"]},
+			victory_animations = [&"fight/victory_flex", &"fight/victory_fist_pump"],
+			alt_body_albedo = "res://assets/characters/base/T_Superhero_Male_Light.png", alt_hair_color = Color(0.42, 0.42, 0.44)},
 		signatures = {
 			"overhead_smash": ["Overhead Smash", "6HP", &"ual2/OverhandThrow", 0.40, 0.9, 20, 4, 24, 130, H.OVERHEAD, 0, 18, 12, Vector2(2.0, 0), Vector3(0.2, 0.8, -0.95), 0.28, {knockdown = true, camera_intensity = 0.3}],
 			"heavy_boot": ["Heavy Boot", "6HK", &"fight/front_kick", 0.20, 0.0, 12, 4, 22, 100, H.MID, 22, 16, 11, Vector2(4.5, 0), Vector3(0.05, 1.0, -1.0), 0.22, {camera_intensity = 0.2}],
@@ -86,6 +89,8 @@ func _initialize() -> void:
 		for stat: String in spec.stats:
 			if stat == "victory_animations":
 				character.victory_animations.assign(spec.stats[stat])
+			elif stat == "alt_body_albedo":
+				character.alt_body_albedo = load(spec.stats[stat])
 			else:
 				character.set(stat, spec.stats[stat])
 		var portrait := "res://assets/ui/portraits/%s.png" % id # from tools/render_portraits.gd

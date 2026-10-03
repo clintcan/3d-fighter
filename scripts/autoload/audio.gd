@@ -33,6 +33,7 @@ var _music: Array[AudioStreamPlayer] = []
 var _music_name: StringName
 var _active_music := 0
 var _rng := RandomNumberGenerator.new() # cosmetic only, never gameplay RNG
+var _voice_queue: Array[String] = []
 
 
 func _ready() -> void:
@@ -49,6 +50,7 @@ func _ready() -> void:
 	for i in SFX_VOICES:
 		_pool.append(_make_player("SFX"))
 	_voice = _make_player("Voice")
+	_voice.finished.connect(_play_next_voice)
 	for i in 2:
 		_music.append(_make_player("Music"))
 	get_tree().node_added.connect(_on_node_added)
@@ -74,13 +76,31 @@ func sfx(sound: StringName, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 	player.play()
 
 
-## Announcer line from assets/audio/voice/<line>.ogg. A new line cuts off the old one.
+## Announcer line from assets/audio/voice/<line>.ogg. A new line cuts off the old one
+## and cancels any queued sequence.
 func voice(line: String) -> void:
+	_voice_queue.clear()
+	_play_voice(line)
+
+
+func _play_voice(line: String) -> void:
 	var path := VOICE_DIR + line + ".ogg"
 	if not ResourceLoader.exists(path):
 		return
 	_voice.stream = load(path)
 	_voice.play()
+
+
+## Plays announcer lines back to back ("player_1", "winner"). Replaces any queued lines.
+func voice_sequence(lines: Array[String]) -> void:
+	_voice_queue = lines.duplicate()
+	_play_next_voice()
+
+
+func _play_next_voice() -> void:
+	if _voice_queue.is_empty():
+		return
+	_play_voice(_voice_queue.pop_front())
 
 
 ## Crossfades to a looping track; does nothing if it's already playing.

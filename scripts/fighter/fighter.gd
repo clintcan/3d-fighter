@@ -119,6 +119,8 @@ var _victory_time := 0.0
 var last_hit_level: MoveData.HitLevel = MoveData.HitLevel.MID
 ## Skinned character model, or null for a graybox capsule.
 var model: FighterModel
+## Alternate costume (mirror match P2).
+var alt := false
 
 var _flash_color := Color.WHITE
 var _material: StandardMaterial3D
@@ -129,9 +131,10 @@ var _material: StandardMaterial3D
 @onready var hurtbox_debug: MeshInstance3D = $HurtboxDebug
 
 
-func setup(character: CharacterData, fighter_controller: FighterController) -> void:
+func setup(character: CharacterData, fighter_controller: FighterController, alt_look: bool = false) -> void:
 	data = character
 	controller = fighter_controller
+	alt = alt_look
 	name = character.display_name
 	health = character.max_health
 
@@ -153,7 +156,7 @@ func _ready() -> void:
 	if data.model_scene:
 		model = FighterModel.new()
 		add_child(model)
-		model.build(data)
+		model.build(data, alt)
 		visual.visible = false
 
 

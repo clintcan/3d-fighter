@@ -22,6 +22,13 @@ Heavy Kick            K               B
 Sidestep              L               RB
 Pause / move list     Esc             Start
 
+VERSUS (2 PLAYERS) - choose "Versus" in the main menu
+Player 2 keyboard: Arrows move, Numpad 4 / 5 punch, Numpad 1 / 2 kick,
+Numpad 6 sidestep (no numpad: [ ] punch, ; ' kick, / sidestep).
+Gamepad 1 is Player 1 and Gamepad 2 is Player 2 (swap in Options).
+On the character select screen each player picks in turn with
+Light Punch (select) and Heavy Punch (back).
+
 Block: hold back (standing) or down-back (crouching).
 Dash: tap forward twice. Backdash: tap back twice.
 Throw: Light Punch + Light Kick together, up close.

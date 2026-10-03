@@ -24,7 +24,8 @@ var _flash_material: StandardMaterial3D
 var _flash_tween: Tween
 
 
-func build(data: CharacterData) -> void:
+## `alt` uses the character's alternate skin texture and hair colour (mirror matches).
+func build(data: CharacterData, alt: bool = false) -> void:
 	var body := data.model_scene.instantiate() as Node3D
 	_body = body
 	add_child(body)
@@ -39,7 +40,8 @@ func build(data: CharacterData) -> void:
 		_contacts[bone] = skeleton.get_bone_global_rest(bone).origin.y + SOLE_BELOW_ORIGIN
 	for hair_scene in data.hair_scenes:
 		_attach_skinned(hair_scene)
-	_customize_materials(data)
+	var albedo := data.alt_body_albedo if alt and data.alt_body_albedo else data.body_albedo
+	_customize_materials(albedo, data.alt_hair_color if alt else data.hair_color)
 
 	player = AnimationPlayer.new()
 	body.add_child(player)
@@ -115,17 +117,17 @@ func _attach_skinned(scene: PackedScene) -> void:
 
 
 ## Swaps the body's skin texture and tints hair, working on per-instance material copies.
-func _customize_materials(data: CharacterData) -> void:
+func _customize_materials(body_albedo: Texture2D, hair_color: Color) -> void:
 	for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
 		for surface in mesh.get_surface_override_material_count():
 			var material := mesh.mesh.surface_get_material(surface) as StandardMaterial3D
 			if material == null:
 				continue
-			if material.resource_name.begins_with("MI_Superhero") and data.body_albedo:
+			if material.resource_name.begins_with("MI_Superhero") and body_albedo:
 				var skin := material.duplicate() as StandardMaterial3D
-				skin.albedo_texture = data.body_albedo
+				skin.albedo_texture = body_albedo
 				mesh.set_surface_override_material(surface, skin)
 			elif material.resource_name.begins_with("MI_Hair"):
 				var hair := material.duplicate() as StandardMaterial3D
-				hair.albedo_color = data.hair_color
+				hair.albedo_color = hair_color
 				mesh.set_surface_override_material(surface, hair)

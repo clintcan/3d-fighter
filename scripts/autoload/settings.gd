@@ -9,6 +9,8 @@ var voice_volume := 1.0
 var camera_mode: ActionCamera.Mode = ActionCamera.Mode.FULL
 var ai_difficulty: AIController.Difficulty = AIController.Difficulty.NORMAL
 var fullscreen := false
+## Give gamepad 1 to Player 2 (useful with a single pad in Versus).
+var swap_pads := false
 
 
 func _ready() -> void:
@@ -26,6 +28,7 @@ func load_settings() -> void:
 	camera_mode = cfg.get_value("game", "camera_mode", camera_mode)
 	ai_difficulty = cfg.get_value("game", "ai_difficulty", ai_difficulty)
 	fullscreen = cfg.get_value("video", "fullscreen", fullscreen)
+	swap_pads = cfg.get_value("input", "swap_pads", swap_pads)
 
 
 func save_settings() -> void:
@@ -36,6 +39,7 @@ func save_settings() -> void:
 	cfg.set_value("game", "camera_mode", camera_mode)
 	cfg.set_value("game", "ai_difficulty", ai_difficulty)
 	cfg.set_value("video", "fullscreen", fullscreen)
+	cfg.set_value("input", "swap_pads", swap_pads)
 	cfg.save(PATH)
 
 
@@ -43,5 +47,6 @@ func apply() -> void:
 	Audio.set_bus_volume("Music", music_volume)
 	Audio.set_bus_volume("SFX", sfx_volume)
 	Audio.set_bus_volume("Voice", voice_volume)
+	InputSetup.apply(swap_pads)
 	if DisplayServer.get_name() != "headless":
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)

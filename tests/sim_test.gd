@@ -186,7 +186,7 @@ func _initialize() -> void:
 	# Fixed matchup: per-character frame data makes timings depend on who's fighting.
 	var gs = root.get_node("GameState")
 	gs.player_character = gs.roster[0] # Kenji
-	gs.cpu_character = gs.roster[2] # Brutus
+	gs.p2_character = gs.roster[2] # Brutus
 	change_scene_to_file("res://scenes/fight.tscn")
 	await process_frame
 	await process_frame
@@ -297,6 +297,7 @@ func _initialize() -> void:
 	round_tests()
 	character_tests()
 	fx_tests()
+	await versus_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -455,3 +456,50 @@ func fx_tests() -> void:
 	press(InputBuffer.LP); step(6)
 	check("hits spawn effects", m.fx.spawned > before, "%d -> %d" % [before, m.fx.spawned])
 	check("audio buses exist", AudioServer.get_bus_index("Music") > 0 and AudioServer.get_bus_index("SFX") > 0 and AudioServer.get_bus_index("Voice") > 0)
+
+## Joypad device assigned to an action (first joypad event), or -99 if none.
+func _pad_device(action: String) -> int:
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventJoypadButton:
+			return ev.device
+	return -99
+
+func versus_tests() -> void:
+	var gs = root.get_node("GameState")
+	var setup = root.get_node("InputSetup")
+	setup.apply(false)
+	check("gamepad 1 -> P1, gamepad 2 -> P2", _pad_device("p1_lp") == 0 and _pad_device("p2_lp") == 1)
+	setup.apply(true)
+	check("swap setting gives gamepad 1 to P2", _pad_device("p1_lp") == 1 and _pad_device("p2_lp") == 0)
+	setup.apply(false)
+	check("P2 keyboard has numpad + fallback keys", InputMap.action_get_events("p2_lp").filter(func(e): return e is InputEventKey).size() == 2)
+
+	# Versus fight: P2 is a second player controller, independent of P1.
+	gs.mode = gs.Mode.VERSUS
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[1]
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	var vm = current_scene
+	vm.set_physics_process(false)
+	vm.start_fight_immediately()
+	var a: Fighter = vm.fighters[0]
+	var b: Fighter = vm.fighters[1]
+	check("Versus: P2 is player-controlled", b.controller is PlayerController and (b.controller as PlayerController).prefix == "p2_")
+	var ax := a.position.x
+	var bx := b.position.x
+	Input.action_press("p2_left") # P2 starts on the right: left = toward P1
+	for i in 30: vm._physics_process(1.0 / 60.0)
+	Input.action_release("p2_left")
+	check("P2's keys move only P2", b.position.x < bx - 0.5 and absf(a.position.x - ax) < 0.01, "P2 dx %.2f, P1 dx %.2f" % [b.position.x - bx, a.position.x - ax])
+	Input.action_press("p1_lp")
+	vm._physics_process(1.0 / 60.0)
+	Input.action_release("p1_lp")
+	vm._physics_process(1.0 / 60.0)
+	check("P1's attack button attacks with P1 only", a.state == Fighter.State.ATTACK and b.state != Fighter.State.ATTACK, "%s / %s" % [state_name(a), state_name(b)])
+
+	# Mirror match: P2 gets the alternate look.
+	gs.p2_character = gs.roster[0]
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	check("mirror match gives P2 the alternate look", current_scene.fighters[1].alt and not current_scene.fighters[0].alt)
+	gs.mode = gs.Mode.VS_CPU

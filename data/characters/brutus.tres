@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="CharacterData" format=3]
 
 [ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Buzzed.gltf" id="1_2ndvl"]
+[ext_resource type="Texture2D" path="res://assets/characters/base/T_Superhero_Male_Light.png" id="1_063lg"]
 [ext_resource type="Script" path="res://scripts/character_data.gd" id="1_char"]
 [ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_k5w2a"]
 [ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Beard.gltf" id="2_adg58"]
@@ -33,6 +34,8 @@ model_scene = ExtResource("3_ryvlx")
 hair_scenes = Array[PackedScene]([ExtResource("1_2ndvl"), ExtResource("2_adg58")])
 model_scale = 1.08
 hair_color = Color(0.22, 0.13, 0.07, 1)
+alt_body_albedo = ExtResource("1_063lg")
+alt_hair_color = Color(0.42, 0.42, 0.44, 1)
 victory_animations = Array[StringName]([&"fight/victory_flex", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.95, 0.6, 0.15, 1)
 max_health = 1150

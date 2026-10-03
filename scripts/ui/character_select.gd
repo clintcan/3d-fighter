@@ -1,7 +1,9 @@
 extends Control
 ## Character select: portrait roster, a turntable 3D preview of the focused fighter,
-## stats and signature moves. Selecting picks a random CPU opponent and goes to the VS
-## screen.
+## stats and signature moves.
+## Vs CPU: pick with any device; the CPU opponent is random.
+## Versus: P1 then P2 pick in turn, each with their own controls (up/down to move,
+## Light Punch to confirm, Heavy Punch to go back), then the VS screen.
 
 const VS_SCENE := "res://scenes/vs_screen.tscn"
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
@@ -18,9 +20,17 @@ const HEALTH_SCALE := 1200.0 # max_health shown as a full bar
 @onready var health_bar: ProgressBar = %HealthBar
 @onready var signature_label: Label = %SignatureLabel
 
+const PLAYER_COLORS := [Color(0.35, 0.6, 1.0), Color(1.0, 0.4, 0.35)]
+
 var _turntable: Node3D
 var _models := {} # CharacterData -> FighterModel
 var _focused: CharacterData
+# Versus mode state
+var _versus := false
+var _picking := 0 # 0 = P1 choosing, 1 = P2 choosing
+var _cursor := 0
+var _p1_pick := -1
+var _styles: Array = [] # per button: [normal, focused]
 
 
 func _ready() -> void:
@@ -34,9 +44,17 @@ func _ready() -> void:
 		model.build(character)
 		model.visible = false
 		_models[character] = model
-	if roster_box.get_child_count() > 0:
-		var start := GameState.roster.find(GameState.player_character)
-		(roster_box.get_child(maxi(start, 0)) as Button).grab_focus()
+	_versus = GameState.mode == GameState.Mode.VERSUS
+	if roster_box.get_child_count() == 0:
+		return
+	var start := maxi(GameState.roster.find(GameState.player_character), 0)
+	if _versus:
+		for button in roster_box.get_children():
+			(button as Button).focus_mode = Control.FOCUS_NONE # no shared UI navigation
+		_cursor = start
+		_refresh_versus()
+	else:
+		(roster_box.get_child(start) as Button).grab_focus()
 
 
 func _process(delta: float) -> void:
@@ -46,9 +64,74 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
-		Audio.sfx(&"ui_back", -4.0)
-		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
+	if _versus:
+		_versus_input(event)
+	elif event.is_action_pressed("ui_cancel"):
+		_back_to_menu()
+
+
+func _back_to_menu() -> void:
+	Audio.sfx(&"ui_back", -4.0)
+	get_tree().change_scene_to_file(MAIN_MENU_SCENE)
+
+
+func _versus_input(event: InputEvent) -> void:
+	var prefix := "p%d_" % (_picking + 1)
+	var count := roster_box.get_child_count()
+	if event.is_action_pressed(prefix + "up"):
+		_move_cursor(-1, count)
+	elif event.is_action_pressed(prefix + "down"):
+		_move_cursor(1, count)
+	elif event.is_action_pressed(prefix + "lp"):
+		_confirm_versus(_cursor)
+	elif event.is_action_pressed(prefix + "hp"):
+		if _picking == 1:
+			_picking = 0 # P2 backs out: P1 chooses again
+			_cursor = _p1_pick
+			_p1_pick = -1
+			Audio.sfx(&"ui_back", -4.0)
+			_refresh_versus()
+		else:
+			_back_to_menu()
+	elif event.is_action_pressed("ui_cancel"):
+		_back_to_menu()
+
+
+func _move_cursor(step: int, count: int) -> void:
+	_cursor = wrapi(_cursor + step, 0, count)
+	Audio.sfx(&"ui_focus", -6.0)
+	_refresh_versus()
+
+
+func _confirm_versus(index: int) -> void:
+	Audio.sfx(&"ui_accept", -4.0)
+	if _picking == 0:
+		_p1_pick = index
+		_picking = 1
+		_cursor = index # P2 starts on the same fighter; mirror matches are allowed
+		_refresh_versus()
+		return
+	GameState.player_character = GameState.roster[_p1_pick]
+	GameState.p2_character = GameState.roster[index]
+	get_tree().change_scene_to_file(VS_SCENE)
+
+
+## Title, hint, cursor highlight and P1's locked pick for the player currently choosing.
+func _refresh_versus() -> void:
+	var player := _picking + 1
+	($Margin/VBox/Title as Label).text = "PLAYER %d  -  SELECT YOUR FIGHTER" % player
+	($Margin/VBox/Hint as Label).text = "PLAYER %d:  %s  ·  Light Punch to select  ·  Heavy Punch to go back" % [
+		player, "W / S or stick" if player == 1 else "Up / Down arrows or stick"]
+	for i in roster_box.get_child_count():
+		var button := roster_box.get_child(i) as Button
+		var character: CharacterData = GameState.roster[i]
+		var style: StyleBoxFlat = (_styles[i][1] if i == _cursor else _styles[i][0]).duplicate()
+		if i == _cursor:
+			style.border_color = PLAYER_COLORS[_picking]
+		button.add_theme_stylebox_override("normal", style)
+		button.add_theme_stylebox_override("hover", style)
+		button.text = character.display_name + ("   P1" if i == _p1_pick else "")
+	_show_details(GameState.roster[_cursor])
 
 
 func _build_preview_stage() -> void:
@@ -122,10 +205,17 @@ func _make_portrait_button(character: CharacterData) -> Button:
 	button.add_theme_stylebox_override("hover", focused)
 	button.add_theme_stylebox_override("pressed", focused)
 	button.add_theme_stylebox_override("focus", focused)
+	_styles.append([normal, focused])
 
 	button.focus_entered.connect(_show_details.bind(character))
-	button.mouse_entered.connect(button.grab_focus)
-	button.pressed.connect(_select.bind(character))
+	button.mouse_entered.connect(func() -> void:
+		if not _versus:
+			button.grab_focus())
+	button.pressed.connect(func() -> void:
+		if _versus:
+			_confirm_versus(GameState.roster.find(character))
+		else:
+			_select(character))
 	return button
 
 
@@ -151,5 +241,5 @@ func _show_details(character: CharacterData) -> void:
 
 func _select(character: CharacterData) -> void:
 	GameState.player_character = character
-	GameState.cpu_character = GameState.pick_random_cpu()
+	GameState.p2_character = GameState.pick_random_cpu()
 	get_tree().change_scene_to_file(VS_SCENE)

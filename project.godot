@@ -26,6 +26,7 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 
 GameState="*res://scripts/autoload/game_state.gd"
 Audio="*res://scripts/autoload/audio.gd"
+InputSetup="*res://scripts/autoload/input_setup.gd"
 Settings="*res://scripts/autoload/settings.gd"
 
 [display]

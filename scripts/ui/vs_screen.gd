@@ -19,9 +19,10 @@ var _leaving := false
 func _ready() -> void:
 	GameState.ensure_selections()
 	left_portrait.texture = GameState.player_character.portrait
-	right_portrait.texture = GameState.cpu_character.portrait
-	left_name.text = GameState.player_character.display_name.to_upper()
-	right_name.text = "%s (CPU)" % GameState.cpu_character.display_name.to_upper()
+	right_portrait.texture = GameState.p2_character.portrait
+	var versus := GameState.mode == GameState.Mode.VERSUS
+	left_name.text = ("P1  " if versus else "") + GameState.player_character.display_name.to_upper()
+	right_name.text = "%s (%s)" % [GameState.p2_character.display_name.to_upper(), "P2" if versus else "CPU"]
 	# Wait a frame so containers have laid out, then animate from off-screen.
 	await get_tree().process_frame
 	var width := get_viewport_rect().size.x

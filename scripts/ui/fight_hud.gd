@@ -68,9 +68,9 @@ func _ready() -> void:
 	%PauseMenuButton.pressed.connect(func() -> void: main_menu_pressed.emit())
 
 
-func setup(p1: Fighter, p2: Fighter, rounds_to_win: int) -> void:
-	p1_name.text = p1.data.display_name
-	p2_name.text = "%s (CPU)" % p2.data.display_name
+func setup(p1: Fighter, p2: Fighter, rounds_to_win: int, versus: bool = false) -> void:
+	p1_name.text = "%s (P1)" % p1.data.display_name if versus else p1.data.display_name
+	p2_name.text = "%s (%s)" % [p2.data.display_name, "P2" if versus else "CPU"]
 	_bind_health(p1, p1_health, p1_trail)
 	_bind_health(p2, p2_health, p2_trail)
 	# A combo is shown on the attacker's side, so P2's hits taken appear under P1.
