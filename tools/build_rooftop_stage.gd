@@ -46,6 +46,7 @@ func _initialize() -> void:
 	stage.name = "Rooftop"
 	stage.set_script(load(STAGE_SCRIPT))
 	stage.set("rope_line", 50.0) # nothing sits between the camera and the fight
+	stage.set("music", &"rooftop")
 
 	_make_materials()
 	_build_environment()

@@ -15,7 +15,8 @@ const CREDITS := [
 	["Characters & animations", "Quaternius: Universal Base Characters,\nUniversal Animation Library 1 & 2 (CC0)"],
 	["Stage lighting & textures", "Poly Haven: \"Basement Boxing Ring\" HDRI by Sergej\nMajboroda; Terlenka, Fabric Leather 02,\nConcrete Floor Worn 001 (CC0)"],
 	["Dojo textures", "Poly Haven: Tatami Mat, Hinoki Planks, Japanese Cedar Planks\n(Charlotte Baglioni, Rico Cilliers), Dark Wood (Dario Barresi,\nDimitrios Savva, Rico Cilliers), White Plaster 02 (Rob Tuytel) (CC0)"],
-	["Music", "\"Heavy Battle 2\" and \"Space Battle\" by MintoDog\n(OpenGameArt, CC0)"],
+	["Music", "\"Heavy Battle 2\" and \"Space Battle\" by MintoDog, \"Determination\"\nby HydroGene, \"Midnight Drive\" by congusbongus (OpenGameArt, CC0)"],
+	["Fighter voices", "\"Male Grunt/Yelling sounds\" by HaelDB, \"Female Hurt\nGrunts & Groans\" by AuraVoice (OpenGameArt, CC0)"],
 	["Sound effects & announcer", "Kenney: Impact Sounds, Interface Sounds,\nVoiceover Pack: Fighter (CC0)"],
 	["Rooftop skyline", "Poly Haven: \"Shanghai Bund\" HDRI by Greg Zaal (CC0)"],
 	["Made for this project", "Ring, arena, dojo, rooftop and crowds, fight and special-move\nanimations, portraits, swing, energy and super sounds"],
@@ -90,7 +91,7 @@ func _ready() -> void:
 		column.add_child(_record_label)
 	column.add_child(_label("Enter / A to continue", 24, Color(0.5, 0.5, 0.55)))
 
-	Audio.voice("winner" if _run.cleared else "you_lose")
+	Audio.voice("winner" if _run.cleared else "game_over")
 
 
 func _process(delta: float) -> void:

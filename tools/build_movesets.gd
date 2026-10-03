@@ -97,7 +97,7 @@ const CHARACTERS := {
 				{travel = 8.0, chip_damage = 14, camera_intensity = 0.3}],
 			# Double-fist slam: a shockwave along the floor that must be blocked low.
 			"earthquake": ["Earthquake", "214P", &"fight/ground_pound", 0.33, 0.85, 18, 6, 24, 110, H.LOW, 0, 16, 12, Vector2(1.5, 0), Vector3(0, 0.2, -0.9), 0.55,
-				{knockdown = true, chip_damage = 12, camera_intensity = 0.3}],
+				{knockdown = true, chip_damage = 12, camera_intensity = 0.3, impact_fx = &"shockwave"}],
 			"titan_rush": ["Titan Rush", "236236P", &"fight/shoulder_charge", 0.15, 0.83, 6, 24, 26, 40, H.MID, 24, 16, 6, Vector2(0.6, 0), Vector3(0, 1.0, -0.6), 0.4,
 				{super_move = true, hits = 4, hit_interval = 6, travel = 5.0, invuln_frames = 10, chip_damage = 8, followup = "~titan_finish", camera_intensity = 0.2}],
 			"titan_finish": ["Titan Rush", "~titan_finish", &"ual2/OverhandThrow", 0.40, 0.9, 8, 5, 26, 220, H.MID, 0, 20, 16, Vector2(2.5, 0), Vector3(0.2, 0.8, -0.95), 0.42,
@@ -168,7 +168,7 @@ func _make(row: Array) -> MoveData:
 	m.knockdown = extras.get("knockdown", false)
 	m.lunge = extras.get("lunge", 0.0)
 	for key in ["chip_damage", "hits", "hit_interval", "travel", "rise", "landing_recovery", "invuln_frames",
-			"low_profile", "super_move", "followup", "projectile_speed", "projectile_lifetime", "projectile_color"]:
+			"low_profile", "super_move", "followup", "projectile_speed", "projectile_lifetime", "projectile_color", "impact_fx"]:
 		if extras.has(key):
 			m.set(key, extras[key])
 	return m

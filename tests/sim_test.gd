@@ -312,6 +312,7 @@ func _initialize() -> void:
 	await training_tests()
 	await arcade_tests()
 	await stage_tests()
+	await polish_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -815,4 +816,50 @@ func stage_tests() -> void:
 	hp = p2.health
 	press(InputBuffer.LP); step(6)
 	check("Rooftop: loads and combat works", m.stage.name == "Rooftop" and p2.health == hp - 30, "hp %d -> %d" % [hp, p2.health])
+	gs.stage_path = gs.DEFAULT_STAGE
+
+
+func polish_tests() -> void:
+	var gs = root.get_node("GameState")
+	var audio = root.get_node("Audio")
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+	# Each stage brings its own music.
+	for entry in [[gs.DOJO_STAGE, &"dojo"], [gs.ROOFTOP_STAGE, &"rooftop"], [gs.DEFAULT_STAGE, &"fight"]]:
+		gs.stage_path = entry[0]
+		change_scene_to_file("res://scenes/fight.tscn")
+		await process_frame; await process_frame
+		check("Music: %s plays its own track" % entry[1], current_scene.stage.music == entry[1] and audio._music_name == entry[1])
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+
+	# Every fighter has special, super and K.O. shouts.
+	var missing := []
+	for c in gs.roster:
+		for kind in ["special", "super", "ko"]:
+			audio.shout(c.id, kind, -80.0)
+			if (audio._shouts["%s_%s" % [c.id, kind]] as Array).is_empty():
+				missing.append("%s_%s" % [c.id, kind])
+	check("Shouts: every fighter has special / super / K.O. takes", missing.is_empty(), str(missing))
+
+	# Walk forward, release, then 623: the 6 starts a dash that turns into the special.
+	reset(DummyController.Mode.STAND); approach(1.0)
+	motion("623", InputBuffer.HP)
+	check("Dragon punch comes out straight from a walk (dash cancel)", p1.current_move != null and p1.current_move.name == "Rising Dragon",
+		p1.current_move.name if p1.current_move else state_name(p1))
+	step(120)
+
+	# Impact effects fire on the special's first active frame.
+	var fx = m.fx # untyped: naming FightFx here would compile it before the Audio autoload exists
+	reset(DummyController.Mode.STAND)
+	p1.position.x = -2.5; p2.position.x = 2.5
+	var before: int = fx.spawned
+	motion("236", InputBuffer.HP)
+	step(14)
+	check("FX: projectile launch flash", fx.spawned > before)
+	before = fx.spawned
+	wait_until(func() -> bool: return p1.projectile == null, 120)
+	check("FX: projectile impact burst + ring", fx.spawned >= before + 2, "%d effects" % (fx.spawned - before))
 	gs.stage_path = gs.DEFAULT_STAGE

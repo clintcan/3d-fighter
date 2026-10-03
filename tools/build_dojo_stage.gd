@@ -54,6 +54,7 @@ func _initialize() -> void:
 	stage.name = "Dojo"
 	stage.set_script(load(STAGE_SCRIPT))
 	stage.set("rope_line", 5.8) # students (on the camera's side) hide when the camera is behind them
+	stage.set("music", &"dojo")
 
 	_make_materials()
 	_build_environment()

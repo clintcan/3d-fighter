@@ -4,6 +4,7 @@ extends Node
 ## focus/press sounds automatically. Purely cosmetic: nothing here affects gameplay.
 
 const SFX_DIR := "res://assets/audio/sfx/"
+const FIGHTER_VOICE_DIR := "res://assets/audio/voice/fighters/"
 const VOICE_DIR := "res://assets/audio/voice/"
 const MUSIC_DIR := "res://assets/audio/music/"
 const SFX := {
@@ -23,6 +24,8 @@ const SFX := {
 const MUSIC := {
 	&"menu": "menu_space_battle",
 	&"fight": "fight_heavy_battle_2",
+	&"dojo": "fight_dojo_determination",
+	&"rooftop": "fight_rooftop_midnight_drive",
 }
 const SFX_VOICES := 16
 const MUSIC_FADE := 1.2
@@ -36,6 +39,7 @@ var _music_name: StringName
 var _active_music := 0
 var _rng := RandomNumberGenerator.new() # cosmetic only, never gameplay RNG
 var _voice_queue: Array[String] = []
+var _shouts := {} # "<id>_<kind>" -> Array[AudioStream]
 
 
 func _ready() -> void:
@@ -75,6 +79,28 @@ func sfx(sound: StringName, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 	player.stream = streams[_rng.randi() % streams.size()]
 	player.volume_db = volume_db
 	player.pitch_scale = pitch * _rng.randf_range(0.94, 1.06)
+	player.play()
+
+
+## A fighter's shout: a random take of assets/audio/voice/fighters/<id>_<kind>_N.ogg
+## (kinds: "special", "super", "ko"). Silently does nothing if there are none.
+func shout(fighter_id: StringName, kind: String, volume_db: float = 0.0) -> void:
+	var key := "%s_%s" % [fighter_id, kind]
+	if not _shouts.has(key):
+		var takes: Array[AudioStream] = []
+		for n in range(1, 9):
+			var path := FIGHTER_VOICE_DIR + "%s_%d.ogg" % [key, n]
+			if ResourceLoader.exists(path):
+				takes.append(load(path))
+		_shouts[key] = takes
+	var streams: Array = _shouts[key]
+	if streams.is_empty():
+		return
+	var player := _pool[_next_player]
+	_next_player = (_next_player + 1) % _pool.size()
+	player.stream = streams[_rng.randi() % streams.size()]
+	player.volume_db = volume_db
+	player.pitch_scale = _rng.randf_range(0.97, 1.03)
 	player.play()
 
 

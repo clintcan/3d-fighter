@@ -2,7 +2,8 @@ class_name TrainingMode
 extends Node
 ## Training mode tools, added by FightManager when GameState.mode == TRAINING:
 ## endless session with health refill, dummy settings (stance, guard, CPU, record &
-## playback), measured frame data for P1's attacks, input history, hitbox display, and
+## playback), measured frame data for P1's attacks, input history with a live input
+## display (stick + buttons), hitbox display, and
 ## a training menu. Keys: Tab / pad Back = menu, Backspace / L3 = reset, F6 = record,
 ## F7 = playback.
 
@@ -48,6 +49,7 @@ var _layer: CanvasLayer
 var _status: Label
 var _frame_label: Label
 var _history_label: Label
+var _input_display: InputDisplay
 var _menu: PanelContainer
 var _menu_first: Control
 
@@ -149,6 +151,8 @@ func _track_history() -> void:
 			history.pop_back()
 	if show_input_history:
 		_history_label.text = format_history()
+		_input_display.packed = player.input.current()
+		_input_display.queue_redraw()
 
 
 func _refill(fighter: Fighter) -> void:
@@ -320,8 +324,13 @@ func _build_ui() -> void:
 	frame_panel.add_child(_frame_label)
 
 	var history_panel := _panel(Vector2(40, 210), Control.PRESET_TOP_LEFT)
+	var history_box := VBoxContainer.new()
+	history_box.add_theme_constant_override("separation", 10)
+	history_panel.add_child(history_box)
+	_input_display = InputDisplay.new()
+	history_box.add_child(_input_display)
 	_history_label = _label(22, mono)
-	history_panel.add_child(_history_label)
+	history_box.add_child(_history_label)
 
 	_build_menu()
 
@@ -443,6 +452,34 @@ func _toggle(grid: GridContainer, label_text: String, value: bool, on_change: Ca
 	check.button_pressed = value
 	check.toggled.connect(on_change)
 	grid.add_child(check)
+
+
+## Live input: a stick gate with a dot at the held direction (facing-relative: right =
+## toward the opponent) and lamps for LP, HP, LK, HK and sidestep.
+class InputDisplay extends Control:
+	const GATE := 34.0
+	const LAMPS := [[InputBuffer.LP, "LP"], [InputBuffer.HP, "HP"], [InputBuffer.LK, "LK"], [InputBuffer.HK, "HK"], [InputBuffer.SIDESTEP, "SS"]]
+	var packed := InputBuffer.pack(InputBuffer.NEUTRAL, 0)
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(250, GATE * 2.0 + 8.0)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var center := Vector2(GATE + 4.0, GATE + 4.0)
+		draw_circle(center, GATE, Color(1, 1, 1, 0.12))
+		draw_arc(center, GATE, 0.0, TAU, 32, Color(1, 1, 1, 0.5), 2.0)
+		var dir := packed & 0xF
+		var offset := Vector2.ZERO
+		if dir != InputBuffer.NEUTRAL:
+			offset = Vector2(((dir - 1) % 3) - 1, 1 - ((dir - 1) / 3)).normalized() * (GATE - 10.0)
+		draw_circle(center + offset, 10.0, Color(1.0, 0.82, 0.3))
+		var font := ThemeDB.fallback_font
+		for i in LAMPS.size():
+			var on: bool = ((packed >> InputBuffer.BUTTON_SHIFT) & int(LAMPS[i][0])) != 0
+			var at := Vector2(GATE * 2.0 + 30.0 + (i % 3) * 52.0, 22.0 + (i / 3) * 40.0)
+			draw_circle(at, 16.0, Color(1.0, 0.45, 0.3) if on else Color(1, 1, 1, 0.15))
+			draw_string(font, at + Vector2(-11, 6), LAMPS[i][1], HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE if on else Color(1, 1, 1, 0.6))
 
 
 ## Feeds P1's controls to the dummy while recording them.

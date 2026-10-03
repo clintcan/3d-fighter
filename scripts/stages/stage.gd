@@ -5,6 +5,8 @@ extends Node3D
 
 ## Fighters are clamped to +/- this distance from the center on X and Z.
 @export var bounds_half_extent: float = 3.6
+## Fight music track (a key of Audio.MUSIC).
+@export var music: StringName = &"fight"
 
 @onready var p1_spawn: Marker3D = $P1Spawn
 @onready var p2_spawn: Marker3D = $P2Spawn

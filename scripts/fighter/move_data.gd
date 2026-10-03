@@ -62,6 +62,9 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 @export var projectile_speed: float = 0.0
 @export var projectile_lifetime: int = 90
 @export var projectile_color: Color = Color(0.4, 0.75, 1.0)
+## Cosmetic effect when the move becomes active ("shockwave" = ground-pound ring and
+## dust). Trails, rising sparks and projectile flashes come from the move's own data.
+@export var impact_fx: StringName = &""
 
 @export_group("Hitbox")
 ## Sphere hitbox. Offset is in the fighter's local space (-Z = toward opponent), or

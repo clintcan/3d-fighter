@@ -339,23 +339,24 @@ _surfaces = [{
 "vertex_data": PackedByteArray("w/U4QClcE0E+CjvBPQpHQClcE0Fcjz7BPQpHQClcE0E+CjvBw/U4QClcE0Fcjz7Bw/U4QAvXD0E+CjvBPQpHQAvXD0Fcjz7BPQpHQAvXD0E+CjvBw/U4QAvXD0Fcjz7BPQpHQClcE0E+CjvBw/U4QClcE0Fcjz7BPQpHQClcE0Fcjz7Bw/U4QClcE0E+CjvBPQpHQAvXD0E+CjvBw/U4QAvXD0Fcjz7BPQpHQAvXD0Fcjz7Bw/U4QAvXD0E+CjvBPQpHQClcE0E+CjvBw/U4QAvXD0E+CjvBw/U4QClcE0E+CjvBPQpHQAvXD0E+CjvBPQpHQClcE0Fcjz7Bw/U4QAvXD0Fcjz7Bw/U4QClcE0Fcjz7BPQpHQAvXD0Fcjz7B/3//f////7//////AAD/v/9//3////+//////wAA/7//f/9/////v/////8AAP+//3//f////7//////AAD/v///AID/////AAAAgP9//7///wCA/////wAAAID/f/+///8AgP////8AAACA/3//v///AID/////AAAAgP9//78AgP//AAD/vwCAAAD///+/AID//wAA/78AgAAA////vwCA//8AAP+/AIAAAP///78AgP//AAD/vwCAAAD///+/")
 }]
 
-[node name="Rooftop" type="Node3D" unique_id=341021860]
+[node name="Rooftop" type="Node3D" unique_id=1103082011]
 script = ExtResource("1_0p4hj")
+music = &"rooftop"
 rope_line = 50.0
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=711068129]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1482956470]
 environment = SubResource("Environment_x6hnx")
 
-[node name="Lights" type="Node3D" parent="." unique_id=1382669060]
+[node name="Lights" type="Node3D" parent="." unique_id=777103301]
 
-[node name="Moonlight" type="DirectionalLight3D" parent="Lights" unique_id=209230831]
+[node name="Moonlight" type="DirectionalLight3D" parent="Lights" unique_id=513211013]
 transform = Transform3D(0.81915206, -0.45198438, 0.35312894, 0, 0.6156615, 0.7880107, -0.57357645, -0.6455006, 0.5043204, 0, 0, 0)
 light_color = Color(0.62, 0.7, 1, 1)
 light_energy = 0.6
 shadow_enabled = true
 directional_shadow_max_distance = 30.0
 
-[node name="FloodlightL" type="SpotLight3D" parent="Lights" unique_id=624306002]
+[node name="FloodlightL" type="SpotLight3D" parent="Lights" unique_id=306620654]
 transform = Transform3D(0.6507914, 0.294809, -0.6996844, 0, 0.92153883, 0.38828635, 0.75925666, -0.2526934, 0.5997295, -9.1, 5.85, 7.8)
 light_color = Color(1, 0.92, 0.78, 1)
 light_energy = 7.0
@@ -364,7 +365,7 @@ spot_range = 22.0
 spot_attenuation = 0.6
 spot_angle = 26.0
 
-[node name="FloodlightR" type="SpotLight3D" parent="Lights" unique_id=813169981]
+[node name="FloodlightR" type="SpotLight3D" parent="Lights" unique_id=64420665]
 transform = Transform3D(0.6507914, -0.294809, 0.6996844, 0, 0.92153883, 0.38828635, -0.75925666, -0.2526934, 0.5997295, 9.1, 5.85, 7.8)
 light_color = Color(1, 0.92, 0.78, 1)
 light_energy = 7.0
@@ -373,7 +374,7 @@ spot_range = 22.0
 spot_attenuation = 0.6
 spot_angle = 26.0
 
-[node name="TopFill" type="SpotLight3D" parent="Lights" unique_id=1514148333]
+[node name="TopFill" type="SpotLight3D" parent="Lights" unique_id=1726872724]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 9, 1)
 light_color = Color(0.85, 0.88, 1, 1)
 light_energy = 3.0
@@ -381,54 +382,54 @@ light_volumetric_fog_energy = 0.0
 spot_range = 12.0
 spot_angle = 40.0
 
-[node name="DoorLamp" type="OmniLight3D" parent="." unique_id=1752316973]
+[node name="DoorLamp" type="OmniLight3D" parent="." unique_id=1383460425]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.9, 2.3, -7.6)
 light_color = Color(1, 0.8, 0.5, 1)
 light_energy = 1.5
 omni_range = 4.0
 
-[node name="Fan11" type="MeshInstance3D" parent="." unique_id=838250746]
+[node name="Fan11" type="MeshInstance3D" parent="." unique_id=2087299136]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 1.12, -2)
 mesh = SubResource("CylinderMesh_rc24y")
 
-[node name="@MeshInstance3D@2" type="MeshInstance3D" parent="." unique_id=685196075]
+[node name="@MeshInstance3D@2" type="MeshInstance3D" parent="." unique_id=1412582150]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 1.12, 1.2)
 mesh = SubResource("CylinderMesh_wcrbc")
 
-[node name="@MeshInstance3D@3" type="MeshInstance3D" parent="." unique_id=733202306]
+[node name="@MeshInstance3D@3" type="MeshInstance3D" parent="." unique_id=546994891]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 1.12, -10.5)
 mesh = SubResource("CylinderMesh_6wapo")
 
-[node name="@MeshInstance3D@4" type="MeshInstance3D" parent="." unique_id=1647854094]
+[node name="@MeshInstance3D@4" type="MeshInstance3D" parent="." unique_id=134711892]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1.12, -10.5)
 mesh = SubResource("CylinderMesh_wx74d")
 
-[node name="WaterTank" type="MeshInstance3D" parent="." unique_id=325248005]
+[node name="WaterTank" type="MeshInstance3D" parent="." unique_id=1060799896]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 4.3, -9)
 mesh = SubResource("CylinderMesh_up6xb")
 
-[node name="WaterTankRoof" type="MeshInstance3D" parent="." unique_id=1113838627]
+[node name="WaterTankRoof" type="MeshInstance3D" parent="." unique_id=488005348]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 6.1, -9)
 mesh = SubResource("CylinderMesh_q7kej")
 
-[node name="TankBand34" type="MeshInstance3D" parent="." unique_id=263728687]
+[node name="TankBand34" type="MeshInstance3D" parent="." unique_id=1060821783]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 3.4, -9)
 mesh = SubResource("CylinderMesh_oot72")
 
-[node name="TankBand43" type="MeshInstance3D" parent="." unique_id=1828606017]
+[node name="TankBand43" type="MeshInstance3D" parent="." unique_id=1401311664]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 4.3, -9)
 mesh = SubResource("CylinderMesh_4gqei")
 
-[node name="TankBand52" type="MeshInstance3D" parent="." unique_id=2084404553]
+[node name="TankBand52" type="MeshInstance3D" parent="." unique_id=1495779389]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 5.2, -9)
 mesh = SubResource("CylinderMesh_fy3it")
 
-[node name="Beacon" type="OmniLight3D" parent="." unique_id=1246230440]
+[node name="Beacon" type="OmniLight3D" parent="." unique_id=1853641442]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 9.1, -11.8)
 light_color = Color(1, 0.15, 0.08, 1)
 omni_range = 4.0
 
-[node name="NeonFight" type="Label3D" parent="." unique_id=851716265]
+[node name="NeonFight" type="Label3D" parent="." unique_id=301369456]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 3.3, -12.2)
 pixel_size = 0.004
 double_sided = false
@@ -438,7 +439,7 @@ text = "FIGHT"
 font_size = 230
 outline_size = 18
 
-[node name="NeonNight" type="Label3D" parent="." unique_id=784626421]
+[node name="NeonNight" type="Label3D" parent="." unique_id=1633280581]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 2.4, -12.2)
 pixel_size = 0.004
 double_sided = false
@@ -448,58 +449,58 @@ text = "NIGHT"
 font_size = 170
 outline_size = 18
 
-[node name="NeonGlow0" type="OmniLight3D" parent="." unique_id=2111789363]
+[node name="NeonGlow0" type="OmniLight3D" parent="." unique_id=1756611550]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.7, 3.3, -11)
 light_color = Color(1, 0.18, 0.62, 1)
 light_energy = 2.2
 omni_range = 7.0
 
-[node name="NeonGlow1" type="OmniLight3D" parent="." unique_id=676141568]
+[node name="NeonGlow1" type="OmniLight3D" parent="." unique_id=1456473780]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3, 2.4, -11)
 light_color = Color(0.2, 0.85, 1, 1)
 light_energy = 2.2
 omni_range = 7.0
 
-[node name="Geometry" type="Node3D" parent="." unique_id=1549216627]
+[node name="Geometry" type="Node3D" parent="." unique_id=573628011]
 
-[node name="Batch0" type="MeshInstance3D" parent="Geometry" unique_id=1037797840]
+[node name="Batch0" type="MeshInstance3D" parent="Geometry" unique_id=1268009501]
 mesh = SubResource("ArrayMesh_pk56q")
 
-[node name="Batch1" type="MeshInstance3D" parent="Geometry" unique_id=1383460945]
+[node name="Batch1" type="MeshInstance3D" parent="Geometry" unique_id=1687987253]
 mesh = SubResource("ArrayMesh_2o4fb")
 
-[node name="Batch2" type="MeshInstance3D" parent="Geometry" unique_id=1066989240]
+[node name="Batch2" type="MeshInstance3D" parent="Geometry" unique_id=1310886656]
 mesh = SubResource("ArrayMesh_iowfi")
 
-[node name="Batch3" type="MeshInstance3D" parent="Geometry" unique_id=1592258233]
+[node name="Batch3" type="MeshInstance3D" parent="Geometry" unique_id=175659857]
 mesh = SubResource("ArrayMesh_qadsa")
 
-[node name="Batch4" type="MeshInstance3D" parent="Geometry" unique_id=1730354035]
+[node name="Batch4" type="MeshInstance3D" parent="Geometry" unique_id=1328446104]
 mesh = SubResource("ArrayMesh_avn3b")
 
-[node name="Batch5" type="MeshInstance3D" parent="Geometry" unique_id=2032884276]
+[node name="Batch5" type="MeshInstance3D" parent="Geometry" unique_id=426300525]
 mesh = SubResource("ArrayMesh_tkitt")
 
-[node name="Batch6" type="MeshInstance3D" parent="Geometry" unique_id=980347789]
+[node name="Batch6" type="MeshInstance3D" parent="Geometry" unique_id=2026139524]
 mesh = SubResource("ArrayMesh_hyfby")
 
-[node name="Batch7" type="MeshInstance3D" parent="Geometry" unique_id=1817528247]
+[node name="Batch7" type="MeshInstance3D" parent="Geometry" unique_id=35523161]
 mesh = SubResource("ArrayMesh_sijdu")
 
-[node name="Batch8" type="MeshInstance3D" parent="Geometry" unique_id=727209578]
+[node name="Batch8" type="MeshInstance3D" parent="Geometry" unique_id=1917532905]
 mesh = SubResource("ArrayMesh_h7gpq")
 
-[node name="Batch9" type="MeshInstance3D" parent="Geometry" unique_id=1898377398]
+[node name="Batch9" type="MeshInstance3D" parent="Geometry" unique_id=1956115470]
 mesh = SubResource("ArrayMesh_piepp")
 
-[node name="Batch10" type="MeshInstance3D" parent="Geometry" unique_id=2087005486]
+[node name="Batch10" type="MeshInstance3D" parent="Geometry" unique_id=1473184663]
 mesh = SubResource("ArrayMesh_v2s7g")
 
-[node name="Batch11" type="MeshInstance3D" parent="Geometry" unique_id=1006789695]
+[node name="Batch11" type="MeshInstance3D" parent="Geometry" unique_id=876263073]
 mesh = SubResource("ArrayMesh_g5gh3")
 
-[node name="P1Spawn" type="Marker3D" parent="." unique_id=1576937378]
+[node name="P1Spawn" type="Marker3D" parent="." unique_id=1537455414]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, 0)
 
-[node name="P2Spawn" type="Marker3D" parent="." unique_id=2046628242]
+[node name="P2Spawn" type="Marker3D" parent="." unique_id=1532385454]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 0)

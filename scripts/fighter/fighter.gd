@@ -16,6 +16,8 @@ signal throw_impact(defender: Fighter)
 signal meter_changed(current: int, maximum: int)
 ## A super started: FightManager freezes the fight for the super flash.
 signal super_started(fighter: Fighter, move: MoveData)
+## Cosmetic: the current move's first active frame (impact effects).
+signal move_active(fighter: Fighter, move: MoveData)
 
 enum State {
 	IDLE, WALK_FWD, WALK_BACK, CROUCH,
@@ -92,6 +94,9 @@ const MOTION_PRIORITY := ["236236", "623", "214", "236"]
 ## A normal that connected can be cancelled into a special for this long after its
 ## active frames; a special into a super likewise.
 const SPECIAL_CANCEL_WINDOW := 10
+## A forward dash can turn into a special during its first frames, so walk-forward,
+## release, 623 (whose 6 starts a dash) still comes out as the dragon punch.
+const DASH_SPECIAL_CANCEL := 8
 ## Knockback (m/s) of the non-final hits of a multi-hit move, so the victim stays close.
 const MULTI_HIT_KNOCKBACK := 0.6
 
@@ -255,6 +260,9 @@ func tick() -> void:
 				_landing_frames = LANDING_FRAMES
 				_return_to_neutral()
 		State.DASH:
+			if state_frame <= DASH_SPECIAL_CANCEL and _try_special(false):
+				_apply_motion()
+				return
 			velocity = forward * data.dash_speed * _burst_curve(DASH_FRAMES)
 			if state_frame >= DASH_FRAMES:
 				_return_to_neutral()
@@ -366,6 +374,7 @@ func _tick_attack() -> void:
 	elif not airborne:
 		velocity = _with_friction(velocity)
 	if frame == move.startup + 1:
+		move_active.emit(self, move)
 		if move.rise > 0.0:
 			velocity.y = move.rise
 		if move.projectile_speed > 0.0:

@@ -308,6 +308,11 @@ func _on_knocked_out(loser: Fighter) -> void:
 			func() -> void: Engine.time_scale = 1.0)
 
 
+## Extra shake from effects (ground pounds, super finishers), scaled by the camera mode.
+func shake(amount: float) -> void:
+	_add_trauma(amount)
+
+
 func _add_trauma(amount: float) -> void:
 	_trauma = minf(_trauma + amount * MODE_SCALES[mode], 1.0)
 

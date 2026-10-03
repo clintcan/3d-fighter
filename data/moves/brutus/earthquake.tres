@@ -19,6 +19,7 @@ blockstun = 16
 hitstop = 12
 knockdown = true
 chip_damage = 12
+impact_fx = &"shockwave"
 hitbox_radius = 0.55
 hitbox_offset = Vector3(0, 0.2, -0.9)
 camera_intensity = 0.3

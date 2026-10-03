@@ -70,6 +70,7 @@ func _show_arcade_ladder() -> void:
 	if run.current().boss:
 		right_portrait.modulate = SHADOW_TINT
 		right_name.text += "\nFINAL BOSS"
+		Audio.voice("prepare_yourself")
 	var title := Label.new()
 	title.text = "FINAL STAGE" if run.is_final() else "STAGE %d / %d" % [run.stage + 1, run.stages.size()]
 	title.text += "  ·  " + GameState.stage_name(GameState.stage_path).to_upper()

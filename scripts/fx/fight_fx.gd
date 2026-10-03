@@ -2,6 +2,9 @@ class_name FightFx
 extends Node3D
 ## Hit sparks, impact flashes, model hit-flash, knockdown dust and fight sounds, driven
 ## by FightManager / Fighter signals. Purely cosmetic: reads gameplay, never writes it.
+## Special moves add: fighter shouts (special / super / K.O.), motion trails while a
+## travelling move is active, sparks along rising and flurry attacks, a ground-pound
+## shockwave, projectile launch and impact bursts, and a big burst on super finishers.
 
 const HEAVY_HITSTOP := 8 # moves with at least this much hitstop count as heavy
 const SPARK_POOL := 8
@@ -11,6 +14,8 @@ const HIT_COLOR := Color(1.0, 0.75, 0.35)
 const COUNTER_COLOR := Color(1.0, 0.35, 0.15)
 const BLOCK_COLOR := Color(0.45, 0.75, 1.0)
 const SUPER_COLOR := Color(1.0, 0.82, 0.3)
+const TRAIL_COLOR := Color(0.8, 0.9, 1.0)
+const DEBRIS_COLOR := Color(0.55, 0.45, 0.35)
 
 var manager: Node
 ## Total effects spawned (lets tests confirm hits produce effects).
@@ -21,6 +26,9 @@ var _dust: Array[GPUParticles3D] = []
 var _next_spark := 0
 var _next_dust := 0
 var _flash_texture: Texture2D
+## Per fighter: continuous emitters toggled each frame while a special is active.
+var _trails := {} # Fighter -> GPUParticles3D (streaks behind travelling moves)
+var _strike_sparks := {} # Fighter -> GPUParticles3D (sparks along rising/flurry hits)
 
 
 func setup(fight_manager: Node) -> void:
@@ -37,7 +45,14 @@ func setup(fight_manager: Node) -> void:
 		Audio.sfx(&"hit_heavy", 0.0, 1.2))
 	manager.throw_landed.connect(func(_a: Fighter, _d: Fighter) -> void: Audio.sfx(&"block", -4.0, 0.8))
 	for fighter: Fighter in manager.fighters:
-		fighter.attack_started.connect(_on_attack_started)
+		fighter.attack_started.connect(_on_attack_started.bind(fighter))
+		fighter.move_active.connect(_on_move_active)
+		fighter.knocked_out.connect(func(f: Fighter) -> void: Audio.shout(f.data.id, "ko"))
+		fighter.combo_changed.connect(func(hits: int) -> void:
+			if hits == 5:
+				Audio.voice("combo"))
+		_trails[fighter] = _make_trail()
+		_strike_sparks[fighter] = _make_strike_sparks()
 		fighter.landed_hard.connect(_on_landed_hard)
 		fighter.throw_impact.connect(_on_throw_impact)
 
@@ -45,6 +60,14 @@ func setup(fight_manager: Node) -> void:
 func _on_hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult) -> void:
 	var point: Vector3 = manager.last_hit_point
 	var heavy := move.hitstop >= HEAVY_HITSTOP
+	if result != Fighter.HitResult.BLOCKED:
+		if move.projectile_speed > 0.0:
+			spark(point, move.projectile_color, 2.0) # energy burst
+			_ring(point, move.projectile_color, 1.6, false)
+		elif move.input.begins_with("~"): # super finisher
+			spark(point, SUPER_COLOR, 2.4)
+			_ring(point, SUPER_COLOR, 2.2, false)
+			manager.camera.shake(0.45)
 	match result:
 		Fighter.HitResult.BLOCKED:
 			spark(point, BLOCK_COLOR, 0.6)
@@ -63,17 +86,53 @@ func _on_hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result
 				defender.model.flash(Color.WHITE, 0.16 if heavy else 0.1)
 
 
-func _on_attack_started(move: MoveData) -> void:
+func _on_attack_started(move: MoveData, fighter: Fighter) -> void:
 	if move.projectile_speed > 0.0:
 		Audio.sfx(&"energy", -4.0)
 	elif not move.super_move: # the super flash has its own sound
 		Audio.sfx(&"swing_heavy" if move.hitstop >= HEAVY_HITSTOP else &"swing_light", -8.0)
+	if move.is_special() and not move.super_move:
+		Audio.shout(fighter.data.id, "special")
+
+
+## First active frame: launch flash, rising burst, or ground-pound shockwave.
+func _on_move_active(fighter: Fighter, move: MoveData) -> void:
+	if move.projectile_speed > 0.0:
+		spark(fighter.global_transform * Projectile.SPAWN_OFFSET, move.projectile_color, 1.0)
+	if move.rise > 0.0:
+		spark(fighter.global_transform * move.hitbox_offset, SUPER_COLOR if move.input.begins_with("~") else HIT_COLOR, 1.2)
+	if move.impact_fx == &"shockwave":
+		var point := fighter.global_position + fighter.forward * absf(move.hitbox_offset.z)
+		point.y = 0.02
+		_ring(point, Color(0.95, 0.85, 0.7), 3.4, true)
+		dust(point)
+		_debris(point)
+		Audio.sfx(&"fall", 2.0, 0.7)
+		manager.camera.shake(0.35)
+
+
+## Trails and strike sparks follow fighters while a qualifying move is active.
+func _process(_delta: float) -> void:
+	for fighter: Fighter in _trails:
+		var move := fighter.current_move
+		var active := fighter.state == Fighter.State.ATTACK and move != null \
+				and fighter.state_frame > move.startup and fighter.state_frame <= move.startup + move.active
+		var trail: GPUParticles3D = _trails[fighter]
+		trail.emitting = active and move.travel > 0.0
+		if trail.emitting:
+			trail.global_position = fighter.global_position + Vector3.UP * (0.25 if move.low_profile else 1.0)
+		var sparks: GPUParticles3D = _strike_sparks[fighter]
+		sparks.emitting = active and (move.rise > 0.0 or move.hits > 1)
+		if sparks.emitting:
+			sparks.global_position = fighter.global_transform * move.hitbox_offset
+			(sparks.process_material as ParticleProcessMaterial).color = SUPER_COLOR if move.super_move or move.input.begins_with("~") else HIT_COLOR
 
 
 ## Super start: a burst of golden sparks and a glow on the fighter, plus the flash sound.
 func _on_super_flash(fighter: Fighter, _move: MoveData) -> void:
 	spark(fighter.global_position + Vector3.UP * 1.1, SUPER_COLOR, 2.2)
 	Audio.sfx(&"super", 0.0)
+	Audio.shout(fighter.data.id, "super", 2.0)
 	if fighter.model:
 		fighter.model.flash(SUPER_COLOR, 0.6)
 
@@ -105,6 +164,53 @@ func spark(point: Vector3, color: Color, size: float) -> void:
 	mat.initial_velocity_max = 4.5 * size
 	p.restart()
 	_impact_flash(point, color, size)
+
+
+## Expanding ring: flat on the floor (ground pound) or facing the camera (impacts).
+func _ring(point: Vector3, color: Color, size: float, flat: bool) -> void:
+	spawned += 1
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.42
+	torus.outer_radius = 0.5
+	torus.rings = 32
+	torus.ring_segments = 6
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.albedo_color = Color(color, 0.9)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	torus.material = mat
+	var ring := MeshInstance3D.new()
+	ring.mesh = torus
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(ring)
+	ring.global_position = point
+	if flat:
+		ring.scale = Vector3(1.0, 0.15, 1.0)
+	else:
+		var camera := get_viewport().get_camera_3d()
+		if camera:
+			ring.look_at(camera.global_position, Vector3.UP)
+			ring.rotate_object_local(Vector3.RIGHT, PI / 2.0) # torus axis toward the camera
+	var start := ring.scale * 0.2
+	var tween := ring.create_tween().set_parallel()
+	tween.tween_property(ring, "scale", start * 5.0 * size, 0.35).from(start).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(mat, "albedo_color:a", 0.0, 0.35).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(ring.queue_free)
+
+
+## Chunks of debris thrown up by a ground pound.
+func _debris(point: Vector3) -> void:
+	var p := _sparks[_next_spark]
+	_next_spark = (_next_spark + 1) % _sparks.size()
+	p.global_position = point
+	p.amount_ratio = 1.0
+	var mat := p.process_material as ParticleProcessMaterial
+	mat.color = DEBRIS_COLOR
+	mat.initial_velocity_min = 3.0
+	mat.initial_velocity_max = 6.0
+	p.restart()
 
 
 func dust(point: Vector3) -> void:
@@ -156,6 +262,55 @@ func _make_sparks() -> GPUParticles3D:
 	ramp.gradient = fade
 	mat.color_ramp = ramp
 	return _make_emitter(mat, 40, 0.3, Vector2(0.09, 0.09))
+
+
+## Speed streaks left behind a travelling move (charges, slides).
+func _make_trail() -> GPUParticles3D:
+	var mat := ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	mat.emission_sphere_radius = 0.35
+	mat.direction = Vector3.ZERO
+	mat.spread = 180.0
+	mat.initial_velocity_min = 0.0
+	mat.initial_velocity_max = 0.3
+	mat.gravity = Vector3.ZERO
+	mat.scale_min = 0.8
+	mat.scale_max = 1.6
+	mat.color = Color(TRAIL_COLOR, 0.55)
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 0.7))
+	fade.set_color(1, Color(1, 1, 1, 0))
+	var ramp := GradientTexture1D.new()
+	ramp.gradient = fade
+	mat.color_ramp = ramp
+	return _make_continuous(mat, 60, 0.35, Vector2(0.3, 0.3))
+
+
+## Sparks streaming off the striking limb during rising attacks and flurries.
+func _make_strike_sparks() -> GPUParticles3D:
+	var mat := ParticleProcessMaterial.new()
+	mat.direction = Vector3.UP
+	mat.spread = 60.0
+	mat.initial_velocity_min = 1.0
+	mat.initial_velocity_max = 3.0
+	mat.gravity = Vector3(0, -4, 0)
+	mat.scale_min = 0.6
+	mat.scale_max = 1.2
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 1))
+	fade.set_color(1, Color(1, 1, 1, 0))
+	var ramp := GradientTexture1D.new()
+	ramp.gradient = fade
+	mat.color_ramp = ramp
+	return _make_continuous(mat, 50, 0.3, Vector2(0.08, 0.08))
+
+
+func _make_continuous(mat: ParticleProcessMaterial, amount: int, lifetime: float, quad_size: Vector2) -> GPUParticles3D:
+	var p := _make_emitter(mat, amount, lifetime, quad_size)
+	p.one_shot = false
+	p.explosiveness = 0.0
+	p.emitting = false
+	return p
 
 
 func _make_dust() -> GPUParticles3D:

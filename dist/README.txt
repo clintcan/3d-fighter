@@ -84,7 +84,11 @@ All third-party assets are CC0 (public domain), credited with thanks:
   Planks (Charlotte Baglioni, Rico Cilliers), Dark Wood (Dario Barresi,
   Dimitrios Savva, Rico Cilliers), White Plaster 02 (Rob Tuytel);
   Rooftop skyline: "Shanghai Bund" HDRI by Greg Zaal
-- Music: "Heavy Battle 2" and "Space Battle" by MintoDog - https://opengameart.org
+- Music: "Heavy Battle 2" and "Space Battle" by MintoDog; "Determination" by
+  HydroGene (dojo); "Midnight Drive" by congusbongus (rooftop)
+  - https://opengameart.org
+- Fighter voices: "Male Grunt/Yelling sounds" by HaelDB, "Female Hurt Grunts &
+  Groans" by AuraVoice - https://opengameart.org
 - Sound effects & announcer: Kenney - Impact Sounds, Interface Sounds,
   Voiceover Pack: Fighter - https://kenney.nl
 

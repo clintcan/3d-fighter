@@ -114,7 +114,7 @@ func _ready() -> void:
 	fx.name = "FightFx"
 	add_child(fx)
 	fx.setup(self)
-	Audio.music(&"fight")
+	Audio.music(stage.music)
 	if is_training():
 		var training := TrainingMode.new()
 		training.name = "TrainingMode"
