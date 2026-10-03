@@ -1,6 +1,6 @@
 extends Control
-## Character select: portrait roster, a turntable 3D preview of the focused fighter,
-## stats and signature moves.
+## Character select: portrait roster, a 3D preview of the focused fighter performing a
+## routine that matches their CPU personality (FighterShowcase), stats and moves.
 ## Vs CPU: pick with any device; the CPU opponent is random.
 ## Versus: P1 then P2 pick in turn, each with their own controls (up/down to move,
 ## Light Punch to confirm, Heavy Punch to go back), then the VS screen.
@@ -12,7 +12,6 @@ const VS_SCENE := "res://scenes/vs_screen.tscn"
 const STAGE_SELECT_SCENE := "res://scenes/stage_select.tscn"
 const FIGHT_SCENE := "res://scenes/fight.tscn"
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
-const TURNTABLE_SPEED := 0.5 # rad/s
 const HEALTH_SCALE := 1200.0 # max_health shown as a full bar
 
 @onready var roster_box: VBoxContainer = %Roster
@@ -31,6 +30,8 @@ const PLAYER_COLORS := [Color(0.35, 0.6, 1.0), Color(1.0, 0.4, 0.35)]
 var _turntable: Node3D
 var _models := {} # CharacterData -> FighterModel
 var _focused: CharacterData
+var _showcase: FighterShowcase
+var _effects: Node3D # showcase effects, outside the turning turntable
 # Versus mode state
 var _versus := false
 var _picking := 0 # 0 = P1 choosing, 1 = P2 choosing
@@ -66,9 +67,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	_turntable.rotate_y(TURNTABLE_SPEED * delta)
-	if _focused:
-		(_models[_focused] as FighterModel).show_clip(&"fight/guard", -1.0, 1.0, delta)
+	if _showcase:
+		_showcase.process(delta)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -195,6 +195,8 @@ func _build_preview_stage() -> void:
 
 	_turntable = Node3D.new()
 	viewport.add_child(_turntable)
+	_effects = Node3D.new()
+	viewport.add_child(_effects)
 
 	var camera := Camera3D.new()
 	camera.fov = 32.0
@@ -243,12 +245,15 @@ func _show_details(character: CharacterData) -> void:
 	if _focused:
 		(_models[_focused] as FighterModel).visible = false
 	_focused = character
-	(_models[character] as FighterModel).visible = true
-	_turntable.rotation.y = 0.0
+	var model := _models[character] as FighterModel
+	model.visible = true
+	_showcase = FighterShowcase.new(model, character, _turntable, _effects)
 
 	name_label.text = character.display_name.to_upper()
 	archetype_label.text = character.archetype
-	description_label.text = character.description
+	var style: Dictionary = AIController.PERSONALITIES.get(character.id, AIController.DEFAULT_PERSONALITY)
+	description_label.text = "%s
+As CPU: %s, %s." % [character.description, style.name, style.blurb]
 	power_bar.value = character.power_rating
 	speed_bar.value = character.speed_rating
 	health_bar.value = character.max_health / HEALTH_SCALE

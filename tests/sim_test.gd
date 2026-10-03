@@ -313,6 +313,8 @@ func _initialize() -> void:
 	await arcade_tests()
 	await stage_tests()
 	await polish_tests()
+	await personality_tests()
+	await showcase_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -863,3 +865,102 @@ func polish_tests() -> void:
 	wait_until(func() -> bool: return p1.projectile == null, 120)
 	check("FX: projectile impact burst + ring", fx.spawned >= before + 2, "%d effects" % (fx.spawned - before))
 	gs.stage_path = gs.DEFAULT_STAGE
+
+
+## Average distance (and fireball count) the CPU keeps from a standing P1 over 30 s.
+func _cpu_spacing(gs, cpu_index: int) -> Dictionary:
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[cpu_index]
+	gs.stage_path = gs.DEFAULT_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	var a: Fighter = m.fighters[0]
+	var b: Fighter = m.fighters[1]
+	a.controller = m.dummy
+	m.dummy.mode = DummyController.Mode.STAND
+	var cpu := AIController.new(AIController.Difficulty.HARD, 3)
+	cpu.attach(b)
+	b.controller = cpu
+	m.start_fight_immediately()
+	for f in m.fighters: f.immortal = true
+	var result := {dist = 0.0, fireballs = 0, name = cpu.personality_name()}
+	b.attack_started.connect(func(mv: MoveData) -> void:
+		if mv.projectile_speed > 0.0: result.fireballs += 1)
+	for i in 1800:
+		m._physics_process(1.0 / 60.0)
+		result.dist += Vector2(b.position.x - a.position.x, b.position.z - a.position.z).length() / 1800.0
+	return result
+
+
+func personality_tests() -> void:
+	var gs = root.get_node("GameState")
+	var kenji: Dictionary = await _cpu_spacing(gs, 0)
+	var rhea: Dictionary = await _cpu_spacing(gs, 1)
+	var brutus: Dictionary = await _cpu_spacing(gs, 2)
+	check("CPU personalities: Zoner / Rushdown / Punisher", kenji.name == "Zoner" and rhea.name == "Rushdown" and brutus.name == "Punisher")
+	check("CPU spacing: Kenji zones far, Brutus mid, Rhea up close", kenji.dist > brutus.dist + 0.4 and brutus.dist > rhea.dist + 0.15,
+		"%.2f / %.2f / %.2f" % [kenji.dist, brutus.dist, rhea.dist])
+	check("CPU: Kenji zones with fireballs", kenji.fireballs >= 8, "%d fireballs" % kenji.fireballs)
+
+	# The accidental-dash filter: walk 6, neutral, 6 holds neutral instead of dashing;
+	# planned dashes pass; a block that would backdash becomes a crouch block.
+	var cpu := AIController.new()
+	var outputs := []
+	for d in [6, 5, 6]:
+		outputs.append(cpu._without_accidental_dash(InputBuffer.pack(d, 0)) & 0xF)
+	cpu._dashing = true
+	outputs.append(cpu._without_accidental_dash(InputBuffer.pack(5, 0)) & 0xF)
+	outputs.append(cpu._without_accidental_dash(InputBuffer.pack(6, 0)) & 0xF)
+	cpu._dashing = false
+	cpu._recent_dirs.clear()
+	cpu._blocking = true
+	cpu._block_level = MoveData.HitLevel.HIGH
+	for d in [4, 5, 4]:
+		outputs.append(cpu._without_accidental_dash(InputBuffer.pack(d, 0)) & 0xF)
+	check("CPU: no accidental dashes (walk -> neutral, block -> crouch block)", outputs == [6, 5, 5, 5, 6, 4, 5, 1], str(outputs))
+
+	# Brutus punishes a whiffed roundhouse from long range with Bull Charge.
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	var brute := AIController.new(AIController.Difficulty.HARD, 5)
+	brute.attach(p2)
+	p2.controller = brute
+	var charges := [0]
+	p2.attack_started.connect(func(mv: MoveData) -> void:
+		if mv.name == "Bull Charge": charges[0] += 1)
+	for attempt in 6:
+		m.start_match(); m.start_fight_immediately()
+		p1.position.x = -1.3; p2.position.x = 1.3 # 2.6 m: out of normal reach
+		for f in m.fighters: f.reset_physics_interpolation()
+		brute.reset()
+		step(20)
+		p1.position.x = p2.position.x - 2.6
+		press(InputBuffer.HK) # whiffs
+		step(70)
+	check("CPU: Brutus whiff-punishes from range with Bull Charge", charges[0] >= 2, "%d charges in 6 whiffs" % charges[0])
+
+
+func showcase_tests() -> void:
+	var gs = root.get_node("GameState")
+	gs.mode = gs.Mode.VS_CPU
+	change_scene_to_file("res://scenes/character_select.tscn")
+	await process_frame; await process_frame
+	var cs = current_scene
+	var progressed := []
+	for i in gs.roster.size():
+		(cs.get_node("%Roster").get_child(i) as Button).grab_focus()
+		await process_frame
+		var show: FighterShowcase = cs._showcase
+		var steps_seen := {}
+		for f in 420: # 7 s of routine
+			show.process(1.0 / 60.0)
+			steps_seen[show._index] = true
+		progressed.append(steps_seen.size() >= 4 and show.data == gs.roster[i])
+	check("Character select: each fighter performs a personality routine", not progressed.has(false), str(progressed))
