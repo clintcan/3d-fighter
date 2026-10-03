@@ -16,7 +16,7 @@ Outputs (version from project.godot):
 
 Godot is found as `godot_console` on PATH, or set GODOT=path\\to\\godot_console.exe.
 Signing uses tools/macos_sign_notarize.py and the secrets in %USERPROFILE%\\AppleDeveloper
-(never copied into the project). See CLAUDE.md "Release builds".
+(never copied into the project).
 """
 import argparse
 import os

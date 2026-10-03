@@ -84,7 +84,6 @@ tools/     generators (stages, animations, movesets, key art) and build_release.
 tests/     headless simulation tests
 ```
 
-`CLAUDE.md` holds the full design and technical notes.
 
 ## Credits
 

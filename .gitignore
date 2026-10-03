@@ -9,3 +9,6 @@
 # Release archives (rebuild with the Windows export + zip step)
 /dist/*.zip
 /dist/*.tar.gz
+
+# Local design notes (not published)
+CLAUDE.md
