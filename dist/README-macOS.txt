@@ -31,7 +31,8 @@ Gamepad 1 is Player 1 and Gamepad 2 is Player 2 (swap in Options).
 On the character select screen each player picks in turn with
 Light Punch (select) and Heavy Punch (back).
 
-STAGES: after picking fighters, choose the Boxing Ring, the Dojo or Random.
+STAGES: after picking fighters, choose the Boxing Ring, the Dojo, the Rooftop
+or Random.
 
 ARCADE - choose "Arcade" in the main menu
 Fight your way up a ladder of CPU opponents to the final boss: your own
@@ -84,7 +85,8 @@ All third-party assets are CC0 (public domain), credited with thanks:
   Sergej Majboroda; Terlenka, Fabric Leather 02, Concrete Floor Worn 001
   - https://polyhaven.com; Dojo: Tatami Mat, Hinoki Planks, Japanese Cedar
   Planks (Charlotte Baglioni, Rico Cilliers), Dark Wood (Dario Barresi,
-  Dimitrios Savva, Rico Cilliers), White Plaster 02 (Rob Tuytel)
+  Dimitrios Savva, Rico Cilliers), White Plaster 02 (Rob Tuytel);
+  Rooftop skyline: "Shanghai Bund" HDRI by Greg Zaal
 - Music: "Heavy Battle 2" and "Space Battle" by MintoDog - https://opengameart.org
 - Sound effects & announcer: Kenney - Impact Sounds, Interface Sounds,
   Voiceover Pack: Fighter - https://kenney.nl

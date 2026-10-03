@@ -17,7 +17,8 @@ const CREDITS := [
 	["Dojo textures", "Poly Haven: Tatami Mat, Hinoki Planks, Japanese Cedar Planks\n(Charlotte Baglioni, Rico Cilliers), Dark Wood (Dario Barresi,\nDimitrios Savva, Rico Cilliers), White Plaster 02 (Rob Tuytel) (CC0)"],
 	["Music", "\"Heavy Battle 2\" and \"Space Battle\" by MintoDog\n(OpenGameArt, CC0)"],
 	["Sound effects & announcer", "Kenney: Impact Sounds, Interface Sounds,\nVoiceover Pack: Fighter (CC0)"],
-	["Made for this project", "Ring, arena, dojo and crowds, fight and special-move\nanimations, portraits, swing, energy and super sounds"],
+	["Rooftop skyline", "Poly Haven: \"Shanghai Bund\" HDRI by Greg Zaal (CC0)"],
+	["Made for this project", "Ring, arena, dojo, rooftop and crowds, fight and special-move\nanimations, portraits, swing, energy and super sounds"],
 	["", ""],
 	["THANKS FOR PLAYING!", ""],
 ]
@@ -36,7 +37,7 @@ func _ready() -> void:
 	_run = GameState.arcade
 	if _run == null: # scene run on its own (editor F6): show a sample cleared run
 		GameState.ensure_selections()
-		_run = ArcadeRun.create(GameState.player_character, GameState.roster, 1, 1, GameState.stage_paths(), GameState.DOJO_STAGE)
+		_run = ArcadeRun.create(GameState.player_character, GameState.roster, 1, 1, GameState.arcade_arenas(), GameState.DOJO_STAGE)
 		_run.cleared = true
 	var previous_best := ArcadeRun.best_score(_run.player)
 	var record := _run.record_best()

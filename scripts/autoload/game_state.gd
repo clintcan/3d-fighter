@@ -4,6 +4,7 @@ extends Node
 const CHARACTER_DIR := "res://data/characters/"
 const DEFAULT_STAGE := "res://scenes/stages/ring.tscn"
 const DOJO_STAGE := "res://scenes/stages/dojo.tscn"
+const ROOFTOP_STAGE := "res://scenes/stages/rooftop.tscn"
 ## Selectable stages: scene, display name, select-screen thumbnail (rendered by
 ## tools/render_stage_thumbs.gd) and a one-line description.
 const STAGES := [
@@ -11,6 +12,8 @@ const STAGES := [
 		blurb = "Under the arena lights, in front of a packed house."},
 	{path = DOJO_STAGE, name = "Dojo", thumb = "res://assets/ui/stages/dojo.png",
 		blurb = "Tatami, paper screens and a hall full of students."},
+	{path = ROOFTOP_STAGE, name = "Rooftop", thumb = "res://assets/ui/stages/rooftop.png",
+		blurb = "A helipad high above the city lights."},
 ]
 
 const ROUNDS_TO_WIN := 2
@@ -60,7 +63,7 @@ func pick_random_cpu() -> CharacterData:
 ## Starts an Arcade run with `character` and sets up its first opponent.
 func start_arcade(character: CharacterData) -> void:
 	player_character = character
-	arcade = ArcadeRun.create(character, roster, Settings.ai_difficulty, randi(), stage_paths(), DOJO_STAGE)
+	arcade = ArcadeRun.create(character, roster, Settings.ai_difficulty, randi(), arcade_arenas(), DOJO_STAGE)
 	apply_arcade_stage()
 
 
@@ -71,6 +74,12 @@ func apply_arcade_stage() -> void:
 
 func stage_paths() -> Array:
 	return STAGES.map(func(s: Dictionary) -> String: return s.path)
+
+
+## Stages for Arcade's regular fights: every stage except the boss's (the dojo), so a
+## run visits all of them.
+func arcade_arenas() -> Array:
+	return stage_paths().filter(func(path: String) -> bool: return path != DOJO_STAGE)
 
 
 ## Display name of a stage scene (for the VS screen etc.).

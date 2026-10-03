@@ -5,8 +5,8 @@ extends RefCounted
 ##
 ## Ladder: every other roster fighter in a shuffled order with rising difficulty, then
 ## the final boss: the player's own "shadow" (alternate look, Hard AI, full super meter
-## at the start of every round). Fights alternate through `arenas` (GameState.STAGES);
-## the boss is fought on `boss_stage` (the dojo).
+## at the start of every round). Regular fights rotate through `arenas` (every stage
+## but the boss's); the boss is fought on `boss_stage` (the dojo).
 ## Score: damage dealt × 10, per round won a time bonus (seconds left × 100), a life
 ## bonus (up to 5,000 at full health) and 10,000 for a perfect, plus 10,000 × stage
 ## number per stage cleared. A continue replays the stage from its starting score.

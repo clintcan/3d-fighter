@@ -6,10 +6,12 @@ extends Control
 const VS_SCENE := "res://scenes/vs_screen.tscn"
 const FIGHT_SCENE := "res://scenes/fight.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
-const CARD_SIZE := Vector2(560, 315)
+const MAX_CARD_WIDTH := 560.0
+const CARD_GAP := 36
 const GOLD := Color(1.0, 0.82, 0.3)
 
 var _cards: Array[Button] = []
+var _card_size := Vector2(MAX_CARD_WIDTH, MAX_CARD_WIDTH * 9.0 / 16.0)
 var _name_label: Label
 var _blurb_label: Label
 var _leaving := false
@@ -31,10 +33,14 @@ func _ready() -> void:
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 36)
+	row.add_theme_constant_override("separation", CARD_GAP)
 	column.add_child(row)
 	var entries: Array = GameState.STAGES.duplicate()
 	entries.append({path = "", name = "Random", thumb = "", blurb = "Let fate decide."})
+	# Cards shrink to fit however many stages there are (16:9 thumbnails).
+	var available := get_viewport_rect().size.x - 120.0 - CARD_GAP * (entries.size() - 1)
+	var width := minf(MAX_CARD_WIDTH, available / entries.size() - 16.0)
+	_card_size = Vector2(width, width * 9.0 / 16.0)
 	for entry: Dictionary in entries:
 		row.add_child(_make_card(entry))
 
@@ -53,7 +59,7 @@ func _ready() -> void:
 
 func _make_card(entry: Dictionary) -> Button:
 	var card := Button.new()
-	card.custom_minimum_size = CARD_SIZE + Vector2(16, 16)
+	card.custom_minimum_size = _card_size + Vector2(16, 16)
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = Color(0.08, 0.08, 0.12)
 	normal.set_border_width_all(3)
@@ -80,7 +86,7 @@ func _make_card(entry: Dictionary) -> Button:
 		image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(image)
 	else:
-		var mark := _label("?", 200, Color(0.6, 0.6, 0.7))
+		var mark := _label("?", int(_card_size.y * 0.6), Color(0.6, 0.6, 0.7))
 		mark.set_anchors_preset(Control.PRESET_FULL_RECT)
 		mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		card.add_child(mark)
