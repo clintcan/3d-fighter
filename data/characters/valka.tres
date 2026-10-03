@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/characters/base/T_Superhero_Female_Dark_BaseColor.png" id="1_uw3yd"]
+[ext_resource type="Texture2D" path="res://assets/characters/base/T_Superhero_Female_Light_BaseColor.png" id="2_me1hj"]
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Long.gltf" id="3_bpfkp"]
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Eyebrows_Female.gltf" id="4_2nnx0"]
+[ext_resource type="PackedScene" path="res://assets/characters/base/Superhero_Female_FullBody.gltf" id="5_msfu8"]
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="6_fb2cx"]
+[ext_resource type="Resource" path="res://data/moves/valka/jab.tres" id="7_m5tmo"]
+[ext_resource type="Resource" path="res://data/moves/valka/straight.tres" id="8_psa1o"]
+[ext_resource type="Resource" path="res://data/moves/valka/mid_kick.tres" id="9_eb221"]
+[ext_resource type="Resource" path="res://data/moves/valka/roundhouse.tres" id="10_mteem"]
+[ext_resource type="Resource" path="res://data/moves/valka/crouch_jab.tres" id="11_ymjbn"]
+[ext_resource type="Resource" path="res://data/moves/valka/low_kick.tres" id="12_i3ayy"]
+[ext_resource type="Resource" path="res://data/moves/valka/uppercut.tres" id="13_kok1v"]
+[ext_resource type="Resource" path="res://data/moves/valka/sweep.tres" id="14_tqoe6"]
+[ext_resource type="Resource" path="res://data/moves/valka/jump_jab.tres" id="15_gvnbm"]
+[ext_resource type="Resource" path="res://data/moves/valka/jump_hammer.tres" id="16_lm7ho"]
+[ext_resource type="Resource" path="res://data/moves/valka/jump_kick.tres" id="17_cyumr"]
+[ext_resource type="Resource" path="res://data/moves/valka/flying_kick.tres" id="18_ui72f"]
+[ext_resource type="Resource" path="res://data/moves/valka/shoulder_tackle.tres" id="19_x4f1n"]
+[ext_resource type="Resource" path="res://data/moves/valka/knee_lift.tres" id="20_rbvqp"]
+[ext_resource type="Resource" path="res://data/moves/valka/valkyrie_slam.tres" id="21_3aess"]
+[ext_resource type="Resource" path="res://data/moves/valka/spinning_lariat.tres" id="22_u03mm"]
+[ext_resource type="Resource" path="res://data/moves/valka/thunder_valkyrie.tres" id="23_m6gqs"]
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="24_cyr4a"]
+[ext_resource type="Texture2D" path="res://assets/ui/portraits/valka.png" id="24_me1hj"]
+
+[resource]
+script = ExtResource("24_cyr4a")
+id = &"valka"
+display_name = "Valka"
+archetype = "Grappler"
+description = "Towering wrestler. Walks you down, spins through fireballs, and grabs anyone who just blocks."
+select_order = 3
+portrait = ExtResource("24_me1hj")
+model_scene = ExtResource("5_msfu8")
+hair_scenes = Array[PackedScene]([ExtResource("3_bpfkp"), ExtResource("4_2nnx0")])
+body_albedo = ExtResource("2_me1hj")
+model_scale = 1.06
+hair_color = Color(0.93, 0.86, 0.68, 1)
+alt_body_albedo = ExtResource("1_uw3yd")
+alt_hair_color = Color(0.62, 0.12, 0.06, 1)
+victory_animations = Array[StringName]([&"fight/victory_flex", &"fight/victory_fist_pump"])
+placeholder_color = Color(0.85, 0.75, 0.3, 1)
+max_health = 1100
+walk_speed = 1.8
+back_walk_speed = 1.4
+dash_speed = 5.0
+jump_velocity = 5.8
+weight = 1.15
+throw_damage = 150
+power_rating = 0.8
+speed_rating = 0.4
+moves = Array[ExtResource("6_fb2cx")]([ExtResource("7_m5tmo"), ExtResource("8_psa1o"), ExtResource("9_eb221"), ExtResource("10_mteem"), ExtResource("11_ymjbn"), ExtResource("12_i3ayy"), ExtResource("13_kok1v"), ExtResource("14_tqoe6"), ExtResource("15_gvnbm"), ExtResource("16_lm7ho"), ExtResource("17_cyumr"), ExtResource("18_ui72f"), ExtResource("19_x4f1n"), ExtResource("20_rbvqp"), ExtResource("21_3aess"), ExtResource("22_u03mm"), ExtResource("23_m6gqs")])

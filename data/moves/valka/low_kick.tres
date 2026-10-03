@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_p83wb"]
+
+[resource]
+script = ExtResource("1_p83wb")
+name = "Low Kick"
+input = "2LK"
+animation = &"fight/sweep"
+animation_impact = 0.18
+startup = 7
+recovery = 13
+damage = 39
+hit_level = 2
+blockstun = 11
+hitstop = 7
+knockback = Vector2(1.32, 0)
+hitbox_radius = 0.18
+hitbox_offset = Vector3(0.08, 0.18, -0.78)

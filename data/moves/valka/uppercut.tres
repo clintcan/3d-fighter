@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_xj83p"]
+
+[resource]
+script = ExtResource("1_xj83p")
+name = "Uppercut"
+input = "2HP"
+animation = &"fight/uppercut"
+animation_impact = 0.22
+startup = 9
+active = 4
+recovery = 24
+damage = 99
+hitstun = 0
+blockstun = 16
+hitstop = 11
+knockback = Vector2(0.88000005, 7.15)
+launches = true
+hitbox_radius = 0.25
+hitbox_offset = Vector3(0, 1.3, -0.4)
+camera_intensity = 0.35

@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_8h4vn"]
+
+[resource]
+script = ExtResource("1_8h4vn")
+name = "Shoulder Tackle"
+input = "6HP"
+animation = &"fight/shoulder_charge"
+animation_impact = 0.15
+animation_end = 0.83
+startup = 12
+active = 4
+recovery = 20
+damage = 85
+hitstun = 20
+blockstun = 15
+hitstop = 9
+knockback = Vector2(3.5, 0)
+lunge = 4.0
+hitbox_radius = 0.3
+hitbox_offset = Vector3(0, 1, -0.6)
+camera_intensity = 0.15

@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_in4jg"]
+
+[resource]
+script = ExtResource("1_in4jg")
+name = "Valkyrie Slam"
+input = "63214P"
+animation = &"fight/throw"
+animation_impact = 0.08
+animation_end = 0.85
+recovery = 30
+damage = 200
+hitstun = 0
+blockstun = 0
+hitstop = 12
+knockback = Vector2(0, 0)
+command_grab = true
+grab_range = 1.15
+hitbox_radius = 0.3
+hitbox_offset = Vector3(0, 1, -0.6)
+camera_intensity = 0.4

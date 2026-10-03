@@ -459,6 +459,15 @@ func _resolve_pushboxes() -> void:
 func _resolve_throws() -> void:
 	var a := fighters[0]
 	var b := fighters[1]
+	# Command grabs: unblockable, untechable, on the move's first active frame.
+	for attacker in fighters:
+		if not attacker.is_command_grab_frame():
+			continue
+		var target := attacker.opponent
+		if target.is_throwable() and _flat(target.position - attacker.position).length() <= attacker.current_move.grab_range:
+			attacker.on_command_grab()
+			target.on_grabbed_by(attacker, false)
+			throw_landed.emit(attacker, target)
 	if a.is_throw_grab_frame() and b.is_throw_grab_frame():
 		a.tech_apart()
 		b.tech_apart()
@@ -507,7 +516,7 @@ func _resolve_hits() -> void:
 		if not hitbox.is_empty() and attacker.opponent.overlaps_hurtbox(hitbox.center, hitbox.radius):
 			connecting.append([attacker, attacker.current_move, hitbox.center, attacker.is_final_hit()])
 		var p := attacker.projectile
-		if p and attacker.opponent.overlaps_hurtbox(p.position, p.radius):
+		if p and not attacker.opponent.is_projectile_immune() and attacker.opponent.overlaps_hurtbox(p.position, p.radius):
 			connecting.append([attacker, p.move, p.position, true, p])
 	for hit in connecting:
 		var attacker: Fighter = hit[0]

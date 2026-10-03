@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_mtdaj"]
+
+[resource]
+script = ExtResource("1_mtdaj")
+name = "Thunder Valkyrie"
+input = "236236P"
+animation = &"fight/throw"
+animation_impact = 0.08
+animation_end = 0.85
+startup = 4
+active = 4
+recovery = 34
+damage = 330
+hitstun = 0
+blockstun = 0
+hitstop = 16
+knockback = Vector2(0, 0)
+invuln_frames = 6
+super_move = true
+impact_fx = &"shockwave"
+command_grab = true
+grab_range = 1.4
+hitbox_radius = 0.3
+hitbox_offset = Vector3(0, 1, -0.6)
+camera_intensity = 0.6

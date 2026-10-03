@@ -65,6 +65,13 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 ## Cosmetic effect when the move becomes active ("shockwave" = ground-pound ring and
 ## dust). Trails, rising sparks and projectile flashes come from the move's own data.
 @export var impact_fx: StringName = &""
+## Command grab: on its first active frame it grabs an opponent within `grab_range`
+## (unblockable, can't be teched; damage = this move's damage). A whiff plays out the
+## move's recovery.
+@export var command_grab: bool = false
+@export var grab_range: float = 1.0
+## Projectiles pass through the fighter during this move's startup and active frames.
+@export var projectile_immune: bool = false
 
 @export_group("Hitbox")
 ## Sphere hitbox. Offset is in the fighter's local space (-Z = toward opponent), or

@@ -315,6 +315,8 @@ func _initialize() -> void:
 	await polish_tests()
 	await personality_tests()
 	await showcase_tests()
+	await loading_tests()
+	await valka_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -964,3 +966,109 @@ func showcase_tests() -> void:
 			steps_seen[show._index] = true
 		progressed.append(steps_seen.size() >= 4 and show.data == gs.roster[i])
 	check("Character select: each fighter performs a personality routine", not progressed.has(false), str(progressed))
+
+
+func loading_tests() -> void:
+	var gs = root.get_node("GameState")
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = gs.roster[1]; gs.p2_character = gs.roster[2]
+	gs.stage_path = gs.ROOFTOP_STAGE
+	gs.go_to_fight(self)
+	await process_frame; await process_frame
+	check("Loading screen: shown on the way to a fight", current_scene.scene_file_path == "res://scenes/loading_screen.tscn")
+	var bar_moved := false
+	var frames := 0
+	while current_scene.scene_file_path != "res://scenes/fight.tscn" and frames < 1200:
+		if current_scene.get("_bar") and current_scene._bar.value > 0.0:
+			bar_moved = true
+		await process_frame
+		frames += 1
+	check("Loading screen: progress bar fills, then the fight starts on the chosen stage",
+		bar_moved and current_scene.scene_file_path == "res://scenes/fight.tscn" and current_scene.stage.name == "Rooftop", "%d frames" % frames)
+	gs.stage_path = gs.DEFAULT_STAGE
+
+
+class Masher extends FighterController:
+	## Once grabbed, mashes the throw-tech input (fresh LP+LK presses every other tick).
+	var tick := 0
+	func read(f: Fighter) -> int:
+		tick += 1
+		var mash := f.state == Fighter.State.THROWN and tick % 2 == 0
+		return InputBuffer.pack(5, InputBuffer.LP | InputBuffer.LK if mash else 0)
+
+
+func valka_tests() -> void:
+	var gs = root.get_node("GameState")
+	var valka: CharacterData = gs.roster.filter(func(c): return c.id == &"valka").front()
+	check("Valka: in the roster as the fourth fighter", valka != null and gs.roster.size() == 4 and gs.roster[3] == valka)
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = valka; gs.p2_character = gs.roster[0]
+	gs.stage_path = gs.DEFAULT_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	var cpu := AIController.new()
+	cpu.attach(p1)
+	check("Valka: Grappler CPU personality", cpu.personality_name() == "Grappler")
+
+	# Command grab: unblockable.
+	reset(DummyController.Mode.STAND_BLOCK); p1.position.x = -0.5; p2.position.x = 0.5
+	var hp := p2.health
+	motion("63214", InputBuffer.HP)
+	wait_until(func() -> bool: return p2.state == Fighter.State.THROWN, 12)
+	check("Valka Slam grabs a blocking opponent", p2.state == Fighter.State.THROWN and p1.state == Fighter.State.THROW, "%s / %s" % [state_name(p1), state_name(p2)])
+	wait_until(func() -> bool: return p2.state == Fighter.State.AIR_HIT, 60)
+	check("Valka Slam deals its damage and slams", p2.health == hp - 200 and p2.state == Fighter.State.AIR_HIT, "hp %d -> %d" % [hp, p2.health])
+	step(150)
+
+	# ...and can't be teched.
+	reset(DummyController.Mode.STAND); p1.position.x = -0.5; p2.position.x = 0.5
+	p2.controller = Masher.new()
+	hp = p2.health
+	motion("63214", InputBuffer.HP)
+	step(50)
+	check("Valka Slam can't be teched", p2.health == hp - 200 and p2.state != Fighter.State.TECH, "hp %d, %s" % [p2.health, state_name(p2)])
+	step(150)
+	# Control: the same masher does break a normal throw.
+	reset(DummyController.Mode.STAND); p1.position.x = -0.4; p2.position.x = 0.4
+	p2.controller = Masher.new()
+	press(InputBuffer.LP | InputBuffer.LK)
+	wait_until(func() -> bool: return p1.state == Fighter.State.TECH, 30)
+	check("...while a normal throw still gets teched by the same input", p1.state == Fighter.State.TECH, state_name(p1))
+	step(60)
+
+	# A whiff is punishable.
+	reset(DummyController.Mode.STAND); p1.position.x = -1.3; p2.position.x = 1.3
+	motion("63214", InputBuffer.HP)
+	step(12)
+	check("Valka Slam whiff leaves her recovering", p1.state == Fighter.State.ATTACK and p2.state != Fighter.State.THROWN, state_name(p1))
+	step(60)
+
+	# Spinning Lariat goes straight through a fireball.
+	reset(DummyController.Mode.STAND); p1.position.x = -1.5; p2.position.x = 1.5
+	ctl2.dir = 5
+	p2.controller = ctl2
+	hp = p1.health
+	for d in [2, 3, 6]:
+		ctl2.dir = d
+		if d == 6: ctl2.buttons = InputBuffer.HP
+		step(1)
+	ctl2.dir = 5
+	wait_until(func() -> bool: return p2.projectile != null and p2.projectile.position.distance_to(p1.position + Vector3.UP) < 2.2, 60)
+	motion("623", InputBuffer.HP)
+	check("Spinning Lariat starts", p1.current_move != null and p1.current_move.name == "Spinning Lariat")
+	wait_until(func() -> bool: return p2.projectile == null, 90)
+	check("Spinning Lariat passes through the fireball", p1.health == hp, "hp %d -> %d" % [hp, p1.health])
+	step(90)
+
+	# Super command grab.
+	reset(DummyController.Mode.STAND_BLOCK); p1.position.x = -0.6; p2.position.x = 0.6
+	p1.add_meter(Fighter.MAX_METER)
+	hp = p2.health
+	motion("236236", InputBuffer.HP)
+	step(m.SUPER_FREEZE_TICKS + 60)
+	check("Thunder Valkyrie: super grab through a block", p2.health == hp - 330 and p1.meter == 0, "hp %d -> %d" % [hp, p2.health])
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]

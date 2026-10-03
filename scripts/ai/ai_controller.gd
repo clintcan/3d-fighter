@@ -41,9 +41,10 @@ const WAKEUP_SPACING := 1.4
 ## How far from the preferred range before the AI steers back toward it.
 const SPACING_SLACK := 0.5
 
-## Option weight keys: fireball, rush (travelling special), dash, jump, throw,
-## ground_special (214), poke, string, sidestep, wait (stand / walk back), retreat and
-## approach (steering toward the preferred range). Missing keys count as 1.0.
+## Option weight keys: fireball, rush (travelling special), dash, jump, throw, grab
+## (command grab), ground_special (214), poke, string, sidestep, wait (stand / walk
+## back), retreat and approach (steering toward the preferred range). Missing keys
+## count as 1.0.
 ## Bonuses add to the difficulty profile's chances / aggression.
 const PERSONALITIES := {
 	&"kenji": {
@@ -59,6 +60,13 @@ const PERSONALITIES := {
 		rising_anti_air = 0.5, pressure = 0.75, far_punish = 0.3,
 		weights = {rush = 2.0, dash = 2.4, jump = 1.6, throw = 1.8, string = 1.5,
 			sidestep = 0.6, wait = 0.3, retreat = 0.2, approach = 1.8},
+	},
+	&"valka": {
+		name = "Grappler", blurb = "walks you down and grabs you if you just block", preferred_range = 0.8,
+		aggression = 0.05, block = 0.1, punish = 0.05, anti_air = 0.15,
+		rising_anti_air = 0.8, pressure = 0.55, far_punish = 0.0,
+		weights = {grab = 2.5, approach = 2.0, dash = 0.6, jump = 0.5, throw = 1.5, poke = 0.9,
+			wait = 0.6, retreat = 0.3, sidestep = 0.6},
 	},
 	&"brutus": {
 		name = "Punisher", blurb = "waits patiently, then punishes every mistake", preferred_range = 1.6,
@@ -278,6 +286,12 @@ func _wants_block_projectile(fighter: Fighter) -> bool:
 	var id := p.get_instance_id()
 	if id != _rolled_projectile:
 		_rolled_projectile = id
+		var immune := _special_with(func(m: MoveData) -> bool: return m.projectile_immune and not m.super_move)
+		if immune and to_me.length() < reach(immune) + 2.0 and fighter.is_actionable() and _rng.randf() < 0.5:
+			_blocking = false
+			_plan.clear()
+			_queue_special(immune) # spin straight through it
+			return false
 		_blocking = _rng.randf() < minf(block_chance + 0.2, 0.95)
 		if not _blocking and to_me.length() > PROJECTILE_JUMP_RANGE * 0.7 and _rng.randf() < anti_air_chance:
 			_plan.clear()
@@ -339,7 +353,7 @@ func _react(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 		Fighter.State.JUMP:
 			var approaching: bool = (seen.velocity as Vector3).dot(fighter.position - seen.position) > 0.0
 			if approaching and dist < 2.0 and _rng.randf() < anti_air_chance * 0.15:
-				var rising := _special_with(func(m: MoveData) -> bool: return m.rise > 0.0 and not m.super_move)
+				var rising := _special_with(func(m: MoveData) -> bool: return (m.rise > 0.0 or m.projectile_immune) and not m.super_move)
 				if rising and _rng.randf() < personality.rising_anti_air:
 					_queue_special(rising) # invincible rising anti-air
 				else:
@@ -391,6 +405,7 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 	var projectile_move := _special_with(func(m: MoveData) -> bool: return m.projectile_speed > 0.0)
 	var rush := _special_with(func(m: MoveData) -> bool: return m.travel > 0.0 and m.rise == 0.0 and not m.super_move)
 	var ground_special := _special_with(func(m: MoveData) -> bool: return m.motion() == "214")
+	var grab := _special_with(func(m: MoveData) -> bool: return m.command_grab and not m.super_move)
 	var can_fireball := projectile_move != null and fighter.projectile == null
 	if dist > FAR_RANGE:
 		options = [
@@ -421,6 +436,7 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 			[1.0, func() -> void: _queue_press(HP, 2)],
 			[0.8 * aggression * _w("ground_special") if ground_special and dist <= reach(ground_special) else 0.0, func() -> void: _queue_special(ground_special)],
 			[1.2 * aggression * _w("throw") if dist < THROW_RANGE else 0.0, func() -> void: _queue_throw()],
+			[1.0 * aggression * _w("grab") if grab and dist < grab.grab_range - 0.05 else 0.0, func() -> void: _queue_special(grab)],
 			[1.5 * (1.0 - aggression) * _w("wait"), func() -> void: _plan.append([4 if _rng.randf() < 0.5 else 1, 0, _rng.randi_range(8, 18)])],
 			[0.6 * _w("retreat"), func() -> void: _queue_backdash()],
 			[0.5 * _w("sidestep"), func() -> void: _queue_sidestep()],
@@ -518,10 +534,15 @@ func _queue_jump_in() -> void:
 	_plan.append([5, 0, 20])
 
 
-## Pressure on a blocking opponent: a quick jab (frame trap), a low, or a throw.
+## Pressure on a blocking opponent: a quick jab (frame trap), a low, a throw, or a
+## command grab as they come out of blockstun.
 func _queue_pressure(dist: float) -> void:
 	var roll := _rng.randf()
-	if dist < THROW_RANGE and roll < 0.35 * _w("throw"):
+	var grab := _special_with(func(m: MoveData) -> bool: return m.command_grab and not m.super_move)
+	if grab and dist < grab.grab_range and roll < 0.25 * _w("grab"):
+		_plan.append([5, 0, 3]) # let blockstun end: grabs can't catch a blocking opponent
+		_queue_special(grab)
+	elif dist < THROW_RANGE and roll < 0.35 * _w("throw"):
 		_queue_throw()
 	elif roll < 0.65:
 		_queue_press(LP)
@@ -573,6 +594,8 @@ func attach(fighter: Fighter) -> void:
 static func reach(move: MoveData) -> float:
 	if move == null:
 		return 0.0
+	if move.command_grab:
+		return move.grab_range
 	if move.projectile_speed > 0.0:
 		return move.projectile_speed * move.projectile_lifetime * Fighter.DT
 	var slide := move.lunge * move.lunge / (2.0 * Fighter.GROUND_FRICTION)

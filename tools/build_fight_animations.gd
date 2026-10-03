@@ -71,7 +71,9 @@ func _initialize() -> void:
 	lib.add_animation("kick_flurry", build_kick_flurry())
 	lib.add_animation("rising_kick", build_rising_kick())
 	lib.add_animation("ground_pound", build_ground_pound())
-	lib.add_animation("slide_kick", build_in_place_ranges([[ual2.get_animation("Slide_Start"), 0.2, 0.83], [ual2.get_animation("Slide_Exit"), 0.0, 0.3]], crouch, 0.25))
+	lib.add_animation("lariat", build_lariat())
+	lib.add_animation("knee_lift", build_knee_lift())
+	lib.add_animation("slide_kick",build_in_place_ranges([[ual2.get_animation("Slide_Start"), 0.2, 0.83], [ual2.get_animation("Slide_Exit"), 0.0, 0.3]], crouch, 0.25))
 	lib.add_animation("shoulder_charge", build_in_place_ranges([[ual2.get_animation("Shield_Dash"), 0.0, 0.5]], guard, 0.3))
 	var err := ResourceSaver.save(lib, OUTPUT)
 	print("saved ", OUTPUT, " (", lib.get_animation_list().size(), " clips) err=", err)
@@ -858,6 +860,74 @@ func build_ground_pound() -> Animation:
 
 	return make_animation([[0.0, guard], [0.18, raise], [0.27, raise], [0.33, slam],
 		[0.55, hold], [0.85, guard]], false)
+
+
+## Spinning lariat (Valka): both arms flung out straight at shoulder height, fists
+## clenched, then the whole body spins like a top two full turns on planted feet, leaning
+## slightly into the spin. First swing at 0.12 s.
+func build_lariat() -> Animation:
+	var s := rear_sign()
+	var lead_foot := global_origin(guard, "foot_" + lead)
+	var rear_foot := global_origin(guard, "foot_" + rear)
+	var wind := duplicate_pose(guard)
+	move_bone(wind, "pelvis", Vector3(0, -0.06, 0))
+	hip_turn(wind, -25.0)
+	plant_both(wind, lead_foot, rear_foot)
+	var keys := [[0.0, guard], [0.08, wind]]
+	var t := 0.12
+	var turns := 8 # quarter turns: two full spins
+	for q in range(turns + 1):
+		var pose := duplicate_pose(guard)
+		move_bone(pose, "pelvis", Vector3(0, -0.04, 0))
+		lean(pose, -6.0, 4.0)
+		for side in ["l", "r"]:
+			var out := 1.0 if side == "l" else -1.0
+			aim(pose, "upperarm_" + side, "lowerarm_" + side, Vector3(out, 0.08, 0.1))
+			aim(pose, "lowerarm_" + side, "hand_" + side, Vector3(out, 0.05, 0.12))
+		rotate_bone(pose, "pelvis", Vector3.UP, -s * q * 90.0) # the whole body spins
+		keys.append([t, pose])
+		t += 0.07
+	keys.append([t + 0.18, guard])
+	return make_animation(keys, false)
+
+
+## Knee lift (Valka): grab the opponent's head with both hands and drive the rear knee
+## up to chest height, pulling down as the hips thrust forward. Impact 0.16 s.
+func build_knee_lift() -> Animation:
+	var s := rear_sign()
+	var lead_foot := global_origin(guard, "foot_" + lead)
+	var clinch := duplicate_pose(guard)
+	move_bone(clinch, "pelvis", Vector3(0, -0.02, 0.05))
+	lean(clinch, -6.0, 0.0)
+	var chest := global_origin(clinch, "spine_03")
+	for side in ["l", "r"]:
+		var x := 0.12 if side == "l" else -0.12
+		reach_arm(clinch, side, Vector3(x, chest.y + 0.1, chest.z + 0.5))
+
+	var strike := duplicate_pose(clinch)
+	move_bone(strike, "pelvis", Vector3(0, 0.02, 0.12))
+	hip_turn(strike, 15.0)
+	lean(strike, -14.0, 0.0)
+	plant_foot(strike, lead, lead_foot)
+	pivot_support_foot(strike, 15.0, true)
+	var hip := global_origin(strike, "thigh_" + rear)
+	solve_ik(strike, "thigh_" + rear, "calf_" + rear, "foot_" + rear,
+		hip + Vector3(s * 0.02, 0.05, 0.3), Vector3(0, 0.3, 1))
+	point_foot(strike, rear, Vector3(0, -1.0, -0.3))
+	for side in ["l", "r"]:
+		var x := 0.1 if side == "l" else -0.1
+		reach_arm(strike, side, Vector3(x, chest.y - 0.05, chest.z + 0.45)) # pulling the head down
+
+	# Knee comes straight back down under the hip (no swing through a kick).
+	var recoil := duplicate_pose(clinch)
+	plant_foot(recoil, lead, lead_foot)
+	hip = global_origin(recoil, "thigh_" + rear)
+	solve_ik(recoil, "thigh_" + rear, "calf_" + rear, "foot_" + rear,
+		hip + Vector3(0, -0.55, 0.05), Vector3(0, 0.2, 1))
+	point_foot(recoil, rear, Vector3(0, -0.6, 0.8))
+
+	return make_animation([[0.0, guard], [0.08, clinch], [0.16, strike], [0.26, strike],
+		[0.36, recoil], [0.46, clinch], [0.62, guard]], false)
 
 
 ## Resamples `source` keeping its `keep_bones`, with the rest of the body from the guard.

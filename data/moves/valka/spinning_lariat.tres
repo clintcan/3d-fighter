@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_v7xla"]
+
+[resource]
+script = ExtResource("1_v7xla")
+name = "Spinning Lariat"
+input = "623P"
+animation = &"fight/lariat"
+animation_impact = 0.12
+animation_end = 0.93
+startup = 7
+active = 32
+recovery = 16
+damage = 45
+hitstun = 18
+blockstun = 14
+knockback = Vector2(2, 4)
+launches = true
+chip_damage = 6
+hits = 3
+hit_interval = 8
+travel = 1.2
+projectile_immune = true
+hitbox_radius = 0.6
+hitbox_offset = Vector3(0, 1.35, -0.35)
+camera_intensity = 0.2

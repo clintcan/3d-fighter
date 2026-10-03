@@ -16,8 +16,8 @@ config/version="0.2.0"
 config/icon="res://assets/ui/icon.png"
 config/windows_native_icon="res://assets/ui/icon.ico"
 boot_splash/bg_color=Color(0.03, 0.03, 0.05, 1)
-boot_splash/image="res://assets/ui/icon.png"
-boot_splash/fullsize=false
+boot_splash/image="res://assets/ui/splash.png"
+boot_splash/fullsize=true
 boot_splash/use_filter=true
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
@@ -98,6 +98,8 @@ common/max_physics_steps_per_frame=8
 3d/physics_engine="Jolt Physics"
 
 [rendering]
+
+environment/defaults/default_clear_color=Color(0.03, 0.03, 0.05, 1)
 
 textures/vram_compression/import_etc2_astc=true
 anti_aliasing/quality/msaa_3d=2

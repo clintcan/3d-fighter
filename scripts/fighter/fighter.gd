@@ -90,7 +90,7 @@ const MOTION_WINDOW := 14
 const SUPER_MOTION_WINDOW := 26
 const MOTION_FINISH := 8
 ## Specials checked longest/most specific first, so 236236 beats 236 and 623 beats 236.
-const MOTION_PRIORITY := ["236236", "623", "214", "236"]
+const MOTION_PRIORITY := ["236236", "63214", "623", "214", "236"]
 ## A normal that connected can be cancelled into a special for this long after its
 ## active frames; a special into a super likewise.
 const SPECIAL_CANCEL_WINDOW := 10
@@ -133,6 +133,10 @@ var juggle_hits := 0 # hits taken while airborne in the current combo
 var air_attack_used := false
 ## Throw bookkeeping: tick (state_frame) the grab connected, or -1 while reaching/whiffing.
 var throw_grab_frame := -1
+## The command grab being performed (its damage replaces throw_damage), or null.
+var grab_move: MoveData
+## False while held by a command grab (no tech).
+var throw_techable := true
 var current_move: MoveData
 var move_has_hit := false
 ## Multi-hit bookkeeping for the current move.
@@ -219,6 +223,8 @@ func reset_to(spawn_position: Vector3) -> void:
 	juggle_hits = 0
 	air_attack_used = false
 	throw_grab_frame = -1
+	grab_move = null
+	throw_techable = true
 	sidestep_dir = Vector3.ZERO
 	last_hit_level = MoveData.HitLevel.MID
 	victory = false
@@ -293,7 +299,7 @@ func tick() -> void:
 			_tick_throw()
 		State.THROWN:
 			velocity = Vector3.ZERO
-			if state_frame <= THROW_TECH_WINDOW and _throw_pressed():
+			if throw_techable and state_frame <= THROW_TECH_WINDOW and _throw_pressed():
 				_tech_throw()
 		State.TECH:
 			if state_frame >= TECH_FRAMES:
@@ -438,7 +444,7 @@ func _try_special(cancel_only: bool) -> bool:
 				func(b: int) -> bool: return input.pressed_within(b, BUFFER_WINDOW))
 			if pressed.is_empty():
 				continue
-			var window := SUPER_MOTION_WINDOW if move.super_move else MOTION_WINDOW
+			var window := SUPER_MOTION_WINDOW if move.super_move or motion.length() >= 5 else MOTION_WINDOW
 			if not input.motion(_motion_sequence(motion), window, MOTION_FINISH + BUFFER_WINDOW):
 				continue
 			for b: int in pressed:
@@ -579,7 +585,7 @@ func _set_state(new_state: State, crouch: bool = false) -> void:
 
 ## Active hitbox this tick as {center: Vector3, radius: float}, or {} if none.
 func get_active_hitbox() -> Dictionary:
-	if state != State.ATTACK or current_move.projectile_speed > 0.0:
+	if state != State.ATTACK or current_move.projectile_speed > 0.0 or current_move.command_grab:
 		return {}
 	if hits_landed >= current_move.hits or state_frame < next_hit_frame:
 		return {}
@@ -723,6 +729,17 @@ func is_throw_grab_frame() -> bool:
 	return state == State.THROW and throw_grab_frame < 0 and state_frame == THROW_STARTUP
 
 
+## True on a command grab's first active frame (FightManager resolves the grab).
+func is_command_grab_frame() -> bool:
+	return state == State.ATTACK and current_move != null and current_move.command_grab \
+			and state_frame == current_move.startup + 1
+
+
+func is_projectile_immune() -> bool:
+	return state == State.ATTACK and current_move != null and current_move.projectile_immune \
+			and state_frame <= current_move.startup + current_move.active
+
+
 func is_throwable() -> bool:
 	return position.y <= 0.0 and state not in NOT_THROWABLE_STATES and not is_invulnerable()
 
@@ -732,8 +749,19 @@ func on_throw_grabbed() -> void:
 	throw_grab_frame = state_frame
 
 
+## Called on the attacker when its command grab connects: becomes a held throw that
+## deals the move's damage.
+func on_command_grab() -> void:
+	grab_move = current_move
+	current_move = null
+	velocity = Vector3.ZERO
+	_set_state(State.THROW)
+	throw_grab_frame = 0
+
+
 ## Called on the defender when grabbed: held in front of the attacker.
-func on_grabbed_by(attacker: Fighter) -> void:
+func on_grabbed_by(attacker: Fighter, techable: bool = true) -> void:
+	throw_techable = techable
 	current_move = null
 	velocity = Vector3.ZERO
 	position = attacker.position + attacker.forward * THROW_HOLD_DISTANCE
@@ -767,20 +795,24 @@ func _tick_throw() -> void:
 		opponent._release_from_throw(self)
 	elif held_for >= THROW_HOLD_FRAMES + THROW_RECOVERY:
 		throw_grab_frame = -1
+		grab_move = null
 		_return_to_neutral()
 
 
 ## Thrown: damage, then tossed into a knockdown (no juggles after a throw).
 func _release_from_throw(attacker: Fighter) -> void:
 	var push_dir := attacker.forward
-	_take_damage(attacker.data.throw_damage)
+	var grab := attacker.grab_move
+	_take_damage(grab.damage if grab else attacker.data.throw_damage)
 	throw_impact.emit(self)
 	_set_combo(1)
 	_flash_color = Color.WHITE
-	hitstop = 8
-	attacker.hitstop = 8
+	hitstop = grab.hitstop if grab else 8
+	attacker.hitstop = hitstop
 	juggle_hits = MAX_JUGGLE_HITS
-	velocity = push_dir * 2.5 + Vector3.UP * 4.5
+	throw_techable = true
+	# Command grabs slam harder: a higher toss.
+	velocity = push_dir * 2.5 + Vector3.UP * (6.0 if grab else 4.5)
 	if health == 0:
 		_knock_out(push_dir)
 	else:

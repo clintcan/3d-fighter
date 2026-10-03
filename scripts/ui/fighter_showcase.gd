@@ -19,6 +19,10 @@ const ROUTINES := {
 	&"rhea": [["idle", 0.5, &"fight/guard", 1.8], ["move", "236236K"], ["idle", 0.4, &"fight/guard", 1.8],
 		["move", "236K"], ["idle", 0.4, &"fight/guard", 1.8], ["move", "6HP"], ["move", "623K"],
 		["idle", 0.6, &"fight/guard", 1.8], ["clip", &"fight/victory_point", 2.4], ["idle", 0.4, &"fight/guard", 1.8]],
+	# Grappler: walks you down, spins, reaches for the grab, knees, flexes.
+	&"valka": [["idle", 1.3, &"fight/walk_guard", 0.6], ["move", "623P"], ["idle", 0.8],
+		["move", "63214P"], ["idle", 0.8], ["move", "6LK"], ["move", "6HP"], ["idle", 0.8],
+		["clip", &"fight/victory_flex", 2.6], ["idle", 1.0, &"fight/walk_guard", 0.6]],
 	# Punisher: waits with folded arms, then slams, charges, smashes, flexes.
 	&"brutus": [["idle", 2.2, &"ual2/Idle_FoldArms", 1.0], ["move", "214P"], ["idle", 1.6],
 		["move", "236P"], ["idle", 1.4], ["move", "6HP"], ["idle", 1.0],

@@ -145,6 +145,16 @@ func _on_landed_hard(fighter: Fighter) -> void:
 func _on_throw_impact(defender: Fighter) -> void:
 	spark(defender.global_position + Vector3.UP * 1.1, HIT_COLOR, 1.4)
 	Audio.sfx(&"hit_heavy", 1.0, 0.85)
+	# Command grabs slam: dust and a shake; the super grab adds a gold shockwave.
+	var grab := defender.opponent.grab_move
+	if grab:
+		var floor_point := Vector3(defender.global_position.x, 0.02, defender.global_position.z)
+		dust(floor_point)
+		manager.camera.shake(0.3)
+		if grab.impact_fx == &"shockwave":
+			_ring(floor_point, SUPER_COLOR, 3.4, true)
+			spark(defender.global_position + Vector3.UP * 0.8, SUPER_COLOR, 2.4)
+			manager.camera.shake(0.4)
 	if defender.model:
 		defender.model.flash(Color.WHITE, 0.16)
 

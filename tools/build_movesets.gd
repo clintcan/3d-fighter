@@ -104,6 +104,34 @@ const CHARACTERS := {
 				{knockdown = true, chip_damage = 18, camera_intensity = 0.6}],
 		},
 	},
+	"valka": {
+		startup = 1, damage = 1.1, knockback = 1.1, hitstop = 1,
+		# New characters are created from these (existing ones keep their scene setup).
+		create = {display_name = "Valka", archetype = "Grappler", select_order = 3,
+			description = "Towering wrestler. Walks you down, spins through fireballs, and grabs anyone who just blocks.",
+			model_scene = "res://assets/characters/base/Superhero_Female_FullBody.gltf",
+			hair_scenes = ["res://assets/characters/hair/Hair_Long.gltf", "res://assets/characters/hair/Eyebrows_Female.gltf"],
+			body_albedo = "res://assets/characters/base/T_Superhero_Female_Light_BaseColor.png",
+			model_scale = 1.06, hair_color = Color(0.93, 0.86, 0.68), placeholder_color = Color(0.85, 0.75, 0.3)},
+		stats = {max_health = 1100, walk_speed = 1.8, back_walk_speed = 1.4, dash_speed = 5.0,
+			jump_velocity = 5.8, weight = 1.15, throw_damage = 150, power_rating = 0.8, speed_rating = 0.4,
+			victory_animations = [&"fight/victory_flex", &"fight/victory_fist_pump"],
+			alt_body_albedo = "res://assets/characters/base/T_Superhero_Female_Dark_BaseColor.png", alt_hair_color = Color(0.62, 0.12, 0.06)},
+		signatures = {
+			"shoulder_tackle": ["Shoulder Tackle", "6HP", &"fight/shoulder_charge", 0.15, 0.83, 12, 4, 20, 85, H.MID, 20, 15, 9, Vector2(3.5, 0), Vector3(0, 1.0, -0.6), 0.3, {lunge = 4.0, camera_intensity = 0.15}],
+			"knee_lift": ["Knee Lift", "6LK", &"fight/knee_lift", 0.16, 0.62, 8, 3, 18, 70, H.MID, 0, 14, 9, Vector2(0.8, 6.0), Vector3(0, 1.0, -0.45), 0.28, {launches = true, camera_intensity = 0.25}],
+		},
+		specials = {
+			# Command grab: unblockable and untechable, but a whiff is very punishable.
+			"valkyrie_slam": ["Valkyrie Slam", "63214P", &"fight/throw", 0.08, 0.85, 5, 3, 30, 200, H.MID, 0, 0, 12, Vector2.ZERO, Vector3(0, 1.0, -0.6), 0.3,
+				{command_grab = true, grab_range = 1.15, camera_intensity = 0.4}],
+			# Spins through fireballs; three hits, the last one pops the opponent up.
+			"spinning_lariat": ["Spinning Lariat", "623P", &"fight/lariat", 0.12, 0.93, 7, 32, 16, 45, H.MID, 18, 14, 6, Vector2(2.0, 4.0), Vector3(0, 1.35, -0.35), 0.6,
+				{hits = 3, hit_interval = 8, travel = 1.2, projectile_immune = true, launches = true, chip_damage = 6, camera_intensity = 0.2}],
+			"thunder_valkyrie": ["Thunder Valkyrie", "236236P", &"fight/throw", 0.08, 0.85, 4, 4, 34, 330, H.MID, 0, 0, 16, Vector2.ZERO, Vector3(0, 1.0, -0.6), 0.3,
+				{super_move = true, command_grab = true, grab_range = 1.4, invuln_frames = 6, camera_intensity = 0.6, impact_fx = &"shockwave"}],
+		},
+	},
 }
 
 
@@ -126,7 +154,11 @@ func _initialize() -> void:
 			moves.append(_save(_make(spec.specials[file]), dir + file + ".tres"))
 
 		var path := "res://data/characters/%s.tres" % id
-		var character := load(path) as CharacterData
+		var character: CharacterData
+		if ResourceLoader.exists(path):
+			character = load(path) as CharacterData
+		else:
+			character = _create_character(id, spec.create)
 		character.moves.assign(moves)
 		for stat: String in spec.stats:
 			if stat == "victory_animations":
@@ -141,6 +173,25 @@ func _initialize() -> void:
 		var err := ResourceSaver.save(character, path)
 		print("%-7s %2d moves  err=%d" % [id, moves.size(), err])
 	quit()
+
+
+## A brand-new character resource from its `create` visuals.
+func _create_character(id: String, visuals: Dictionary) -> CharacterData:
+	var character := CharacterData.new()
+	character.id = StringName(id)
+	for key: String in visuals:
+		var value = visuals[key]
+		match key:
+			"model_scene", "body_albedo":
+				character.set(key, load(value))
+			"hair_scenes":
+				var scenes: Array[PackedScene] = []
+				for path: String in value:
+					scenes.append(load(path))
+				character.hair_scenes = scenes
+			_:
+				character.set(key, value)
+	return character
 
 
 func _make(row: Array) -> MoveData:
@@ -168,7 +219,8 @@ func _make(row: Array) -> MoveData:
 	m.knockdown = extras.get("knockdown", false)
 	m.lunge = extras.get("lunge", 0.0)
 	for key in ["chip_damage", "hits", "hit_interval", "travel", "rise", "landing_recovery", "invuln_frames",
-			"low_profile", "super_move", "followup", "projectile_speed", "projectile_lifetime", "projectile_color", "impact_fx"]:
+			"low_profile", "super_move", "followup", "projectile_speed", "projectile_lifetime", "projectile_color", "impact_fx",
+			"command_grab", "grab_range", "projectile_immune"]:
 		if extras.has(key):
 			m.set(key, extras[key])
 	return m

@@ -4,7 +4,6 @@ extends Control
 ## back to return to character select. Any player's controls work.
 
 const VS_SCENE := "res://scenes/vs_screen.tscn"
-const FIGHT_SCENE := "res://scenes/fight.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const MAX_CARD_WIDTH := 560.0
 const CARD_GAP := 36
@@ -112,8 +111,10 @@ func _choose(path: String) -> void:
 	if path == "":
 		path = (GameState.STAGES.pick_random() as Dictionary).path
 	GameState.stage_path = path
-	var training := GameState.mode == GameState.Mode.TRAINING
-	get_tree().change_scene_to_file(FIGHT_SCENE if training else VS_SCENE)
+	if GameState.mode == GameState.Mode.TRAINING:
+		GameState.go_to_fight(get_tree())
+	else:
+		get_tree().change_scene_to_file(VS_SCENE)
 
 
 func _unhandled_input(event: InputEvent) -> void:

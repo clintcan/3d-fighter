@@ -64,11 +64,14 @@ SPECIAL MOVES (P = either punch, K = either kick; written facing right)
           forward, down, down-forward + K ... Crescent Rise (rising kick)
   Brutus  down, down-forward, forward + P ... Bull Charge
           down, down-back, back + P ......... Earthquake (low ground pound)
+  Valka   forward, half-circle to back + P .. Valkyrie Slam (command grab:
+                                              unblockable, can't be broken)
+          forward, down, down-forward + P ... Spinning Lariat (through fireballs)
 Normal attacks that connect can be cancelled into a special.
 
 SUPER: landing and taking hits fills the SUPER meter (bottom corners).
 When it's full, do down, down-forward, forward twice + P (Kenji, Brutus)
-or + K (Rhea) for the character's super. Sidestep dodges fireballs.
+or + K (Rhea) for the character's super. Valka's super is a command grab. Sidestep dodges fireballs.
 
 Options (main menu): music / effects / announcer volume, action camera
 (Off / Subtle / Full), CPU difficulty (Easy / Normal / Hard), fullscreen.

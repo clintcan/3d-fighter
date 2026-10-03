@@ -207,7 +207,10 @@ func _build_preview_stage() -> void:
 
 func _make_portrait_button(character: CharacterData) -> Button:
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(240, 240)
+	# Portraits shrink so the whole roster fits the column (240 px for three fighters).
+	var count := maxi(GameState.roster.size(), 1)
+	var side := clampf((760.0 - 18.0 * (count - 1)) / count, 140.0, 240.0)
+	button.custom_minimum_size = Vector2(side, side)
 	button.icon = character.portrait
 	button.expand_icon = true
 	button.text = character.display_name

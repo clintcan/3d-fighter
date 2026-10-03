@@ -34,6 +34,11 @@ var stage_path: String = DEFAULT_STAGE
 var match_seed := 1
 ## The Arcade run in progress (ARCADE mode), or null.
 var arcade: ArcadeRun
+## Stage preloaded by the loading screen, kept referenced so it stays in the resource
+## cache until the fight scene loads it (the loading screen itself is freed first).
+var preloaded_stage: Resource
+
+const LOADING_SCENE := "res://scenes/loading_screen.tscn"
 
 
 func _ready() -> void:
@@ -58,6 +63,11 @@ func pick_random_cpu() -> CharacterData:
 	if others.is_empty():
 		return player_character
 	return others.pick_random()
+
+
+## Goes to the fight through the loading screen (wallpaper + progress bar).
+func go_to_fight(tree: SceneTree) -> void:
+	tree.change_scene_to_file(LOADING_SCENE)
 
 
 ## Starts an Arcade run with `character` and sets up its first opponent.

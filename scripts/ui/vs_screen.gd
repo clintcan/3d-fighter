@@ -3,7 +3,6 @@ extends Control
 ## the sides, "VS" punches in, then the fight loads. Confirm skips it. In Arcade mode it
 ## also shows the stage number and the ladder, and the boss's portrait is darkened.
 
-const FIGHT_SCENE := "res://scenes/fight.tscn"
 const HOLD_SECONDS := 2.2
 const LADDER_ICON := Vector2(110, 110)
 const SHADOW_TINT := Color(0.55, 0.35, 0.75)
@@ -122,4 +121,4 @@ func _go() -> void:
 	if _leaving:
 		return
 	_leaving = true
-	get_tree().change_scene_to_file(FIGHT_SCENE)
+	GameState.go_to_fight(get_tree())
