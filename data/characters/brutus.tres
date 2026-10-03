@@ -33,6 +33,7 @@ model_scene = ExtResource("3_ryvlx")
 hair_scenes = Array[PackedScene]([ExtResource("1_2ndvl"), ExtResource("2_adg58")])
 model_scale = 1.08
 hair_color = Color(0.22, 0.13, 0.07, 1)
+victory_animations = Array[StringName]([&"fight/victory_flex", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.95, 0.6, 0.15, 1)
 max_health = 1150
 walk_speed = 1.5

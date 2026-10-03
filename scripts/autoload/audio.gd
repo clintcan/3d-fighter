@@ -111,7 +111,9 @@ func set_bus_volume(bus: String, linear: float) -> void:
 
 
 func _on_node_added(node: Node) -> void:
-	if node is BaseButton:
+	# node_added also fires when a node is reparented; connect each button only once.
+	if node is BaseButton and not node.has_meta(&"ui_sounds"):
+		node.set_meta(&"ui_sounds", true)
 		var button := node as BaseButton
 		button.focus_entered.connect(sfx.bind(&"ui_focus", -6.0))
 		button.pressed.connect(sfx.bind(&"ui_accept", -4.0))

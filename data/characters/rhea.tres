@@ -32,6 +32,7 @@ portrait = ExtResource("19_1sqe6")
 model_scene = ExtResource("1_0wr6o")
 hair_scenes = Array[PackedScene]([ExtResource("1_is8na"), ExtResource("2_028q6")])
 hair_color = Color(0.5, 0.16, 0.08, 1)
+victory_animations = Array[StringName]([&"fight/victory_point", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.9, 0.25, 0.4, 1)
 max_health = 900
 walk_speed = 2.6

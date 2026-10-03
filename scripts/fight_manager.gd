@@ -22,6 +22,9 @@ const ROUND_OVER_TICKS := 210
 const VICTORY_POSE_DELAY := 70
 ## After this many rounds a tie on round wins is a draw game.
 const MAX_ROUNDS := 5
+## Match-win cinematic: winner name appears, then the result menu once the shot plays.
+const VICTORY_TITLE_TICKS := 40
+const VICTORY_RESULT_TICKS := 220
 ## Share of a hit's knockback transferred to the attacker when the defender is pinned.
 const CORNER_PUSHBACK := 0.8
 ## Per-tick slerp factor for the logical view direction following the fight axis.
@@ -44,7 +47,9 @@ var round_number := 1
 var round_wins: Array[int] = [0, 0]
 var timer_ticks := 0
 var round_winner: Fighter
+var match_winner: Fighter
 var fx: FightFx
+var _cosmetic_rng := RandomNumberGenerator.new() # victory pose choice only; never gameplay
 ## Fighters knocked out this tick (both, for a double K.O.); resolved after the tick.
 var _knocked_out: Array[Fighter] = []
 
@@ -57,6 +62,7 @@ func _ready() -> void:
 	stage = (load(GameState.stage_path) as PackedScene).instantiate() as Stage
 	add_child(stage)
 
+	_cosmetic_rng.randomize()
 	ai = AIController.new(Settings.ai_difficulty, GameState.match_seed)
 	dummy = DummyController.new()
 	var p1 := _spawn_fighter(GameState.player_character, PlayerController.new("p1_"))
@@ -99,8 +105,10 @@ func start_match() -> void:
 	get_tree().paused = false
 	round_number = 1
 	round_wins = [0, 0]
+	match_winner = null
 	hud.set_round_wins(round_wins)
 	hud.hide_result()
+	hud.end_cinematic()
 	_start_round()
 
 
@@ -148,6 +156,12 @@ func _tick_round() -> void:
 				round_winner.victory = true
 			if phase_ticks >= ROUND_OVER_TICKS:
 				_after_round()
+		Phase.MATCH_OVER:
+			if match_winner:
+				if phase_ticks == VICTORY_TITLE_TICKS:
+					hud.announce("%s WINS" % match_winner.data.display_name.to_upper(), "", true)
+				elif phase_ticks == VICTORY_RESULT_TICKS:
+					hud.show_result()
 	_knocked_out.clear()
 
 
@@ -196,19 +210,27 @@ func _after_round() -> void:
 	if p1_won or p2_won or round_number >= MAX_ROUNDS:
 		phase = Phase.MATCH_OVER
 		phase_ticks = 0
-		var text := "DRAW GAME"
-		var line := "its_a_tie"
 		if round_wins[0] != round_wins[1]:
-			var winner := fighters[0] if round_wins[0] > round_wins[1] else fighters[1]
-			winner.victory = true
-			text = "%s WINS" % winner.data.display_name.to_upper()
-			line = "you_win" if winner == fighters[0] else "you_lose"
-		Audio.voice(line)
-		hud.announce(text, "", true)
-		hud.show_result()
+			_start_victory(fighters[0] if round_wins[0] > round_wins[1] else fighters[1])
+		else:
+			Audio.voice("its_a_tie")
+			hud.announce("DRAW GAME", "", true)
+			hud.show_result()
 	else:
 		round_number += 1
 		_start_round()
+
+
+## Match win: the winner's victory animation, the cinematic camera and letterbox. The
+## title and result menu follow on the tick (see _tick_round).
+func _start_victory(winner: Fighter) -> void:
+	match_winner = winner
+	var clips := winner.data.victory_animations
+	winner.start_victory(clips[_cosmetic_rng.randi() % clips.size()] if not clips.is_empty() else &"")
+	camera.start_victory(winner)
+	hud.announce("")
+	hud.start_cinematic()
+	Audio.voice("you_win" if winner == fighters[0] else "you_lose")
 
 
 func _go_to(scene: String) -> void:

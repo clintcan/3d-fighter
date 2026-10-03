@@ -58,6 +58,13 @@ const MODE_SCALES := [0.0, 0.5, 1.0]
 @export var fov_punch_degrees := 3.0
 @export var fov_punch_decay := 6.0
 
+@export_group("Victory cinematic")
+## Shot 1: wide low-angle orbit around the winner. Shot 2 (after a hard cut): 3/4 front
+## push-in to a close-up, then a slow drift. Angles are measured from the winner's facing.
+@export var victory_shot1_seconds := 1.5
+@export var victory_shot2_seconds := 2.0
+@export var victory_drift_degrees_per_second := 4.0
+
 @export_group("KO slow motion")
 @export var ko_time_scale := 0.3
 @export var ko_slowmo_seconds := 0.6
@@ -79,6 +86,11 @@ var _noise := FastNoiseLite.new()
 var _noise_time := 0.0
 var _fov_punch := 0.0
 var _base_fov := 45.0
+## Match-winner being filmed by the victory cinematic, or null during the fight.
+var victory_target: Fighter
+var _victory_time := 0.0
+var _victory_side := 1.0
+var _victory_cut := false
 
 
 func setup(fight_manager: Node) -> void:
@@ -100,6 +112,7 @@ func snap() -> void:
 	_trauma = 0.0
 	_fov_punch = 0.0
 	focus = null
+	victory_target = null
 	Engine.time_scale = 1.0
 	var targets := _compute_targets(0.0)
 	_base_position = targets.position
@@ -122,6 +135,9 @@ func _process(scaled_delta: float) -> void:
 		return
 	# Run on real time so the camera keeps moving smoothly through KO slow motion.
 	var delta := scaled_delta / maxf(Engine.time_scale, 0.01)
+	if victory_target:
+		_process_victory(delta)
+		return
 	_update_intensity(delta)
 	var strength := _fit_strength(_strength)
 	var targets := _compute_targets(strength)
@@ -137,6 +153,84 @@ func _process(scaled_delta: float) -> void:
 	_apply_transform(_trauma, _noise_time)
 	if manager.stage:
 		manager.stage.update_camera_occlusion(global_position)
+
+
+# --- Victory cinematic -------------------------------------------------------------
+
+## Starts the match-win camera sequence on `winner`.
+func start_victory(winner: Fighter) -> void:
+	victory_target = winner
+	_victory_time = 0.0
+	_victory_cut = false
+	intensity = 0.0
+	_trauma = 0.0
+	_fov_punch = 0.0
+	Engine.time_scale = 1.0
+	# Film from the side the camera is already on, so shot 1 continues the fight view.
+	var to_camera := global_position - winner.global_position
+	_victory_side = 1.0 if to_camera.dot(_victory_right(winner)) >= 0.0 else -1.0
+
+
+func _process_victory(delta: float) -> void:
+	_victory_time += delta
+	var shot := _victory_shot(_victory_time)
+	var cut_now := _victory_time >= victory_shot1_seconds and not _victory_cut
+	if cut_now:
+		_victory_cut = true
+	if cut_now or _victory_time <= delta:
+		# Hard cut (and the very first frame) jumps straight to the shot.
+		_base_position = shot.position
+		_look_target = shot.look
+		_base_fov = shot.fov
+	else:
+		var t := 1.0 - exp(-(10.0 if _victory_cut else 3.0) * delta)
+		_base_position = _base_position.lerp(shot.position, t)
+		_look_target = _look_target.lerp(shot.look, t)
+		_base_fov = lerpf(_base_fov, shot.fov, t)
+	fov = _base_fov
+	_apply_transform(0.0, 0.0)
+	if manager.stage:
+		manager.stage.update_camera_occlusion(global_position)
+
+
+## Camera position/aim/FOV for the victory sequence at `time` seconds.
+func _victory_shot(time: float) -> Dictionary:
+	var winner := victory_target.get_global_transform_interpolated().origin
+	var facing := victory_target.forward
+	var right := _victory_right(victory_target) * _victory_side
+	var angle: float
+	var radius: float
+	var height: float
+	var look_height: float
+	var shot_fov: float
+	if time < victory_shot1_seconds:
+		# Wide, low hero angle from the side, orbiting toward the front.
+		var e: float = smoothstep(0.0, 1.0, time / victory_shot1_seconds)
+		angle = lerpf(100.0, 70.0, e)
+		radius = lerpf(4.2, 3.6, e)
+		height = lerpf(0.55, 0.7, e)
+		look_height = 1.15
+		shot_fov = 46.0
+	else:
+		# 3/4 front push-in to a medium close-up, then a slow drift.
+		var t2 := time - victory_shot1_seconds
+		var e: float = smoothstep(0.0, 1.0, minf(t2 / victory_shot2_seconds, 1.0))
+		angle = lerpf(48.0, 38.0, e) + maxf(t2 - victory_shot2_seconds, 0.0) * victory_drift_degrees_per_second
+		radius = lerpf(2.6, 1.9, e)
+		height = lerpf(1.4, 1.55, e)
+		look_height = lerpf(1.45, 1.55, e)
+		shot_fov = lerpf(38.0, 32.0, e)
+	var rad := deg_to_rad(angle)
+	var dir := (facing * cos(rad) + right * sin(rad)).normalized()
+	return {
+		position = winner + dir * radius + Vector3.UP * height,
+		look = winner + Vector3.UP * look_height,
+		fov = shot_fov,
+	}
+
+
+func _victory_right(fighter: Fighter) -> Vector3:
+	return fighter.forward.cross(Vector3.UP).normalized()
 
 
 # --- Intensity -------------------------------------------------------------------

@@ -39,9 +39,23 @@ const LEVEL_NAMES := ["High", "Mid", "Low", "Overhead"]
 
 var _trail_tweens := {}
 var _announce_tween: Tween
+var _letterbox: Array[ColorRect] = []
+var _cinematic_tween: Tween
 
 
 func _ready() -> void:
+	for top in [true, false]:
+		var bar := ColorRect.new()
+		bar.color = Color.BLACK
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bar.anchor_right = 1.0
+		bar.anchor_top = 0.0 if top else 1.0
+		bar.anchor_bottom = 0.0 if top else 1.0
+		bar.size_flags_horizontal = Control.SIZE_FILL
+		add_child(bar)
+		move_child(bar, 0)
+		_letterbox.append(bar)
+	_set_letterbox(0.0)
 	%RematchButton.pressed.connect(func() -> void: rematch_pressed.emit())
 	%ResultSelectButton.pressed.connect(func() -> void: character_select_pressed.emit())
 	%ResultMenuButton.pressed.connect(func() -> void: main_menu_pressed.emit())
@@ -120,6 +134,56 @@ func note(player_index: int, text: String) -> void:
 
 func set_debug_text(text: String) -> void:
 	debug_label.text = text
+
+
+# --- Victory cinematic ------------------------------------------------------------
+
+## Letterbox bars in, fight HUD out, announcements to the lower third.
+func start_cinematic() -> void:
+	_animate_cinematic(1.0)
+	(center_label.get_parent() as Control).size_flags_vertical = Control.SIZE_SHRINK_END
+	# Keep the lower-third title and menu above the bottom letterbox bar.
+	$Margin.add_theme_constant_override("margin_bottom", int(get_viewport().get_visible_rect().size.y * 0.13))
+	center_label.add_theme_font_size_override("font_size", 96)
+	# Result menu sits in the bottom-right corner so it doesn't cover the winner.
+	result_panel.reparent($Margin, false)
+	result_panel.size_flags_horizontal = Control.SIZE_SHRINK_END
+	result_panel.size_flags_vertical = Control.SIZE_SHRINK_END
+
+
+func end_cinematic() -> void:
+	if _cinematic_tween:
+		_cinematic_tween.kill()
+	_set_letterbox(0.0)
+	%Top.modulate.a = 1.0
+	debug_label.modulate.a = 1.0
+	(center_label.get_parent() as Control).size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	$Margin.add_theme_constant_override("margin_bottom", 30)
+	center_label.add_theme_font_size_override("font_size", 140)
+	if result_panel.get_parent() != center_label.get_parent():
+		result_panel.reparent(center_label.get_parent(), false)
+		result_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		result_panel.size_flags_vertical = Control.SIZE_FILL
+
+
+func _animate_cinematic(amount: float) -> void:
+	if _cinematic_tween:
+		_cinematic_tween.kill()
+	_cinematic_tween = create_tween().set_parallel()
+	_cinematic_tween.tween_method(_set_letterbox, 0.0, amount, 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_cinematic_tween.tween_property(%Top, "modulate:a", 0.0, 0.35)
+	_cinematic_tween.tween_property(debug_label, "modulate:a", 0.0, 0.35)
+
+
+## 0..1: bars cover 11% of the screen height each at 1.
+func _set_letterbox(amount: float) -> void:
+	var height := get_viewport().get_visible_rect().size.y * 0.11 * amount
+	_letterbox[0].offset_top = 0.0
+	_letterbox[0].offset_bottom = height
+	_letterbox[1].offset_top = -height
+	_letterbox[1].offset_bottom = 0.0
+	for bar in _letterbox:
+		bar.visible = amount > 0.0
 
 
 # --- Menus -----------------------------------------------------------------------

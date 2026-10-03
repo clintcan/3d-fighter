@@ -18,5 +18,5 @@ blockstun = 16
 hitstop = 12
 knockback = Vector2(4.375, 0)
 hitbox_radius = 0.22
-hitbox_offset = Vector3(0.05, 1.5, -0.7)
+hitbox_offset = Vector3(-0.08, 1.5, -0.85)
 camera_intensity = 0.2

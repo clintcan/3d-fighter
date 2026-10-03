@@ -32,6 +32,7 @@ model_scene = ExtResource("3_osouf")
 hair_scenes = Array[PackedScene]([ExtResource("2_iif4c")])
 body_albedo = ExtResource("1_8alh3")
 hair_color = Color(0.09, 0.07, 0.06, 1)
+victory_animations = Array[StringName]([&"fight/victory_bow", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.2, 0.45, 0.9, 1)
 power_rating = 0.55
 speed_rating = 0.55

@@ -14,5 +14,5 @@ blockstun = 11
 hitstop = 5
 knockback = Vector2(1.4, 0)
 hitbox_radius = 0.18
-hitbox_offset = Vector3(0.05, 1, -0.9)
+hitbox_offset = Vector3(0.05, 1, -1)
 cancel_into = Array[String](["HP", "6HP"])

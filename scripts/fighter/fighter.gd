@@ -113,6 +113,9 @@ var sidestep_dir := Vector3.ZERO
 var debug_draw := false
 ## Set by FightManager on the round/match winner: shows the victory pose when idle.
 var victory := false
+## Match-win animation (played once, final pose held); empty = round-win folded arms.
+var victory_clip: StringName
+var _victory_time := 0.0
 var last_hit_level: MoveData.HitLevel = MoveData.HitLevel.MID
 ## Skinned character model, or null for a graybox capsule.
 var model: FighterModel
@@ -172,6 +175,7 @@ func reset_to(spawn_position: Vector3) -> void:
 	sidestep_dir = Vector3.ZERO
 	last_hit_level = MoveData.HitLevel.MID
 	victory = false
+	victory_clip = &""
 	_set_combo(0)
 	_set_state(State.IDLE)
 	health_changed.emit(health, data.max_health)
@@ -512,6 +516,13 @@ func on_hit_confirmed() -> void:
 	hitstop = current_move.hitstop
 
 
+## Match win: play `clip` from the start (cosmetic; the fighter stays in its idle state).
+func start_victory(clip: StringName) -> void:
+	victory = true
+	victory_clip = clip
+	_victory_time = 0.0
+
+
 ## True while this fighter's attack is in startup/active and close enough to `target`
 ## that it could connect.
 func is_threatening(target: Fighter) -> bool:
@@ -729,6 +740,8 @@ func _update_limb() -> void:
 
 
 func _update_model(delta: float) -> void:
+	if victory_clip != &"":
+		_victory_time += delta
 	var frozen := hitstop > 0
 	var request := _animation_request(frozen)
 	model.show_clip(request[0], request[1], request[2], 0.0 if frozen else delta)
@@ -781,6 +794,8 @@ func _animation_request(frozen: bool) -> Array:
 			return [&"fight/thrown", 0.0, 1.0]
 		State.TECH:
 			return [&"fight/block_stand", 0.0, 1.0]
+	if victory and victory_clip != &"":
+		return [victory_clip, _victory_time, 1.0]
 	if victory:
 		return [&"ual2/Idle_FoldArms", -1.0, 1.0]
 	return [&"fight/guard", -1.0, 1.0]

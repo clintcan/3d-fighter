@@ -18,4 +18,4 @@ hitstun = 14
 hitstop = 4
 knockback = Vector2(0.9, 0)
 hitbox_radius = 0.18
-hitbox_offset = Vector3(-0.15, 1, -0.65)
+hitbox_offset = Vector3(-0.22, 1, -0.63)

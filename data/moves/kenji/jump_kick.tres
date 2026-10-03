@@ -15,4 +15,4 @@ damage = 45
 hit_level = 3
 knockback = Vector2(1.2, 0)
 hitbox_radius = 0.2
-hitbox_offset = Vector3(0.15, 0.6, -0.85)
+hitbox_offset = Vector3(0.11, 0.45, -0.88)
