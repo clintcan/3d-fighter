@@ -14,6 +14,8 @@ const SFX := {
 	&"bell": ["impactBell_heavy_000", "impactBell_heavy_001"],
 	&"swing_light": ["swing_light.wav"],
 	&"swing_heavy": ["swing_heavy.wav"],
+	&"energy": ["energy.wav"],
+	&"super": ["super.wav"],
 	&"ui_focus": ["select_001", "select_002", "select_003"],
 	&"ui_accept": ["confirmation_001"],
 	&"ui_back": ["back_001"],

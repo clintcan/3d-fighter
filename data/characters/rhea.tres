@@ -21,6 +21,10 @@
 [ext_resource type="Resource" path="res://data/moves/rhea/rushing_hook.tres" id="17_u317i"]
 [ext_resource type="Resource" path="res://data/moves/rhea/step_kick.tres" id="18_v0bkd"]
 [ext_resource type="Texture2D" path="res://assets/ui/portraits/rhea.png" id="19_1sqe6"]
+[ext_resource type="Resource" path="res://data/moves/rhea/gale_slide.tres" id="20_0kpmu"]
+[ext_resource type="Resource" path="res://data/moves/rhea/crescent_rise.tres" id="21_loo3t"]
+[ext_resource type="Resource" path="res://data/moves/rhea/tempest_kicks.tres" id="22_u5vpa"]
+[ext_resource type="Resource" path="res://data/moves/rhea/tempest_finish.tres" id="23_v5xfu"]
 
 [resource]
 script = ExtResource("1_char")
@@ -46,4 +50,4 @@ weight = 0.85
 throw_damage = 100
 power_rating = 0.35
 speed_rating = 0.9
-moves = Array[ExtResource("1_0tygf")]([ExtResource("5_pcrmm"), ExtResource("6_1sqe6"), ExtResource("7_v8o8g"), ExtResource("8_qbp22"), ExtResource("9_iffgu"), ExtResource("10_hpof3"), ExtResource("11_0kpmu"), ExtResource("12_loo3t"), ExtResource("13_u5vpa"), ExtResource("14_v5xfu"), ExtResource("15_lok5t"), ExtResource("16_enack"), ExtResource("17_u317i"), ExtResource("18_v0bkd")])
+moves = Array[ExtResource("1_0tygf")]([ExtResource("5_pcrmm"), ExtResource("6_1sqe6"), ExtResource("7_v8o8g"), ExtResource("8_qbp22"), ExtResource("9_iffgu"), ExtResource("10_hpof3"), ExtResource("11_0kpmu"), ExtResource("12_loo3t"), ExtResource("13_u5vpa"), ExtResource("14_v5xfu"), ExtResource("15_lok5t"), ExtResource("16_enack"), ExtResource("17_u317i"), ExtResource("18_v0bkd"), ExtResource("20_0kpmu"), ExtResource("21_loo3t"), ExtResource("22_u5vpa"), ExtResource("23_v5xfu")])

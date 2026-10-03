@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_odhx8"]
+
+[resource]
+script = ExtResource("1_odhx8")
+name = "Bull Charge"
+input = "236P"
+animation = &"fight/shoulder_charge"
+animation_impact = 0.15
+animation_end = 0.83
+startup = 14
+active = 16
+recovery = 20
+damage = 120
+hitstun = 24
+blockstun = 18
+hitstop = 12
+knockback = Vector2(5, 0)
+chip_damage = 14
+travel = 8.0
+hitbox_radius = 0.38
+hitbox_offset = Vector3(0, 1, -0.6)
+camera_intensity = 0.3

@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_n3dv4"]
+
+[resource]
+script = ExtResource("1_n3dv4")
+name = "Rising Dragon"
+input = "623P"
+animation = &"fight/rising_uppercut"
+animation_impact = 0.09
+animation_end = 0.7
+startup = 4
+active = 12
+recovery = 14
+damage = 110
+hitstun = 0
+blockstun = 18
+hitstop = 10
+knockback = Vector2(1, 7)
+launches = true
+chip_damage = 12
+travel = 1.2
+rise = 7.0
+landing_recovery = 16
+invuln_frames = 7
+hitbox_radius = 0.38
+hitbox_offset = Vector3(-0.15, 1.55, -0.35)
+camera_intensity = 0.35

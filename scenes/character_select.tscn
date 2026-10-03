@@ -185,7 +185,7 @@ show_percentage = false
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
 theme_override_font_sizes/font_size = 24
-text = "SIGNATURE MOVES"
+text = "SPECIAL MOVES"
 
 [node name="SignatureLabel" type="Label" parent="Margin/VBox/Main/Info/VBox"]
 unique_name_in_owner = true

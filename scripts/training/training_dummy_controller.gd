@@ -77,7 +77,7 @@ func _should_block(fighter: Fighter) -> bool:
 
 ## Lows must be crouch-blocked, overheads stand-blocked; mids follow the stance.
 func _block_dir(fighter: Fighter) -> int:
-	var move := fighter.opponent.current_move
+	var move := fighter.opponent.threat_move(fighter)
 	if move == null:
 		return 4
 	match move.hit_level:

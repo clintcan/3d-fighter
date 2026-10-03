@@ -6,7 +6,9 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 
 @export var name: String
 ## Input notation: "LP", "HP", "LK", "HK", "2LP" (crouching), "6HP" / "4HP" (forward /
-## back + button), "j.LP" (airborne). Later: motion inputs like "236P".
+## back + button), "j.LP" (airborne). Specials use a motion plus P (either punch) or K
+## (either kick): "236P" (quarter-circle forward), "623P", "214K", "236236P" (super).
+## Inputs starting with "~" are follow-ups, reachable only through `followup`.
 @export var input: String
 ## Clip as "library/name", e.g. "ual1/Punch_Jab" or "fight/front_kick".
 @export var animation: StringName
@@ -34,6 +36,32 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 @export var knockdown: bool = false
 ## Forward speed (m/s) given to the attacker when the move starts; friction slows it.
 @export var lunge: float = 0.0
+## Chip damage dealt through a block (specials and supers).
+@export var chip_damage: int = 0
+
+@export_group("Special")
+## Hits per move instance (multi-hit moves); a new hit can land every `hit_interval`
+## ticks during the active frames. Launch/knockdown apply on the final hit only.
+@export var hits: int = 1
+@export var hit_interval: int = 4
+## Forward speed (m/s) held during the active frames until the move connects.
+@export var travel: float = 0.0
+## Upward speed (m/s) applied on the first active frame (rising anti-airs).
+@export var rise: float = 0.0
+## Extra landing frames after a rising move comes back down.
+@export var landing_recovery: int = 0
+## The move has no hurtbox (and can't be thrown) through this frame.
+@export var invuln_frames: int = 0
+## Hurtbox lowered to crouch height for the whole move (slides).
+@export var low_profile: bool = false
+## Spends a full super meter and starts with the super freeze.
+@export var super_move: bool = false
+## Move started automatically when this one ends after connecting (hit or block).
+@export var followup: String = ""
+## Projectile fired on the first active frame instead of a body hitbox.
+@export var projectile_speed: float = 0.0
+@export var projectile_lifetime: int = 90
+@export var projectile_color: Color = Color(0.4, 0.75, 1.0)
 
 @export_group("Hitbox")
 ## Sphere hitbox. Offset is in the fighter's local space (-Z = toward opponent), or
@@ -51,3 +79,17 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 
 func total_frames() -> int:
 	return startup + active + recovery
+
+
+## Motion part of a special input ("236" of "236P"), or "" for normals.
+func motion() -> String:
+	var digits := ""
+	for c in input:
+		if not c.is_valid_int():
+			break
+		digits += c
+	return digits if digits.length() >= 3 else ""
+
+
+func is_special() -> bool:
+	return motion() != ""

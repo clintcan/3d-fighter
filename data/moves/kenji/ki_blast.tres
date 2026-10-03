@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_icdmo"]
+
+[resource]
+script = ExtResource("1_icdmo")
+name = "Ki Blast"
+input = "236P"
+animation = &"fight/palm_blast"
+animation_end = 0.65
+startup = 12
+active = 1
+recovery = 30
+damage = 60
+hitstun = 18
+blockstun = 14
+hitstop = 7
+knockback = Vector2(1.8, 0)
+chip_damage = 8
+projectile_speed = 6.5
+projectile_lifetime = 100
+hitbox_radius = 0.3
+hitbox_offset = Vector3(0, 1.2, -0.6)
+camera_intensity = 0.1

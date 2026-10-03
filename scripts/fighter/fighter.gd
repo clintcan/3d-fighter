@@ -13,6 +13,9 @@ signal throw_teched(fighter: Fighter)
 signal attack_started(move: MoveData)
 signal landed_hard(fighter: Fighter)
 signal throw_impact(defender: Fighter)
+signal meter_changed(current: int, maximum: int)
+## A super started: FightManager freezes the fight for the super flash.
+signal super_started(fighter: Fighter, move: MoveData)
 
 enum State {
 	IDLE, WALK_FWD, WALK_BACK, CROUCH,
@@ -74,6 +77,24 @@ const NOT_THROWABLE_STATES := [State.JUMP, State.AIR_HIT, State.KNOCKDOWN, State
 ## Extra distance beyond an attack's reach at which holding back stops walking.
 const PROXIMITY_GUARD_MARGIN := 0.5
 
+## Super meter. A super costs the full bar. Hits build meter for both sides.
+const MAX_METER := 1000
+const METER_PER_DAMAGE_HIT := 1.0 # attacker, per point of the move's damage
+const METER_PER_DAMAGE_BLOCKED := 0.5 # attacker, when blocked
+const METER_PER_DAMAGE_TAKEN := 0.6 # defender
+const METER_PER_SPECIAL := 20 # starting a special
+## Motion input windows (ticks) and how recently the final direction must have been held.
+const MOTION_WINDOW := 14
+const SUPER_MOTION_WINDOW := 26
+const MOTION_FINISH := 8
+## Specials checked longest/most specific first, so 236236 beats 236 and 623 beats 236.
+const MOTION_PRIORITY := ["236236", "623", "214", "236"]
+## A normal that connected can be cancelled into a special for this long after its
+## active frames; a special into a super likewise.
+const SPECIAL_CANCEL_WINDOW := 10
+## Knockback (m/s) of the non-final hits of a multi-hit move, so the victim stays close.
+const MULTI_HIT_KNOCKBACK := 0.6
+
 const BUFFER_WINDOW := 6 # ticks an attack press stays buffered
 const DOUBLE_TAP_WINDOW := 14
 ## Checked heaviest first so a mash of several buttons picks the stronger move.
@@ -109,6 +130,15 @@ var air_attack_used := false
 var throw_grab_frame := -1
 var current_move: MoveData
 var move_has_hit := false
+## Multi-hit bookkeeping for the current move.
+var hits_landed := 0
+var next_hit_frame := 0
+var meter := 0
+## This fighter's projectile in flight (one at a time), ticked by FightManager.
+var projectile: Projectile
+## Set by FightManager during the super freeze (holds animation).
+var frozen := false
+var _landing_frames := LANDING_FRAMES
 var sidestep_dir := Vector3.ZERO
 var debug_draw := false
 ## Set by FightManager on the round/match winner: shows the victory pose when idle.
@@ -172,6 +202,13 @@ func reset_to(spawn_position: Vector3) -> void:
 	stun = 0
 	current_move = null
 	move_has_hit = false
+	hits_landed = 0
+	next_hit_frame = 0
+	_landing_frames = LANDING_FRAMES
+	if projectile:
+		projectile.queue_free()
+		projectile = null
+	frozen = false
 	input = InputBuffer.new()
 	input_locked = false
 	juggle_hits = 0
@@ -214,7 +251,8 @@ func tick() -> void:
 			pass # gravity + landing handled in _apply_motion
 		State.LANDING:
 			velocity = Vector3.ZERO
-			if state_frame >= LANDING_FRAMES:
+			if state_frame >= _landing_frames:
+				_landing_frames = LANDING_FRAMES
 				_return_to_neutral()
 		State.DASH:
 			velocity = forward * data.dash_speed * _burst_curve(DASH_FRAMES)
@@ -319,26 +357,46 @@ func _tick_jump_squat() -> void:
 
 
 func _tick_attack() -> void:
+	var move := current_move
 	var airborne := position.y > 0.0
-	if not airborne:
-		velocity = _with_friction(velocity)
 	var frame := state_frame
-	if move_has_hit and frame > current_move.startup and not current_move.cancel_into.is_empty():
-		if _try_attack(true):
+	var active := frame > move.startup and frame <= move.startup + move.active
+	if active and move.travel > 0.0 and hits_landed < move.hits:
+		velocity = Vector3(0.0, velocity.y, 0.0) + forward * move.travel
+	elif not airborne:
+		velocity = _with_friction(velocity)
+	if frame == move.startup + 1:
+		if move.rise > 0.0:
+			velocity.y = move.rise
+		if move.projectile_speed > 0.0:
+			_fire_projectile(move)
+	if move_has_hit and frame > move.startup and _try_attack(true):
+		return
+	# A connected move with a follow-up chains into it right after its active frames;
+	# a whiff plays out its full recovery.
+	if move.followup != "" and move_has_hit and frame >= move.startup + move.active:
+		var next := _move_for_input(move.followup)
+		if next:
+			_start_move(next, false)
 			return
-	if frame >= current_move.total_frames():
+	if frame >= move.total_frames():
 		if airborne:
+			if move.rise > 0.0:
+				_landing_frames = LANDING_FRAMES + move.landing_recovery
 			current_move = null
-			_set_state(State.JUMP) # air attack finished; keep falling, no second attack
+			air_attack_used = true
+			_set_state(State.JUMP) # attack finished in the air; keep falling, no second attack
 		else:
 			_return_to_neutral()
 
 
-## Starts a buffered attack. With `cancel_only`, only moves listed in the current
-## move's cancel_into are allowed.
+## Starts a buffered attack. With `cancel_only` (the current move connected), only its
+## cancel_into moves, specials (from a normal) or a super (from a special) are allowed.
 func _try_attack(cancel_only: bool) -> bool:
-	var dir := input.dir()
 	var airborne := state == State.JUMP
+	if not airborne and _try_special(cancel_only):
+		return true
+	var dir := input.dir()
 	for button: int in ATTACK_BUTTONS:
 		if not input.pressed_within(button, BUFFER_WINDOW):
 			continue
@@ -346,15 +404,86 @@ func _try_attack(cancel_only: bool) -> bool:
 		if move == null or (cancel_only and move.input not in current_move.cancel_into):
 			continue
 		input.consume(button)
-		current_move = move
-		move_has_hit = false
-		air_attack_used = air_attack_used or airborne
-		_set_state(State.ATTACK, move.input.begins_with("2"))
-		if move.lunge > 0.0 and not airborne:
-			velocity = forward * move.lunge
-		attack_started.emit(move)
+		_start_move(move, airborne)
 		return true
 	return false
+
+
+## Motion-input specials. "P" accepts either punch, "K" either kick.
+func _try_special(cancel_only: bool) -> bool:
+	if cancel_only:
+		var since_active := state_frame - current_move.startup - current_move.active
+		if current_move.super_move or since_active > SPECIAL_CANCEL_WINDOW or position.y > 0.0:
+			return false
+	for motion: String in MOTION_PRIORITY:
+		for move in data.moves:
+			if move.motion() != motion:
+				continue
+			if cancel_only and current_move.is_special() and not move.super_move:
+				continue
+			if move.super_move and meter < MAX_METER:
+				continue
+			if move.projectile_speed > 0.0 and projectile != null:
+				continue
+			var pressed := _special_buttons(move.input.substr(motion.length())).filter(
+				func(b: int) -> bool: return input.pressed_within(b, BUFFER_WINDOW))
+			if pressed.is_empty():
+				continue
+			var window := SUPER_MOTION_WINDOW if move.super_move else MOTION_WINDOW
+			if not input.motion(_motion_sequence(motion), window, MOTION_FINISH + BUFFER_WINDOW):
+				continue
+			for b: int in pressed:
+				input.consume(b)
+			_start_move(move, false)
+			return true
+	return false
+
+
+func _motion_sequence(motion: String) -> Array:
+	var sequence := []
+	for c in motion:
+		sequence.append(int(c))
+	return sequence
+
+
+func _special_buttons(suffix: String) -> Array:
+	match suffix:
+		"P":
+			return [InputBuffer.HP, InputBuffer.LP]
+		"K":
+			return [InputBuffer.HK, InputBuffer.LK]
+	var button = InputBuffer.BUTTON_NAMES.find_key(suffix)
+	return [button] if button != null else []
+
+
+func _start_move(move: MoveData, airborne: bool) -> void:
+	current_move = move
+	move_has_hit = false
+	hits_landed = 0
+	next_hit_frame = 0
+	air_attack_used = air_attack_used or airborne
+	_set_state(State.ATTACK, move.input.begins_with("2") or move.low_profile)
+	if move.lunge > 0.0 and not airborne:
+		velocity = forward * move.lunge
+	if move.super_move:
+		add_meter(-MAX_METER)
+		super_started.emit(self, move)
+	elif move.is_special():
+		add_meter(METER_PER_SPECIAL)
+	attack_started.emit(move)
+
+
+func _fire_projectile(move: MoveData) -> void:
+	projectile = Projectile.new()
+	projectile.setup(self, move)
+	add_sibling(projectile)
+
+
+func add_meter(amount: int) -> void:
+	var value := clampi(meter + amount, 0, MAX_METER)
+	if value != meter:
+		meter = value
+		meter_changed.emit(meter, MAX_METER)
 
 
 ## Picks the move for a button given the held direction (numpad, facing-relative).
@@ -375,6 +504,7 @@ func _find_move(button: int, dir: int, airborne: bool) -> MoveData:
 	return move if move else _move_for_input(button_name)
 
 
+## Exact input lookup (also finds "~" follow-ups).
 func _move_for_input(input_name: String) -> MoveData:
 	for move in data.moves:
 		if move.input == input_name:
@@ -410,6 +540,8 @@ func _on_landed() -> void:
 	match state:
 		State.JUMP, State.ATTACK:
 			velocity = Vector3.ZERO
+			if current_move and current_move.rise > 0.0:
+				_landing_frames = LANDING_FRAMES + current_move.landing_recovery
 			current_move = null
 			_set_state(State.LANDING)
 		State.AIR_HIT:
@@ -427,6 +559,8 @@ func _return_to_neutral() -> void:
 
 
 func _set_state(new_state: State, crouch: bool = false) -> void:
+	if new_state != State.JUMP and new_state != State.LANDING:
+		_landing_frames = LANDING_FRAMES # only a rising move's own fall keeps the extra lag
 	state = new_state
 	state_frame = 0
 	crouching = crouch
@@ -436,7 +570,9 @@ func _set_state(new_state: State, crouch: bool = false) -> void:
 
 ## Active hitbox this tick as {center: Vector3, radius: float}, or {} if none.
 func get_active_hitbox() -> Dictionary:
-	if state != State.ATTACK or move_has_hit:
+	if state != State.ATTACK or current_move.projectile_speed > 0.0:
+		return {}
+	if hits_landed >= current_move.hits or state_frame < next_hit_frame:
 		return {}
 	var frame := state_frame
 	if frame <= current_move.startup or frame > current_move.startup + current_move.active:
@@ -452,6 +588,8 @@ func overlaps_hurtbox(center: Vector3, radius: float) -> bool:
 		return false
 	if state == State.AIR_HIT and juggle_hits >= MAX_JUGGLE_HITS:
 		return false
+	if is_invulnerable():
+		return false
 	var top := (CROUCH_HEIGHT if crouching else STAND_HEIGHT) - BODY_RADIUS
 	var a := position + Vector3.UP * BODY_RADIUS
 	var b := position + Vector3.UP * top
@@ -459,22 +597,35 @@ func overlaps_hurtbox(center: Vector3, radius: float) -> bool:
 	return closest.distance_to(center) <= radius + BODY_RADIUS
 
 
+## Startup invincibility of the current move (reversals, supers).
+func is_invulnerable() -> bool:
+	return state == State.ATTACK and current_move != null and state_frame <= current_move.invuln_frames
+
+
 ## Applies a hit from `attacker` and reports whether it hit, was blocked, or counter-hit.
-func receive_hit(attacker: Fighter, move: MoveData) -> HitResult:
-	var push_dir := attacker.forward
+## `push_dir` overrides the knockback direction (projectiles). On a multi-hit move only
+## the `final` hit launches or knocks down; the others keep the victim close.
+func receive_hit(attacker: Fighter, move: MoveData, push_dir := Vector3.ZERO, final := true) -> HitResult:
+	if push_dir == Vector3.ZERO:
+		push_dir = attacker.forward
+	var knockback := move.knockback if final else Vector2(MULTI_HIT_KNOCKBACK, 0.0)
 	hitstop = move.hitstop
 	if _can_block(move.hit_level):
 		var crouch_block := input.dir() == 1
 		_set_state(State.BLOCKSTUN, crouch_block)
 		stun = move.blockstun
-		velocity = push_dir * move.knockback.x * BLOCK_PUSHBACK_SCALE / data.weight
+		velocity = push_dir * knockback.x * BLOCK_PUSHBACK_SCALE / data.weight
 		_flash_color = Color(0.4, 0.7, 1.0)
+		if move.chip_damage > 0:
+			_take_damage(move.chip_damage)
+			if health == 0:
+				_knock_out(push_dir)
 		return HitResult.BLOCKED
 
 	var counter := state == State.ATTACK and current_move != null \
 			and state_frame <= current_move.startup + current_move.active
 	var airborne := position.y > 0.0 or state in [State.JUMP, State.AIR_HIT]
-	if airborne:
+	if airborne and final:
 		juggle_hits += 1
 	var scale := maxf(MIN_COMBO_SCALE, 1.0 - COMBO_SCALING_STEP * combo_hits)
 	if counter:
@@ -484,14 +635,14 @@ func receive_hit(attacker: Fighter, move: MoveData) -> HitResult:
 	_flash_color = Color(1.0, 0.85, 0.3) if counter else Color.WHITE
 	last_hit_level = move.hit_level
 	current_move = null
-	velocity = push_dir * move.knockback.x / data.weight + Vector3.UP * move.knockback.y
+	velocity = push_dir * knockback.x / data.weight + Vector3.UP * knockback.y
 
 	if health == 0:
 		_knock_out(push_dir)
-	elif airborne or move.launches:
-		velocity.y = maxf(velocity.y, JUGGLE_MIN_UP_SPEED)
+	elif airborne or (move.launches and final):
+		velocity.y = maxf(velocity.y, JUGGLE_MIN_UP_SPEED if final else 1.5)
 		_set_state(State.AIR_HIT)
-	elif move.knockdown:
+	elif move.knockdown and final:
 		# Tripped: a small pop, then falls into a knockdown.
 		velocity.y = KNOCKDOWN_POP_SPEED
 		_set_state(State.AIR_HIT)
@@ -518,7 +669,14 @@ func on_hit_confirmed() -> void:
 	if current_move == null: # traded and got hit on the same tick
 		return
 	move_has_hit = true
+	hits_landed += 1
+	next_hit_frame = state_frame + current_move.hit_interval
 	hitstop = current_move.hitstop
+
+
+## True if the next hit of the current move is its last (multi-hit moves).
+func is_final_hit() -> bool:
+	return current_move == null or hits_landed + 1 >= current_move.hits
 
 
 ## Match win: play `clip` from the start (cosmetic; the fighter stays in its idle state).
@@ -528,15 +686,23 @@ func start_victory(clip: StringName) -> void:
 	_victory_time = 0.0
 
 
-## True while this fighter's attack is in startup/active and close enough to `target`
-## that it could connect.
+## True while this fighter's attack (or projectile) could connect with `target` soon.
 func is_threatening(target: Fighter) -> bool:
-	if state != State.ATTACK or current_move == null:
-		return false
+	return threat_move(target) != null
+
+
+## The attack about to reach `target`: the current move in startup/active within reach,
+## or an approaching projectile. Null if none.
+func threat_move(target: Fighter) -> MoveData:
+	if projectile and projectile.is_threatening(target):
+		return projectile.move
+	if state != State.ATTACK or current_move == null or current_move.projectile_speed > 0.0:
+		return null
 	if state_frame > current_move.startup + current_move.active:
-		return false
+		return null
 	var reach := absf(current_move.hitbox_offset.z) + current_move.hitbox_radius + BODY_RADIUS
-	return _flat_distance_to(target) <= reach + PROXIMITY_GUARD_MARGIN
+	reach += current_move.travel * current_move.active * DT
+	return current_move if _flat_distance_to(target) <= reach + PROXIMITY_GUARD_MARGIN else null
 
 
 func _flat_distance_to(other: Fighter) -> float:
@@ -549,7 +715,7 @@ func is_throw_grab_frame() -> bool:
 
 
 func is_throwable() -> bool:
-	return position.y <= 0.0 and state not in NOT_THROWABLE_STATES
+	return position.y <= 0.0 and state not in NOT_THROWABLE_STATES and not is_invulnerable()
 
 
 ## Called on the attacker when its grab connects.
@@ -747,9 +913,11 @@ func _update_limb() -> void:
 func _update_model(delta: float) -> void:
 	if victory_clip != &"":
 		_victory_time += delta
-	var frozen := hitstop > 0
+	var frozen := hitstop > 0 or self.frozen
 	var request := _animation_request(frozen)
-	model.show_clip(request[0], request[1], request[2], 0.0 if frozen else delta)
+	# Hitstop freezes the pose outright; the super freeze holds the clip time but lets a
+	# cross-fade finish, so nobody is stuck mid-blend in the close-up.
+	model.show_clip(request[0], request[1], request[2], 0.0 if hitstop > 0 else delta)
 	var shake := Vector3.ZERO
 	if frozen and state in [State.HITSTUN, State.BLOCKSTUN, State.AIR_HIT, State.KO]:
 		shake.x = randf_range(-0.03, 0.03)

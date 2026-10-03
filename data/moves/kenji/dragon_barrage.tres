@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_d3om3"]
+
+[resource]
+script = ExtResource("1_d3om3")
+name = "Dragon Barrage"
+input = "236236P"
+animation = &"fight/punch_flurry"
+animation_impact = 0.1
+animation_end = 0.7
+startup = 6
+active = 30
+recovery = 24
+damage = 28
+hitstun = 22
+blockstun = 16
+hitstop = 4
+knockback = Vector2(0.6, 0)
+chip_damage = 6
+hits = 6
+hit_interval = 5
+travel = 1.8
+invuln_frames = 12
+super_move = true
+followup = "~dragon_finish"
+hitbox_radius = 0.32
+hitbox_offset = Vector3(0, 1.22, -0.6)
+camera_intensity = 0.15

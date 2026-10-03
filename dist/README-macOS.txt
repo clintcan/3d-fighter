@@ -1,4 +1,4 @@
-3D FIGHTER  -  v0.1.0 (prototype)  -  macOS
+3D FIGHTER  -  v0.2.0 (prototype)  -  macOS
 ===========================================
 
 A one-on-one 3D fighting game inspired by Street Fighter and Tekken, with a
@@ -46,6 +46,19 @@ Block: hold back (standing) or down-back (crouching).
 Dash: tap forward twice. Backdash: tap back twice.
 Throw: Light Punch + Light Kick together, up close.
 Signature moves: forward + Heavy Punch (and see the move list in the pause menu).
+
+SPECIAL MOVES (P = either punch, K = either kick; written facing right)
+  Kenji   down, down-forward, forward + P ... Ki Blast (fireball)
+          forward, down, down-forward + P ... Rising Dragon (invincible uppercut)
+  Rhea    down, down-forward, forward + K ... Gale Slide (low slide)
+          forward, down, down-forward + K ... Crescent Rise (rising kick)
+  Brutus  down, down-forward, forward + P ... Bull Charge
+          down, down-back, back + P ......... Earthquake (low ground pound)
+Normal attacks that connect can be cancelled into a special.
+
+SUPER: landing and taking hits fills the SUPER meter (bottom corners).
+When it's full, do down, down-forward, forward twice + P (Kenji, Brutus)
+or + K (Rhea) for the character's super. Sidestep dodges fireballs.
 
 Options (main menu): music / effects / announcer volume, action camera
 (Off / Subtle / Full), CPU difficulty (Easy / Normal / Hard), fullscreen.

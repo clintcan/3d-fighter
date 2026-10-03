@@ -251,7 +251,10 @@ func _show_details(character: CharacterData) -> void:
 	health_bar.value = character.max_health / HEALTH_SCALE
 	var lines := PackedStringArray()
 	for move in character.moves:
-		if move.input.begins_with("6") or move.input.begins_with("4"):
+		if move.is_special():
+			lines.append("%s   %s%s" % [FightHud.notation(move.input), move.name, "  (super)" if move.super_move else ""])
+	for move in character.moves:
+		if move.input.length() == 3 and (move.input.begins_with("6") or move.input.begins_with("4")):
 			lines.append("%s   %s" % [move.input, move.name])
 	signature_label.text = "\n".join(lines)
 

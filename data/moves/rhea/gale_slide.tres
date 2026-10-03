@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_55bvv"]
+
+[resource]
+script = ExtResource("1_55bvv")
+name = "Gale Slide"
+input = "236K"
+animation = &"fight/slide_kick"
+animation_impact = 0.15
+animation_end = 1.25
+startup = 8
+active = 16
+recovery = 18
+damage = 70
+hit_level = 2
+hitstun = 0
+blockstun = 14
+hitstop = 8
+knockdown = true
+chip_damage = 8
+travel = 5.5
+low_profile = true
+hitbox_radius = 0.28
+hitbox_offset = Vector3(-0.07, 0.15, -0.85)
+camera_intensity = 0.2

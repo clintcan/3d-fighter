@@ -21,6 +21,10 @@
 [ext_resource type="Resource" path="res://data/moves/kenji/advancing_straight.tres" id="17_p7x8d"]
 [ext_resource type="Resource" path="res://data/moves/kenji/snap_kick.tres" id="18_eengp"]
 [ext_resource type="Texture2D" path="res://assets/ui/portraits/kenji.png" id="19_e40xy"]
+[ext_resource type="Resource" path="res://data/moves/kenji/ki_blast.tres" id="20_jc7cg"]
+[ext_resource type="Resource" path="res://data/moves/kenji/rising_dragon.tres" id="21_hp42r"]
+[ext_resource type="Resource" path="res://data/moves/kenji/dragon_barrage.tres" id="22_26eyd"]
+[ext_resource type="Resource" path="res://data/moves/kenji/dragon_finish.tres" id="23_xn3v5"]
 
 [resource]
 script = ExtResource("1_char")
@@ -39,4 +43,4 @@ victory_animations = Array[StringName]([&"fight/victory_bow", &"fight/victory_fi
 placeholder_color = Color(0.2, 0.45, 0.9, 1)
 power_rating = 0.55
 speed_rating = 0.55
-moves = Array[ExtResource("1_qdmbc")]([ExtResource("5_5a4ip"), ExtResource("6_e40xy"), ExtResource("7_bthns"), ExtResource("8_ynpm3"), ExtResource("9_yj4mt"), ExtResource("10_65oi5"), ExtResource("11_jc7cg"), ExtResource("12_hp42r"), ExtResource("13_26eyd"), ExtResource("14_xn3v5"), ExtResource("15_ffpqg"), ExtResource("16_h8qr8"), ExtResource("17_p7x8d"), ExtResource("18_eengp")])
+moves = Array[ExtResource("1_qdmbc")]([ExtResource("5_5a4ip"), ExtResource("6_e40xy"), ExtResource("7_bthns"), ExtResource("8_ynpm3"), ExtResource("9_yj4mt"), ExtResource("10_65oi5"), ExtResource("11_jc7cg"), ExtResource("12_hp42r"), ExtResource("13_26eyd"), ExtResource("14_xn3v5"), ExtResource("15_ffpqg"), ExtResource("16_h8qr8"), ExtResource("17_p7x8d"), ExtResource("18_eengp"), ExtResource("20_jc7cg"), ExtResource("21_hp42r"), ExtResource("22_26eyd"), ExtResource("23_xn3v5")])

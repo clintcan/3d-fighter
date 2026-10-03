@@ -24,6 +24,7 @@ var dummy: Fighter
 var dummy_controller: TrainingDummyController
 
 var refill_health := true
+var infinite_meter := true
 var show_frame_data := true
 var show_input_history := true
 var show_hitboxes := false
@@ -76,6 +77,9 @@ func _on_tick() -> void:
 	if refill_health:
 		_refill(player)
 		_refill(dummy)
+	if infinite_meter:
+		for fighter: Fighter in manager.fighters:
+			fighter.add_meter(Fighter.MAX_METER)
 	if recording:
 		if _record_buffer.size() >= TrainingDummyController.MAX_RECORDING_TICKS:
 			stop_recording()
@@ -311,7 +315,7 @@ func _build_ui() -> void:
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_layer.add_child(_status)
 
-	var frame_panel := _panel(Vector2(40, -40), Control.PRESET_BOTTOM_LEFT)
+	var frame_panel := _panel(Vector2(40, -120), Control.PRESET_BOTTOM_LEFT) # above the super meter
 	_frame_label = _label(22, mono)
 	frame_panel.add_child(_frame_label)
 
@@ -390,6 +394,7 @@ func _build_menu() -> void:
 			dummy_controller.guard = i as TrainingDummyController.Guard
 			_refresh())
 	_toggle(grid, "Health Refill", refill_health, func(on: bool) -> void: refill_health = on)
+	_toggle(grid, "Infinite Meter", infinite_meter, func(on: bool) -> void: infinite_meter = on)
 	_toggle(grid, "Frame Data", show_frame_data, func(on: bool) -> void:
 		show_frame_data = on
 		_refresh())

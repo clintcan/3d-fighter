@@ -46,6 +46,15 @@ func approach(target: float) -> void:
 
 func state_name(f: Fighter) -> String: return Fighter.State.keys()[f.state]
 
+## Inputs a motion (numpad digits, one tick each) with `button` on the last direction.
+func motion(digits: String, button: int) -> void:
+	for i in digits.length():
+		ctl.dir = int(digits[i])
+		if i == digits.length() - 1:
+			ctl.buttons = button
+		step(1)
+	ctl.dir = 5
+
 func wait_until(cond: Callable, limit: int) -> void:
 	var g := 0
 	while not cond.call() and g < limit: step(); g += 1
@@ -297,6 +306,8 @@ func _initialize() -> void:
 	round_tests()
 	character_tests()
 	fx_tests()
+	specials_tests()
+	await character_specials_tests()
 	await versus_tests()
 	await training_tests()
 
@@ -559,3 +570,128 @@ func training_tests() -> void:
 	hold(5, 28)
 	check("Training: playback replays the recording", p2.position.x > p2x + 0.3, "dx %.2f" % (p2.position.x - p2x))
 	gs.mode = gs.Mode.VS_CPU
+
+
+func specials_tests() -> void:
+	var D := DummyController.Mode
+	var buf := InputBuffer.new()
+	for d in [5, 2, 3, 6]: buf.push(InputBuffer.pack(d, 0))
+	check("motion: 236 detected", buf.motion([2, 3, 6], 14, 8) and not buf.motion([6, 2, 3], 14, 8))
+
+	# Projectile: fires on its first active frame, flies, hits for its damage.
+	reset(D.STAND)
+	motion("236", InputBuffer.HP)
+	check("236P starts Ki Blast", p1.current_move != null and p1.current_move.name == "Ki Blast")
+	wait_until(func() -> bool: return p1.projectile != null, 20)
+	check("Ki Blast fires a projectile", p1.projectile != null)
+	var hp := p2.health
+	wait_until(func() -> bool: return p1.projectile == null, 90)
+	check("projectile hits for 60", p2.health == hp - 60 and p2.state == Fighter.State.HITSTUN, "hp %d -> %d" % [hp, p2.health])
+
+	# One projectile at a time: from long range the first is still flying when P1 recovers.
+	reset(D.STAND)
+	p1.position.x = -3.5; p2.position.x = 3.5
+	motion("236", InputBuffer.HP)
+	wait_until(func() -> bool: return p1.is_actionable(), 80)
+	motion("236", InputBuffer.HP)
+	check("no second projectile while one is in flight", p1.projectile != null and (p1.current_move == null or p1.current_move.name != "Ki Blast"),
+		p1.current_move.name if p1.current_move else state_name(p1))
+	step(60)
+
+	# Chip damage through a block, and meter for both sides.
+	reset(D.STAND_BLOCK)
+	motion("236", InputBuffer.HP)
+	wait_until(func() -> bool: return p1.projectile == null and p1.state != Fighter.State.ATTACK, 120)
+	check("blocked projectile deals chip damage", p2.health == p2.data.max_health - 8, "hp %d" % p2.health)
+	check("meter: special start + blocked hit, defender gains too", p1.meter == Fighter.METER_PER_SPECIAL + 30 and p2.meter == 5, "p1 %d p2 %d" % [p1.meter, p2.meter])
+
+	# Cancel a jab into a special during its hitstop.
+	reset(D.STAND); approach(1.0)
+	press(InputBuffer.LP)
+	wait_until(func() -> bool: return p2.state == Fighter.State.HITSTUN, 10)
+	motion("236", InputBuffer.HP)
+	step(12)
+	check("jab cancels into Ki Blast", p1.projectile != null or (p1.current_move != null and p1.current_move.name == "Ki Blast"),
+		p1.current_move.name if p1.current_move else state_name(p1))
+	step(60)
+
+	# Rising Dragon: invincible startup, rises, launches, extra landing lag.
+	reset(D.STAND); approach(1.0)
+	step(16) # 6-5-6 within the double-tap window would be a dash
+	motion("623", InputBuffer.HP)
+	check("623P starts Rising Dragon, invincible on startup", p1.current_move != null and p1.current_move.name == "Rising Dragon" and p1.is_invulnerable()
+		and not p1.overlaps_hurtbox(p1.position + Vector3.UP, 0.3))
+	wait_until(func() -> bool: return p2.state == Fighter.State.AIR_HIT, 20)
+	check("Rising Dragon launches and rises", p2.state == Fighter.State.AIR_HIT and p1.position.y > 0.05, "%s y=%.2f" % [state_name(p2), p1.position.y])
+	wait_until(func() -> bool: return p1.state == Fighter.State.LANDING, 120)
+	check("Rising Dragon has landing recovery", p1._landing_frames == Fighter.LANDING_FRAMES + p1._move_for_input("623P").landing_recovery, str(p1._landing_frames))
+	step(120)
+
+	# Super: needs a full meter; freezes the fight, multi-hits, chains into the finisher.
+	reset(D.STAND); approach(1.0)
+	motion("236236", InputBuffer.HP)
+	check("no super without meter", m.freeze_ticks == 0 and (p1.current_move == null or not p1.current_move.super_move))
+	step(80)
+	reset(D.STAND); approach(1.0)
+	p1.add_meter(Fighter.MAX_METER)
+	motion("236236", InputBuffer.HP)
+	check("super starts: freeze, meter spent", m.freeze_ticks > 0 and p1.frozen and p1.meter == 0 and p1.current_move.super_move, "freeze %d meter %d" % [m.freeze_ticks, p1.meter])
+	var x1 := p1.position.x
+	step(m.SUPER_FREEZE_TICKS - 2)
+	check("nothing moves during the super freeze", p1.position.x == x1 and p1.state_frame == 0)
+	hp = p2.health
+	var max_combo := 0
+	for i in 120:
+		step(1)
+		max_combo = maxi(max_combo, p2.combo_hits)
+	check("super lands all hits and the finisher", max_combo >= 7 and hp - p2.health >= 150, "combo %d, dmg %d" % [max_combo, hp - p2.health])
+
+	# The AI zones with its projectile from range.
+	reset(D.STAND)
+	p1.position.x = -3.0; p2.position.x = 3.0
+	var cpu := AIController.new(AIController.Difficulty.HARD, 5)
+	cpu.attach(p1)
+	p1.controller = cpu
+	var fired := [0]
+	var count := func(move: MoveData) -> void:
+		if move.projectile_speed > 0.0: fired[0] += 1
+	p1.attack_started.connect(count)
+	for i in 600:
+		step(1)
+	p1.attack_started.disconnect(count)
+	p1.controller = ctl
+	check("AI throws fireballs from range", fired[0] > 0, "%d fired" % fired[0])
+
+
+func character_specials_tests() -> void:
+	var gs = root.get_node("GameState")
+	var D := DummyController.Mode
+	for pick in [1, 2]: # Rhea, Brutus vs Kenji
+		gs.player_character = gs.roster[pick]; gs.p2_character = gs.roster[0]
+		change_scene_to_file("res://scenes/fight.tscn")
+		await process_frame; await process_frame
+		m = current_scene
+		m.set_physics_process(false)
+		p1 = m.fighters[0]; p2 = m.fighters[1]
+		p1.controller = ctl
+		if pick == 1:
+			reset(D.STAND_BLOCK); p1.position.x = -1.0; p2.position.x = 1.0
+			motion("236", InputBuffer.HK)
+			check("Rhea: Gale Slide is low profile", p1.current_move.name == "Gale Slide" and p1.crouching)
+			wait_until(func() -> bool: return p2.state == Fighter.State.AIR_HIT or p2.state == Fighter.State.KNOCKDOWN, 40)
+			check("Rhea: slide beats a standing block and knocks down", p2.state in [Fighter.State.AIR_HIT, Fighter.State.KNOCKDOWN], state_name(p2))
+			reset(D.CROUCH_BLOCK); step(20); p1.position.x = -1.0; p2.position.x = 1.0
+			motion("236", InputBuffer.LK)
+			wait_until(func() -> bool: return p2.state == Fighter.State.BLOCKSTUN, 40)
+			check("Rhea: slide is crouch-blockable (with chip)", p2.state == Fighter.State.BLOCKSTUN and p2.health == p2.data.max_health - 8, "%s hp %d" % [state_name(p2), p2.health])
+		else:
+			reset(D.STAND); p1.position.x = -1.5; p2.position.x = 1.5
+			var x0 := p1.position.x
+			motion("236", InputBuffer.HP)
+			wait_until(func() -> bool: return p2.state == Fighter.State.HITSTUN, 40)
+			check("Brutus: Bull Charge travels in and hits", p2.state == Fighter.State.HITSTUN and p1.position.x - x0 > 0.8, "moved %.2f, %s" % [p1.position.x - x0, state_name(p2)])
+			reset(D.STAND_BLOCK); approach(1.2)
+			motion("214", InputBuffer.HP)
+			wait_until(func() -> bool: return p2.state == Fighter.State.AIR_HIT, 40)
+			check("Brutus: Earthquake hits low through a standing block", p2.state == Fighter.State.AIR_HIT, state_name(p2))
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]

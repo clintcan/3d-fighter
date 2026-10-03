@@ -10,6 +10,7 @@ const DUST_POOL := 3
 const HIT_COLOR := Color(1.0, 0.75, 0.35)
 const COUNTER_COLOR := Color(1.0, 0.35, 0.15)
 const BLOCK_COLOR := Color(0.45, 0.75, 1.0)
+const SUPER_COLOR := Color(1.0, 0.82, 0.3)
 
 var manager: Node
 ## Total effects spawned (lets tests confirm hits produce effects).
@@ -30,6 +31,10 @@ func setup(fight_manager: Node) -> void:
 	for i in DUST_POOL:
 		_dust.append(_make_dust())
 	manager.hit_landed.connect(_on_hit_landed)
+	manager.super_flash.connect(_on_super_flash)
+	manager.projectile_clashed.connect(func(point: Vector3) -> void:
+		spark(point, SUPER_COLOR, 1.4)
+		Audio.sfx(&"hit_heavy", 0.0, 1.2))
 	manager.throw_landed.connect(func(_a: Fighter, _d: Fighter) -> void: Audio.sfx(&"block", -4.0, 0.8))
 	for fighter: Fighter in manager.fighters:
 		fighter.attack_started.connect(_on_attack_started)
@@ -38,7 +43,7 @@ func setup(fight_manager: Node) -> void:
 
 
 func _on_hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult) -> void:
-	var point := attacker.global_transform * move.hitbox_offset
+	var point: Vector3 = manager.last_hit_point
 	var heavy := move.hitstop >= HEAVY_HITSTOP
 	match result:
 		Fighter.HitResult.BLOCKED:
@@ -59,7 +64,18 @@ func _on_hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result
 
 
 func _on_attack_started(move: MoveData) -> void:
-	Audio.sfx(&"swing_heavy" if move.hitstop >= HEAVY_HITSTOP else &"swing_light", -8.0)
+	if move.projectile_speed > 0.0:
+		Audio.sfx(&"energy", -4.0)
+	elif not move.super_move: # the super flash has its own sound
+		Audio.sfx(&"swing_heavy" if move.hitstop >= HEAVY_HITSTOP else &"swing_light", -8.0)
+
+
+## Super start: a burst of golden sparks and a glow on the fighter, plus the flash sound.
+func _on_super_flash(fighter: Fighter, _move: MoveData) -> void:
+	spark(fighter.global_position + Vector3.UP * 1.1, SUPER_COLOR, 2.2)
+	Audio.sfx(&"super", 0.0)
+	if fighter.model:
+		fighter.model.flash(SUPER_COLOR, 0.6)
 
 
 func _on_landed_hard(fighter: Fighter) -> void:

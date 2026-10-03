@@ -2,9 +2,10 @@ class_name AIController
 extends FighterController
 ## Basic CPU opponent (CLAUDE.md §7). Produces the same packed inputs a player would and
 ## never touches fighter state. It perceives the opponent `reaction_frames` late, runs
-## short input "plans" (walk, poke, string, dash, jump-in, throw...), and overrides them
-## with reactive rules: block, punish whiffs, anti-air, juggle. Seeded RNG, so a match
-## with the same inputs plays out identically.
+## short input "plans" (walk, poke, string, dash, jump-in, throw, specials by motion
+## input...), and overrides them with reactive rules: block (projectiles too), punish
+## whiffs (with the super when the meter is full), anti-air, juggle. Seeded RNG, so a
+## match with the same inputs plays out identically.
 
 enum Difficulty { EASY, NORMAL, HARD }
 
@@ -33,6 +34,8 @@ const FAR_RANGE := 2.2
 const CLOSE_RANGE := 1.2
 const THROW_RANGE := 0.9
 const WAKEUP_SPACING := 1.4
+## Distance at which an incoming projectile may be jumped over instead of blocked.
+const PROJECTILE_JUMP_RANGE := 2.6
 
 var difficulty: Difficulty = Difficulty.NORMAL
 var reaction_frames := 14
@@ -59,6 +62,8 @@ var _rolled_attack := ""
 var _rolled_punish := ""
 var _blocking := false
 var _block_dir := 4
+## Projectile already rolled for (instance id) and whether to jump it.
+var _rolled_projectile := 0
 var _moves: Dictionary = {} # input string -> MoveData, filled by attach()
 
 
@@ -85,6 +90,7 @@ func reset() -> void:
 	_rolled_attack = ""
 	_rolled_punish = ""
 	_blocking = false
+	_rolled_projectile = 0
 
 
 func read(fighter: Fighter) -> int:
@@ -95,6 +101,10 @@ func read(fighter: Fighter) -> int:
 	var seen_for_block := _perceived(block_reaction_frames)
 
 	# Reactive defense overrides any plan.
+	if _wants_block_projectile(fighter):
+		_plan.clear()
+		_step_ticks_left = 0
+		return InputBuffer.pack(4, 0)
 	if _wants_block(fighter, seen_for_block, _distance(fighter, seen_for_block)):
 		_plan.clear()
 		_step_ticks_left = 0
@@ -179,6 +189,26 @@ func _wants_block(fighter: Fighter, seen: Dictionary, dist: float) -> bool:
 	return _blocking
 
 
+## Incoming fireball: rolled once per projectile, either jumped over (from range) or
+## blocked when it gets close.
+func _wants_block_projectile(fighter: Fighter) -> bool:
+	var p := fighter.opponent.projectile
+	if p == null or not fighter.is_actionable() and fighter.state != Fighter.State.BLOCKSTUN:
+		return false
+	var to_me := fighter.position - p.position
+	to_me.y = 0.0
+	if to_me.dot(p.direction) < 0.0:
+		return false # already past
+	var id := p.get_instance_id()
+	if id != _rolled_projectile:
+		_rolled_projectile = id
+		_blocking = _rng.randf() < minf(block_chance + 0.2, 0.95)
+		if not _blocking and to_me.length() > PROJECTILE_JUMP_RANGE * 0.7 and _rng.randf() < anti_air_chance:
+			_plan.clear()
+			_plan.append_array([[9, 0, 5], [5, 0, 30]]) # jump over it
+	return _blocking and p.is_threatening(fighter)
+
+
 ## Opportunities that don't wait for the decision interval.
 func _react(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 	match seen.state:
@@ -195,13 +225,21 @@ func _react(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 		Fighter.State.JUMP:
 			var approaching: bool = (seen.velocity as Vector3).dot(fighter.position - seen.position) > 0.0
 			if approaching and dist < 2.0 and _rng.randf() < anti_air_chance * 0.15:
-				_queue_press(HP, 2) # uppercut
+				var rising := _special_with(func(m: MoveData) -> bool: return m.rise > 0.0 and not m.super_move)
+				if rising and _rng.randf() < 0.6:
+					_queue_special(rising) # invincible rising anti-air
+				else:
+					_queue_press(HP, 2) # uppercut
 
 
-## Highs whiff over a crouching target, so crouchers get a mid or a low.
+## Highs whiff over a crouching target, so crouchers get a mid or a low. A full meter
+## goes into the super when it reaches.
 func _punish(fighter: Fighter, dist: float, target_crouching: bool) -> void:
+	var super_move := _special_with(func(m: MoveData) -> bool: return m.super_move)
 	var launcher := _move("2HP")
-	if launcher and dist <= reach(launcher) and _rng.randf() < 0.6:
+	if super_move and fighter.meter >= Fighter.MAX_METER and dist <= reach(super_move) and _rng.randf() < 0.8:
+		_queue_special(super_move)
+	elif launcher and dist <= reach(launcher) and _rng.randf() < 0.6:
 		_queue_press(HP, 2)
 	elif target_crouching:
 		if dist <= reach(_move("LK")):
@@ -233,8 +271,13 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 			return
 
 	var options: Array = []
+	var projectile_move := _special_with(func(m: MoveData) -> bool: return m.projectile_speed > 0.0)
+	var rush := _special_with(func(m: MoveData) -> bool: return m.travel > 0.0 and m.rise == 0.0 and not m.super_move)
+	var ground_special := _special_with(func(m: MoveData) -> bool: return m.motion() == "214")
 	if dist > FAR_RANGE:
 		options = [
+			[2.5 if projectile_move and fighter.projectile == null else 0.0, func() -> void: _queue_special(projectile_move)],
+			[1.0 * aggression if rush and dist <= reach(rush) else 0.0, func() -> void: _queue_special(rush)],
 			[4.0, func() -> void: _plan.append([6, 0, _rng.randi_range(12, 28)])],
 			[2.0 * aggression, func() -> void: _queue_dash()],
 			[1.0 * aggression, func() -> void: _queue_jump_in()],
@@ -245,6 +288,8 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 			[3.0, func() -> void: _plan.append([6, 0, _rng.randi_range(6, 14)])],
 			[2.0 * aggression, func() -> void: _queue_poke(dist)],
 			[1.2 * aggression if _signature_in_range(dist) else 0.0, func() -> void: _queue_press(HP, 6)],
+			[1.0 * aggression if rush and dist <= reach(rush) else 0.0, func() -> void: _queue_special(rush)],
+			[0.8 if projectile_move and fighter.projectile == null else 0.0, func() -> void: _queue_special(projectile_move)],
 			[1.5 * aggression, func() -> void: _queue_jump_in()],
 			[1.0, func() -> void: _queue_sidestep()],
 			[0.6, func() -> void: _queue_backdash()],
@@ -256,6 +301,7 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 			[1.5, func() -> void: _queue_press(LK, 2)],
 			[1.0 * aggression, func() -> void: _queue_press(HK, 2)],
 			[1.0, func() -> void: _queue_press(HP, 2)],
+			[0.8 * aggression if ground_special and dist <= reach(ground_special) else 0.0, func() -> void: _queue_special(ground_special)],
 			[1.2 * aggression if dist < THROW_RANGE else 0.0, func() -> void: _queue_throw()],
 			[1.5 * (1.0 - aggression), func() -> void: _plan.append([4 if _rng.randf() < 0.5 else 1, 0, _rng.randi_range(8, 18)])],
 			[0.6, func() -> void: _queue_backdash()],
@@ -283,12 +329,37 @@ func _queue_press(button: int, dir: int = 5) -> void:
 	_plan.append([dir, 0, 2])
 
 
-## Jab, then (unless the combo is "dropped") cancel into a straight.
+## Jab, then (unless the combo is "dropped") cancel into a straight, or sometimes into
+## a special.
 func _queue_string() -> void:
 	_queue_press(LP)
 	_plan.append([5, 0, 2])
-	if _rng.randf() >= combo_drop_chance:
+	if _rng.randf() < combo_drop_chance:
+		return
+	var finisher := _special_with(func(m: MoveData) -> bool: return not m.super_move and m.projectile_speed == 0.0 and m.rise == 0.0)
+	if finisher and _rng.randf() < 0.3:
+		_queue_special(finisher, false)
+	else:
 		_queue_press(HP)
+
+
+## Inputs a motion special: one tick per direction, the button with the last one.
+func _queue_special(move: MoveData, recover := true) -> void:
+	var motion := move.motion()
+	var suffix := move.input.substr(motion.length())
+	var button: int = HP if suffix == "P" else HK if suffix == "K" else InputBuffer.BUTTON_NAMES.find_key(suffix)
+	for i in motion.length():
+		_plan.append([int(motion[i]), button if i == motion.length() - 1 else 0, 1])
+	if recover:
+		_plan.append([5, 0, 3])
+
+
+## First special (motion input) of this character matching `test`, or null.
+func _special_with(test: Callable) -> MoveData:
+	for move: MoveData in _moves.values():
+		if move.is_special() and test.call(move):
+			return move
+	return null
 
 
 ## The longest-reaching standing poke that can hit at this distance.
@@ -362,5 +433,8 @@ func attach(fighter: Fighter) -> void:
 static func reach(move: MoveData) -> float:
 	if move == null:
 		return 0.0
+	if move.projectile_speed > 0.0:
+		return move.projectile_speed * move.projectile_lifetime * Fighter.DT
 	var slide := move.lunge * move.lunge / (2.0 * Fighter.GROUND_FRICTION)
+	slide += move.travel * move.active * Fighter.DT
 	return absf(move.hitbox_offset.z) + move.hitbox_radius + Fighter.BODY_RADIUS + slide

@@ -67,13 +67,41 @@ func consume(button: int) -> void:
 	_consumed_until[button] = _frame
 
 
-## True if `target_dir` was just pressed for the second time within `window` ticks.
+## True if the numpad `sequence` (e.g. [2, 3, 6]) was input in order within the last
+## `window` ticks, its final direction no more than `finish_within` ticks ago and at most
+## `max_gap` ticks between consecutive directions (so an old walk-forward plus a quick
+## 2-3 isn't read as 623).
+func motion(sequence: Array, window: int, finish_within: int, max_gap: int = 6) -> bool:
+	var index := sequence.size() - 1
+	var last_match := -1
+	for ago in mini(window, SIZE):
+		var d := dir(ago)
+		if d == sequence[index]:
+			if index == sequence.size() - 1 and ago > finish_within:
+				return false
+			last_match = ago
+			continue # still holding the same direction
+		if index > 0 and last_match >= 0 and d == sequence[index - 1]:
+			if ago - last_match > max_gap:
+				return false
+			index -= 1
+			last_match = ago
+			if index == 0:
+				return true
+	return false
+
+
+## True if `target_dir` was just pressed for the second time within `window` ticks, with
+## only neutral in between (so the 6 at the end of a 236 motion isn't a dash).
 func double_tapped(target_dir: int, window: int) -> bool:
-	if dir(0) != target_dir or dir(1) == target_dir:
+	if dir(0) != target_dir or dir(1) != NEUTRAL:
 		return false
 	for ago in range(2, window):
-		if dir(ago) == target_dir:
+		var d := dir(ago)
+		if d == target_dir:
 			return true
+		if d != NEUTRAL:
+			return false
 	return false
 
 

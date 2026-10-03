@@ -11,6 +11,10 @@ signal throw_landed(attacker: Fighter, defender: Fighter)
 signal round_ended(winner: Fighter, reason: String)
 ## Emitted at the end of every simulation tick (training tools measure frame data here).
 signal ticked
+## A super started: the fight freezes for SUPER_FREEZE_TICKS (cosmetic listeners: HUD,
+## camera, effects).
+signal super_flash(fighter: Fighter, move: MoveData)
+signal projectile_clashed(point: Vector3)
 
 enum Phase { INTRO, FIGHT, ROUND_OVER, MATCH_OVER }
 
@@ -30,6 +34,8 @@ const VICTORY_TITLE_TICKS := 40
 const VICTORY_RESULT_TICKS := 220
 ## Share of a hit's knockback transferred to the attacker when the defender is pinned.
 const CORNER_PUSHBACK := 0.8
+## Super flash: everything but input reading stops for this long.
+const SUPER_FREEZE_TICKS := 45
 ## Per-tick slerp factor for the logical view direction following the fight axis.
 const VIEW_FOLLOW := 0.08
 
@@ -55,6 +61,10 @@ var fx: FightFx
 var _cosmetic_rng := RandomNumberGenerator.new() # victory pose choice only; never gameplay
 ## Fighters knocked out this tick (both, for a double K.O.); resolved after the tick.
 var _knocked_out: Array[Fighter] = []
+## Ticks left in the super freeze.
+var freeze_ticks := 0
+## World position of the latest hit (for effects; projectiles hit away from the body).
+var last_hit_point := Vector3.ZERO
 
 @onready var camera: ActionCamera = $ActionCamera
 @onready var hud: FightHud = $HUD
@@ -83,6 +93,7 @@ func _ready() -> void:
 	for fighter in fighters:
 		fighter.knocked_out.connect(_on_knocked_out)
 		fighter.throw_teched.connect(_on_throw_teched)
+		fighter.super_started.connect(_on_super_started)
 
 	hud.setup(p1, p2, GameState.ROUNDS_TO_WIN, "P2" if is_versus() else "Dummy" if is_training() else "CPU")
 	hud.rematch_pressed.connect(start_match)
@@ -135,6 +146,8 @@ func start_match() -> void:
 	hud.set_round_wins(round_wins)
 	hud.hide_result()
 	hud.end_cinematic()
+	for fighter in fighters:
+		fighter.add_meter(-fighter.meter) # meter carries between rounds, not matches
 	_start_round()
 	if is_training():
 		for fighter in fighters:
@@ -282,6 +295,7 @@ func _go_to(scene: String) -> void:
 
 func _reset_round() -> void:
 	ai.reset()
+	_set_freeze(0)
 	fighters[0].reset_to(stage.p1_spawn.global_position)
 	fighters[1].reset_to(stage.p2_spawn.global_position)
 	view_dir = Vector3.BACK
@@ -300,13 +314,32 @@ func _physics_process(_delta: float) -> void:
 	_update_view()
 	for fighter in fighters:
 		fighter.read_input()
+	if freeze_ticks > 0:
+		# Super flash: inputs keep buffering, nothing else moves (timer included).
+		_set_freeze(freeze_ticks - 1)
+		ticked.emit()
+		return
 	for fighter in fighters:
 		fighter.tick()
+	_tick_projectiles()
 	_resolve_pushboxes()
 	_resolve_throws()
 	_resolve_hits()
 	_tick_round()
 	ticked.emit()
+
+
+func _set_freeze(ticks: int) -> void:
+	freeze_ticks = ticks
+	for fighter in fighters:
+		fighter.frozen = ticks > 0
+
+
+func _on_super_started(fighter: Fighter, move: MoveData) -> void:
+	_set_freeze(SUPER_FREEZE_TICKS)
+	super_flash.emit(fighter, move)
+	hud.super_flash(fighters.find(fighter), move.name)
+	camera.start_super(fighter)
 
 
 ## Keeps the camera side-on to the fight axis, turning toward whichever perpendicular is
@@ -371,7 +404,29 @@ func _resolve_throws() -> void:
 			throw_landed.emit(attacker, defender)
 
 
-## Collects all connecting hitboxes first, then applies them, so simultaneous hits trade.
+## Moves projectiles; two projectiles that meet cancel out.
+func _tick_projectiles() -> void:
+	for fighter in fighters:
+		var p := fighter.projectile
+		if p and not p.tick(stage.bounds_half_extent):
+			_remove_projectile(fighter)
+	var a := fighters[0].projectile
+	var b := fighters[1].projectile
+	if a and b and a.position.distance_to(b.position) <= a.radius + b.radius:
+		last_hit_point = (a.position + b.position) * 0.5
+		projectile_clashed.emit(last_hit_point)
+		_remove_projectile(fighters[0])
+		_remove_projectile(fighters[1])
+
+
+func _remove_projectile(fighter: Fighter) -> void:
+	if fighter.projectile:
+		fighter.projectile.queue_free()
+		fighter.projectile = null
+
+
+## Collects all connecting hitboxes (bodies and projectiles) first, then applies them,
+## so simultaneous hits trade.
 func _resolve_hits() -> void:
 	# Capture each attacker's move now: in a trade, applying the first hit clears the
 	# other fighter's current_move before its own hit is applied.
@@ -379,18 +434,37 @@ func _resolve_hits() -> void:
 	for attacker in fighters:
 		var hitbox := attacker.get_active_hitbox()
 		if not hitbox.is_empty() and attacker.opponent.overlaps_hurtbox(hitbox.center, hitbox.radius):
-			connecting.append([attacker, attacker.current_move])
+			connecting.append([attacker, attacker.current_move, hitbox.center, attacker.is_final_hit()])
+		var p := attacker.projectile
+		if p and attacker.opponent.overlaps_hurtbox(p.position, p.radius):
+			connecting.append([attacker, p.move, p.position, true, p])
 	for hit in connecting:
 		var attacker: Fighter = hit[0]
 		var move: MoveData = hit[1]
 		var defender := attacker.opponent
-		var result := defender.receive_hit(attacker, move)
-		attacker.on_hit_confirmed()
-		if defender.is_pinned_against_bounds(attacker.forward) and attacker.position.y <= 0.0:
-			attacker.velocity -= attacker.forward * move.knockback.x * CORNER_PUSHBACK
+		var projectile: Projectile = hit[4] if hit.size() > 4 else null
+		var push_dir := projectile.direction if projectile else attacker.forward
+		var health_before := defender.health
+		var result := defender.receive_hit(attacker, move, push_dir, hit[3])
+		if projectile:
+			_remove_projectile(attacker)
+		else:
+			attacker.on_hit_confirmed()
+			if defender.is_pinned_against_bounds(attacker.forward) and attacker.position.y <= 0.0:
+				attacker.velocity -= attacker.forward * move.knockback.x * CORNER_PUSHBACK
+		_award_meter(attacker, defender, move, result, health_before - defender.health)
 		if result == Fighter.HitResult.COUNTER:
 			hud.note(fighters.find(attacker), "COUNTER")
+		last_hit_point = hit[2]
 		hit_landed.emit(attacker, defender, move, result)
+
+
+## Both sides build meter from an exchange; supers don't refund meter.
+func _award_meter(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult, damage: int) -> void:
+	if not move.super_move and not move.input.begins_with("~"): # supers and their follow-ups
+		var rate := Fighter.METER_PER_DAMAGE_BLOCKED if result == Fighter.HitResult.BLOCKED else Fighter.METER_PER_DAMAGE_HIT
+		attacker.add_meter(roundi(move.damage * rate))
+	defender.add_meter(roundi(damage * Fighter.METER_PER_DAMAGE_TAKEN))
 
 
 func _on_knocked_out(loser: Fighter) -> void:

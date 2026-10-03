@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_y3f1f"]
+
+[resource]
+script = ExtResource("1_y3f1f")
+name = "Tempest Kicks"
+input = "236236K"
+animation = &"fight/kick_flurry"
+animation_impact = 0.1
+animation_end = 0.77
+active = 32
+recovery = 24
+damage = 24
+hitstun = 22
+blockstun = 16
+hitstop = 4
+knockback = Vector2(0.6, 0)
+chip_damage = 5
+hits = 7
+travel = 2.0
+invuln_frames = 11
+super_move = true
+followup = "~tempest_finish"
+hitbox_radius = 0.32
+hitbox_offset = Vector3(-0.04, 1.2, -0.95)
+camera_intensity = 0.15

@@ -65,6 +65,15 @@ const MODE_SCALES := [0.0, 0.5, 1.0]
 @export var victory_shot2_seconds := 2.0
 @export var victory_drift_degrees_per_second := 4.0
 
+@export_group("Super flash")
+## Close-up on the fighter starting a super, held through the super freeze (real time).
+@export var super_seconds := 0.75
+@export var super_distance := 2.7
+@export var super_fov := 36.0
+## How far the shot swings from the side view toward the fighter's front (0..1). Kept
+## small so the opponent, standing in front, doesn't block the shot.
+@export var super_front := 0.25
+
 @export_group("KO slow motion")
 @export var ko_time_scale := 0.3
 @export var ko_slowmo_seconds := 0.6
@@ -91,6 +100,8 @@ var victory_target: Fighter
 var _victory_time := 0.0
 var _victory_side := 1.0
 var _victory_cut := false
+var _super_fighter: Fighter
+var _super_time := 0.0
 
 
 func setup(fight_manager: Node) -> void:
@@ -113,6 +124,7 @@ func snap() -> void:
 	_fov_punch = 0.0
 	focus = null
 	victory_target = null
+	_super_time = 0.0
 	Engine.time_scale = 1.0
 	var targets := _compute_targets(0.0)
 	_base_position = targets.position
@@ -141,7 +153,12 @@ func _process(scaled_delta: float) -> void:
 	_update_intensity(delta)
 	var strength := _fit_strength(_strength)
 	var targets := _compute_targets(strength)
-	var t := 1.0 - exp(-follow_speed * delta)
+	var speed := follow_speed
+	if _super_time > 0.0:
+		_super_time -= delta
+		targets = _super_targets()
+		speed = 9.0
+	var t := 1.0 - exp(-speed * delta)
 	_base_position = _base_position.lerp(targets.position, t)
 	_look_target = _look_target.lerp(targets.look, t)
 	_fov_punch = move_toward(_fov_punch, 0.0, fov_punch_decay * delta)
@@ -153,6 +170,28 @@ func _process(scaled_delta: float) -> void:
 	_apply_transform(_trauma, _noise_time)
 	if manager.stage:
 		manager.stage.update_camera_occlusion(global_position)
+
+
+# --- Super flash -------------------------------------------------------------------
+
+## Swings in to a low close-up of `fighter` for the super freeze, then eases back.
+func start_super(fighter: Fighter) -> void:
+	if mode == Mode.OFF:
+		return
+	_super_fighter = fighter
+	_super_time = super_seconds
+	_add_trauma(0.25)
+
+
+func _super_targets() -> Dictionary:
+	var chest := _super_fighter.get_global_transform_interpolated().origin + Vector3.UP * 1.2
+	var side: Vector3 = manager.view_dir
+	var dir := (side * (1.0 - super_front) + _super_fighter.forward * super_front).normalized()
+	return {
+		position = chest + dir * super_distance + Vector3.UP * 0.15,
+		look = chest + _super_fighter.forward * 0.35,
+		fov = super_fov,
+	}
 
 
 # --- Victory cinematic -------------------------------------------------------------

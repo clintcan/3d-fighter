@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_6otjq"]
+
+[resource]
+script = ExtResource("1_6otjq")
+name = "Earthquake"
+input = "214P"
+animation = &"fight/ground_pound"
+animation_impact = 0.33
+animation_end = 0.85
+startup = 18
+active = 6
+recovery = 24
+damage = 110
+hit_level = 2
+hitstun = 0
+blockstun = 16
+hitstop = 12
+knockdown = true
+chip_damage = 12
+hitbox_radius = 0.55
+hitbox_offset = Vector3(0, 0.2, -0.9)
+camera_intensity = 0.3

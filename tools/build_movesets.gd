@@ -12,7 +12,10 @@ const H := MoveData.HitLevel
 
 ## file: [name, input, animation, impact, end, startup, active, recovery, damage, level,
 ##        hitstun, blockstun, hitstop, knockback, hitbox_offset, radius, extras]
-## extras: cancel_into, camera_intensity, launches, knockdown, lunge
+## extras: cancel_into, camera_intensity, launches, knockdown, lunge, and for specials:
+##         chip_damage, hits, hit_interval, travel, rise, landing_recovery, invuln_frames,
+##         low_profile, super_move, followup, projectile_speed, projectile_lifetime,
+##         projectile_color (see MoveData)
 const BASE := {
 	"jab": ["Jab", "LP", &"ual1/Punch_Jab", 0.20, 0.62, 4, 2, 8, 30, H.HIGH, 14, 10, 5, Vector2(1.2, 0), Vector3(0, 1.40, -0.78), 0.15, {cancel_into = ["LP", "HP", "2LP"]}],
 	"straight": ["Straight", "HP", &"ual1/Punch_Cross", 0.28, 0.85, 9, 3, 18, 80, H.HIGH, 20, 14, 8, Vector2(2.5, 0), Vector3(0.1, 1.36, -0.70), 0.18, {camera_intensity = 0.1}],
@@ -28,7 +31,9 @@ const BASE := {
 	"flying_kick": ["Flying Kick", "j.HK", &"fight/jump_kick", 0.12, 0.45, 8, 6, 10, 85, H.OVERHEAD, 21, 15, 9, Vector2(2.2, 0), Vector3(0.11, 0.45, -0.88), 0.22, {camera_intensity = 0.15}],
 }
 
-## Per-character tuning applied to the base set, plus stats and signature moves.
+## Per-character tuning applied to the base set, plus stats, signature moves, and
+## specials (motion inputs, not scaled by the tuning). Specials' hitboxes were measured
+## from their clips at the impact time (fighter-local, -Z toward the opponent).
 ## startup: frames added to every base move (min 3). damage / knockback: multipliers.
 const CHARACTERS := {
 	"kenji": {
@@ -41,6 +46,18 @@ const CHARACTERS := {
 			"advancing_straight": ["Advancing Straight", "6HP", &"ual1/Punch_Cross", 0.28, 0.85, 12, 3, 18, 90, H.HIGH, 21, 16, 9, Vector2(2.8, 0), Vector3(0.1, 1.36, -0.70), 0.2, {lunge = 4.5, camera_intensity = 0.15}],
 			"snap_kick": ["Snap Kick", "6LK", &"fight/front_kick", 0.20, 0.0, 5, 2, 14, 40, H.MID, 15, 11, 5, Vector2(1.4, 0), Vector3(0.05, 1.0, -1.0), 0.18, {cancel_into = ["HP", "6HP"]}],
 		},
+		specials = {
+			# Fireball: slow enough to walk behind, fast enough to zone with.
+			"ki_blast": ["Ki Blast", "236P", &"fight/palm_blast", 0.20, 0.65, 12, 1, 30, 60, H.MID, 18, 14, 7, Vector2(1.8, 0), Vector3(0, 1.2, -0.6), 0.3,
+				{projectile_speed = 6.5, projectile_lifetime = 100, chip_damage = 8, camera_intensity = 0.1}],
+			# Invincible anti-air / reversal; very punishable when it misses.
+			"rising_dragon": ["Rising Dragon", "623P", &"fight/rising_uppercut", 0.09, 0.7, 4, 12, 14, 110, H.MID, 0, 18, 10, Vector2(1.0, 7.0), Vector3(-0.15, 1.55, -0.35), 0.38,
+				{launches = true, rise = 7.0, travel = 1.2, invuln_frames = 7, landing_recovery = 16, chip_damage = 12, camera_intensity = 0.35}],
+			"dragon_barrage": ["Dragon Barrage", "236236P", &"fight/punch_flurry", 0.10, 0.70, 6, 30, 24, 28, H.MID, 22, 16, 4, Vector2(0.6, 0), Vector3(0, 1.22, -0.6), 0.32,
+				{super_move = true, hits = 6, hit_interval = 5, travel = 1.8, invuln_frames = 12, chip_damage = 6, followup = "~dragon_finish", camera_intensity = 0.15}],
+			"dragon_finish": ["Dragon Barrage", "~dragon_finish", &"fight/rising_uppercut", 0.09, 0.7, 3, 10, 20, 140, H.MID, 0, 20, 16, Vector2(1.2, 8.0), Vector3(-0.15, 1.55, -0.35), 0.42,
+				{launches = true, rise = 7.5, travel = 1.0, invuln_frames = 13, landing_recovery = 12, chip_damage = 15, camera_intensity = 0.6}],
+		},
 	},
 	"rhea": {
 		startup = -1, damage = 0.85, knockback = 0.9, hitstop = -1,
@@ -52,6 +69,17 @@ const CHARACTERS := {
 			"rushing_hook": ["Rushing Hook", "6HP", &"fight/rushing_hook", 0.28, 0.0, 10, 3, 20, 70, H.MID, 20, 14, 8, Vector2(2.5, 0), Vector3(-0.15, 0.72, -0.95), 0.22, {lunge = 4.0, camera_intensity = 0.15}],
 			"step_kick": ["Step Kick", "6LK", &"fight/front_kick", 0.20, 0.0, 7, 3, 12, 40, H.MID, 16, 11, 5, Vector2(1.4, 0), Vector3(0.05, 1.0, -1.0), 0.18, {lunge = 3.5, cancel_into = ["6HP", "LP"]}],
 		},
+		specials = {
+			# Feet-first slide along the canvas: low, slides under highs, knocks down.
+			"gale_slide": ["Gale Slide", "236K", &"fight/slide_kick", 0.15, 1.25, 8, 16, 18, 70, H.LOW, 0, 14, 8, Vector2(1.5, 0), Vector3(-0.07, 0.15, -0.85), 0.28,
+				{knockdown = true, travel = 5.5, low_profile = true, chip_damage = 8, camera_intensity = 0.2}],
+			"crescent_rise": ["Crescent Rise", "623K", &"fight/rising_kick", 0.09, 0.7, 4, 10, 14, 85, H.MID, 0, 16, 9, Vector2(1.0, 7.0), Vector3(-0.04, 1.75, -0.5), 0.36,
+				{launches = true, rise = 7.5, travel = 1.0, invuln_frames = 6, landing_recovery = 14, chip_damage = 10, camera_intensity = 0.3}],
+			"tempest_kicks": ["Tempest Kicks", "236236K", &"fight/kick_flurry", 0.10, 0.77, 5, 32, 24, 24, H.MID, 22, 16, 4, Vector2(0.6, 0), Vector3(-0.04, 1.2, -0.95), 0.32,
+				{super_move = true, hits = 7, hit_interval = 4, travel = 2.0, invuln_frames = 11, chip_damage = 5, followup = "~tempest_finish", camera_intensity = 0.15}],
+			"tempest_finish": ["Tempest Kicks", "~tempest_finish", &"fight/rising_kick", 0.09, 0.7, 3, 10, 18, 120, H.MID, 0, 20, 14, Vector2(1.2, 8.0), Vector3(-0.04, 1.75, -0.5), 0.4,
+				{launches = true, rise = 7.5, travel = 1.0, invuln_frames = 13, landing_recovery = 10, chip_damage = 12, camera_intensity = 0.6}],
+		},
 	},
 	"brutus": {
 		startup = 2, damage = 1.3, knockback = 1.25, hitstop = 2,
@@ -62,6 +90,18 @@ const CHARACTERS := {
 		signatures = {
 			"overhead_smash": ["Overhead Smash", "6HP", &"ual2/OverhandThrow", 0.40, 0.9, 20, 4, 24, 130, H.OVERHEAD, 0, 18, 12, Vector2(2.0, 0), Vector3(0.2, 0.8, -0.95), 0.28, {knockdown = true, camera_intensity = 0.3}],
 			"heavy_boot": ["Heavy Boot", "6HK", &"fight/front_kick", 0.20, 0.0, 12, 4, 22, 100, H.MID, 22, 16, 11, Vector2(4.5, 0), Vector3(0.05, 1.0, -1.0), 0.22, {camera_intensity = 0.2}],
+		},
+		specials = {
+			# Charges across the ring until it connects; huge pushback.
+			"bull_charge": ["Bull Charge", "236P", &"fight/shoulder_charge", 0.15, 0.83, 14, 16, 20, 120, H.MID, 24, 18, 12, Vector2(5.0, 0), Vector3(0, 1.0, -0.6), 0.38,
+				{travel = 8.0, chip_damage = 14, camera_intensity = 0.3}],
+			# Double-fist slam: a shockwave along the floor that must be blocked low.
+			"earthquake": ["Earthquake", "214P", &"fight/ground_pound", 0.33, 0.85, 18, 6, 24, 110, H.LOW, 0, 16, 12, Vector2(1.5, 0), Vector3(0, 0.2, -0.9), 0.55,
+				{knockdown = true, chip_damage = 12, camera_intensity = 0.3}],
+			"titan_rush": ["Titan Rush", "236236P", &"fight/shoulder_charge", 0.15, 0.83, 6, 24, 26, 40, H.MID, 24, 16, 6, Vector2(0.6, 0), Vector3(0, 1.0, -0.6), 0.4,
+				{super_move = true, hits = 4, hit_interval = 6, travel = 5.0, invuln_frames = 10, chip_damage = 8, followup = "~titan_finish", camera_intensity = 0.2}],
+			"titan_finish": ["Titan Rush", "~titan_finish", &"ual2/OverhandThrow", 0.40, 0.9, 8, 5, 26, 220, H.MID, 0, 20, 16, Vector2(2.5, 0), Vector3(0.2, 0.8, -0.95), 0.42,
+				{knockdown = true, chip_damage = 18, camera_intensity = 0.6}],
 		},
 	},
 }
@@ -82,6 +122,8 @@ func _initialize() -> void:
 			moves.append(_save(move, dir + file + ".tres"))
 		for file: String in spec.signatures:
 			moves.append(_save(_make(spec.signatures[file]), dir + file + ".tres"))
+		for file: String in spec.specials:
+			moves.append(_save(_make(spec.specials[file]), dir + file + ".tres"))
 
 		var path := "res://data/characters/%s.tres" % id
 		var character := load(path) as CharacterData
@@ -125,6 +167,10 @@ func _make(row: Array) -> MoveData:
 	m.launches = extras.get("launches", false)
 	m.knockdown = extras.get("knockdown", false)
 	m.lunge = extras.get("lunge", 0.0)
+	for key in ["chip_damage", "hits", "hit_interval", "travel", "rise", "landing_recovery", "invuln_frames",
+			"low_profile", "super_move", "followup", "projectile_speed", "projectile_lifetime", "projectile_color"]:
+		if extras.has(key):
+			m.set(key, extras[key])
 	return m
 
 
