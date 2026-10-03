@@ -7,27 +7,9 @@ dynamic action camera that moves in on the fighter taking the hits.
 HOW TO PLAY
 -----------
 1. Unzip, and (optionally) drag 3DFighter.app into your Applications folder.
-2. The first time you open it, macOS will warn that it can't verify the app.
-   It isn't notarized by Apple (that needs a paid Apple Developer account),
-   but it is safe. To open it:
-
-   macOS 15 Sequoia and newer:
-     - Double-click 3DFighter.app, then click "Done" on the warning.
-     - Open System Settings > Privacy & Security, scroll down, and click
-       "Open Anyway" next to the 3DFighter message. Confirm with your password.
-
-   macOS 14 Sonoma and older:
-     - Right-click (or Control-click) 3DFighter.app, choose "Open",
-       then click "Open" in the dialog.
-
-   You only need to do this once.
-
-   If macOS says the app "is damaged and can't be opened", open Terminal and
-   run (adjust the path if you didn't move it to Applications):
-
-     xattr -cr /Applications/3DFighter.app
-
-   then open it again.
+2. Double-click to play. The app is signed and notarized by Apple, so it opens
+   like any other app (macOS may ask once to confirm it was downloaded from
+   the internet; click "Open").
 
 Requirements: macOS 11 Big Sur or newer, Apple Silicon (M1 or later) or an
 Intel Mac with Metal-capable graphics. Runs natively on both.
