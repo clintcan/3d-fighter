@@ -6,8 +6,10 @@ extends Control
 ## Light Punch to confirm, Heavy Punch to go back), then the VS screen.
 ## Training: pick your fighter, then the training dummy, then straight into the fight.
 ## Arcade: pick your fighter; the ladder of opponents is generated (GameState.arcade).
+## Vs CPU, Versus and Training continue to the stage select.
 
 const VS_SCENE := "res://scenes/vs_screen.tscn"
+const STAGE_SELECT_SCENE := "res://scenes/stage_select.tscn"
 const FIGHT_SCENE := "res://scenes/fight.tscn"
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const TURNTABLE_SPEED := 0.5 # rad/s
@@ -131,7 +133,7 @@ func _confirm_versus(index: int) -> void:
 		return
 	GameState.player_character = GameState.roster[_p1_pick]
 	GameState.p2_character = GameState.roster[index]
-	get_tree().change_scene_to_file(VS_SCENE)
+	get_tree().change_scene_to_file(STAGE_SELECT_SCENE)
 
 
 ## Title, hint, cursor highlight and P1's locked pick for the player currently choosing.
@@ -268,7 +270,7 @@ func _select(character: CharacterData) -> void:
 			title_label.text = "SELECT TRAINING DUMMY"
 			return
 		GameState.p2_character = character
-		get_tree().change_scene_to_file(FIGHT_SCENE)
+		get_tree().change_scene_to_file(STAGE_SELECT_SCENE)
 		return
 	if GameState.mode == GameState.Mode.ARCADE:
 		GameState.start_arcade(character)
@@ -276,4 +278,4 @@ func _select(character: CharacterData) -> void:
 		return
 	GameState.player_character = character
 	GameState.p2_character = GameState.pick_random_cpu()
-	get_tree().change_scene_to_file(VS_SCENE)
+	get_tree().change_scene_to_file(STAGE_SELECT_SCENE)

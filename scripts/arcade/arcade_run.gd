@@ -5,7 +5,8 @@ extends RefCounted
 ##
 ## Ladder: every other roster fighter in a shuffled order with rising difficulty, then
 ## the final boss: the player's own "shadow" (alternate look, Hard AI, full super meter
-## at the start of every round).
+## at the start of every round). Fights alternate through `arenas` (GameState.STAGES);
+## the boss is fought on `boss_stage` (the dojo).
 ## Score: damage dealt × 10, per round won a time bonus (seconds left × 100), a life
 ## bonus (up to 5,000 at full health) and 10,000 for a perfect, plus 10,000 × stage
 ## number per stage cleared. A continue replays the stage from its starting score.
@@ -18,7 +19,7 @@ const PERFECT_BONUS := 10000
 const STAGE_CLEAR_POINTS := 10000
 
 var player: CharacterData
-## [{character: CharacterData, difficulty: AIController.Difficulty, boss: bool}]
+## [{character: CharacterData, difficulty: AIController.Difficulty, boss: bool, stage_path: String}]
 var stages: Array[Dictionary] = []
 var stage := 0
 var score := 0
@@ -30,7 +31,8 @@ var ticks := 0
 var cleared := false
 
 
-static func create(player_character: CharacterData, roster: Array[CharacterData], base_difficulty: int, seed_value: int) -> ArcadeRun:
+static func create(player_character: CharacterData, roster: Array[CharacterData], base_difficulty: int, seed_value: int,
+		arenas: Array, boss_stage: String) -> ArcadeRun:
 	var run := ArcadeRun.new()
 	run.player = player_character
 	var rng := RandomNumberGenerator.new()
@@ -44,8 +46,9 @@ static func create(player_character: CharacterData, roster: Array[CharacterData]
 		others[j] = swap
 	for i in others.size():
 		var difficulty := clampi(base_difficulty - 1 + i, AIController.Difficulty.EASY, AIController.Difficulty.HARD)
-		run.stages.append({character = others[i], difficulty = difficulty, boss = false})
-	run.stages.append({character = player_character, difficulty = AIController.Difficulty.HARD, boss = true})
+		run.stages.append({character = others[i], difficulty = difficulty, boss = false, stage_path = arenas[i % arenas.size()]})
+	run.stages.append({character = player_character, difficulty = AIController.Difficulty.HARD, boss = true,
+		stage_path = boss_stage})
 	return run
 
 

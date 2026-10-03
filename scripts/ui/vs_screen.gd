@@ -28,6 +28,8 @@ func _ready() -> void:
 	right_name.text = "%s (%s)" % [GameState.p2_character.display_name.to_upper(), "P2" if versus else "CPU"]
 	if GameState.is_arcade():
 		_show_arcade_ladder()
+	else:
+		_show_stage_name()
 	# Wait a frame so containers have laid out, then animate from off-screen.
 	await get_tree().process_frame
 	var width := get_viewport_rect().size.x
@@ -46,6 +48,20 @@ func _ready() -> void:
 	get_tree().create_timer(HOLD_SECONDS).timeout.connect(_go)
 
 
+func _show_stage_name() -> void:
+	var label := Label.new()
+	label.text = GameState.stage_name(GameState.stage_path).to_upper()
+	label.add_theme_font_size_override("font_size", 40)
+	label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
+	label.add_theme_constant_override("outline_size", 10)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	label.offset_bottom = -50
+	add_child(label)
+
+
 ## Stage title above "VS" and a row of opponent portraits along the bottom: beaten
 ## ones dimmed, the current one framed in gold, the boss as a silhouette until reached.
 func _show_arcade_ladder() -> void:
@@ -56,6 +72,7 @@ func _show_arcade_ladder() -> void:
 		right_name.text += "\nFINAL BOSS"
 	var title := Label.new()
 	title.text = "FINAL STAGE" if run.is_final() else "STAGE %d / %d" % [run.stage + 1, run.stages.size()]
+	title.text += "  ·  " + GameState.stage_name(GameState.stage_path).to_upper()
 	title.add_theme_font_size_override("font_size", 56)
 	title.add_theme_color_override("font_color", Color(1.0, 0.82, 0.3))
 	title.add_theme_constant_override("outline_size", 12)

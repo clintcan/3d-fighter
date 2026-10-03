@@ -3,6 +3,15 @@ extends Node
 
 const CHARACTER_DIR := "res://data/characters/"
 const DEFAULT_STAGE := "res://scenes/stages/ring.tscn"
+const DOJO_STAGE := "res://scenes/stages/dojo.tscn"
+## Selectable stages: scene, display name, select-screen thumbnail (rendered by
+## tools/render_stage_thumbs.gd) and a one-line description.
+const STAGES := [
+	{path = DEFAULT_STAGE, name = "Boxing Ring", thumb = "res://assets/ui/stages/ring.png",
+		blurb = "Under the arena lights, in front of a packed house."},
+	{path = DOJO_STAGE, name = "Dojo", thumb = "res://assets/ui/stages/dojo.png",
+		blurb = "Tatami, paper screens and a hall full of students."},
+]
 
 const ROUNDS_TO_WIN := 2
 const ROUND_TIME_SECONDS := 99
@@ -51,12 +60,25 @@ func pick_random_cpu() -> CharacterData:
 ## Starts an Arcade run with `character` and sets up its first opponent.
 func start_arcade(character: CharacterData) -> void:
 	player_character = character
-	arcade = ArcadeRun.create(character, roster, Settings.ai_difficulty, randi())
+	arcade = ArcadeRun.create(character, roster, Settings.ai_difficulty, randi(), stage_paths(), DOJO_STAGE)
 	apply_arcade_stage()
 
 
 func apply_arcade_stage() -> void:
 	p2_character = arcade.current().character
+	stage_path = arcade.current().stage_path
+
+
+func stage_paths() -> Array:
+	return STAGES.map(func(s: Dictionary) -> String: return s.path)
+
+
+## Display name of a stage scene (for the VS screen etc.).
+func stage_name(path: String) -> String:
+	for stage: Dictionary in STAGES:
+		if stage.path == path:
+			return stage.name
+	return ""
 
 
 func is_arcade() -> bool:

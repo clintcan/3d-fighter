@@ -31,6 +31,8 @@ Gamepad 1 is Player 1 and Gamepad 2 is Player 2 (swap in Options).
 On the character select screen each player picks in turn with
 Light Punch (select) and Heavy Punch (back).
 
+STAGES: after picking fighters, choose the Boxing Ring, the Dojo or Random.
+
 ARCADE - choose "Arcade" in the main menu
 Fight your way up a ladder of CPU opponents to the final boss: your own
 shadow, who starts every round with a full super meter. Score points for
@@ -78,9 +80,11 @@ Made with Godot Engine (MIT License) - https://godotengine.org
 All third-party assets are CC0 (public domain), credited with thanks:
 - Characters & animations: Quaternius - Universal Base Characters,
   Universal Animation Library 1 & 2 - https://quaternius.com
-- Arena lighting & textures: Poly Haven - "Basement Boxing Ring" HDRI by
+- Stage lighting & textures: Poly Haven - "Basement Boxing Ring" HDRI by
   Sergej Majboroda; Terlenka, Fabric Leather 02, Concrete Floor Worn 001
-  - https://polyhaven.com
+  - https://polyhaven.com; Dojo: Tatami Mat, Hinoki Planks, Japanese Cedar
+  Planks (Charlotte Baglioni, Rico Cilliers), Dark Wood (Dario Barresi,
+  Dimitrios Savva, Rico Cilliers), White Plaster 02 (Rob Tuytel)
 - Music: "Heavy Battle 2" and "Space Battle" by MintoDog - https://opengameart.org
 - Sound effects & announcer: Kenney - Impact Sounds, Interface Sounds,
   Voiceover Pack: Fighter - https://kenney.nl

@@ -417,7 +417,12 @@ func _update_view() -> void:
 		var desired := Vector3.UP.cross(axis).normalized()
 		if desired.dot(view_dir) < 0.0:
 			desired = -desired
-		view_dir = view_dir.slerp(desired, VIEW_FOLLOW).normalized()
+		# Nearly parallel vectors make slerp's rotation axis lose precision (Godot then
+		# errors on a non-normalized axis), so snap when the difference is negligible.
+		if view_dir.angle_to(desired) < 0.001:
+			view_dir = desired
+		else:
+			view_dir = view_dir.slerp(desired, VIEW_FOLLOW).normalized()
 	var view_right := (-view_dir).cross(Vector3.UP)
 	for fighter in fighters:
 		fighter.view_right = view_right

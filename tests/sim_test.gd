@@ -311,6 +311,7 @@ func _initialize() -> void:
 	await versus_tests()
 	await training_tests()
 	await arcade_tests()
+	await stage_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -701,7 +702,7 @@ func character_specials_tests() -> void:
 func arcade_tests() -> void:
 	var gs = root.get_node("GameState")
 	var kenji: CharacterData = gs.roster[0]
-	var run := ArcadeRun.create(kenji, gs.roster, AIController.Difficulty.NORMAL, 3)
+	var run := ArcadeRun.create(kenji, gs.roster, AIController.Difficulty.NORMAL, 3, gs.stage_paths(), gs.DOJO_STAGE)
 	var opponents := run.stages.map(func(e: Dictionary) -> CharacterData: return e.character)
 	check("Arcade: ladder = every other fighter, then the shadow boss", run.stages.size() == gs.roster.size()
 		and not opponents.slice(0, -1).has(kenji) and run.stages[-1].boss and opponents[-1] == kenji, str(opponents.map(func(c): return c.display_name)))
@@ -758,3 +759,48 @@ func arcade_tests() -> void:
 	check("Arcade: Continue restarts the stage and counts", gs.arcade.continues == continues + 1 and m.phase == m.Phase.INTRO)
 	gs.arcade = null
 	gs.mode = gs.Mode.VS_CPU
+
+
+func stage_tests() -> void:
+	var gs = root.get_node("GameState")
+	check("Stages: every listed stage and thumbnail exists", gs.STAGES.all(func(st: Dictionary) -> bool:
+		return ResourceLoader.exists(st.path) and ResourceLoader.exists(st.thumb)))
+
+	# Stage select: a choice sets the stage; Random picks one of the list.
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+	change_scene_to_file("res://scenes/stage_select.tscn")
+	await process_frame; await process_frame
+	current_scene.choose(gs.DOJO_STAGE)
+	check("Stage select: choosing the dojo sets it", gs.stage_path == gs.DOJO_STAGE)
+	await process_frame; await process_frame
+	check("Stage select: continues to the VS screen", current_scene.scene_file_path == "res://scenes/vs_screen.tscn")
+	change_scene_to_file("res://scenes/stage_select.tscn")
+	await process_frame; await process_frame
+	current_scene.choose("")
+	check("Stage select: Random picks a listed stage", gs.STAGES.any(func(st: Dictionary) -> bool: return st.path == gs.stage_path))
+	await process_frame; await process_frame
+
+	# A full fight in the dojo.
+	gs.stage_path = gs.DOJO_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	check("Dojo: loads with the standard bounds and spawns", m.stage.name == "Dojo" and m.stage.bounds_half_extent == 3.6
+		and absf(p1.position.x + 2.0) < 0.01 and absf(p2.position.x - 2.0) < 0.01)
+	reset(DummyController.Mode.STAND); approach(1.1)
+	var hp := p2.health
+	press(InputBuffer.LP); step(6)
+	check("Dojo: combat works the same", p2.health == hp - 30, "hp %d -> %d" % [hp, p2.health])
+	m.stage.update_camera_occlusion(Vector3(0, 2, 7.0))
+	var front: Array = get_nodes_in_group(&"ring_side_1")
+	check("Dojo: students between the camera and the fight hide", not front.is_empty() and front.all(func(n: Node3D) -> bool: return not n.visible))
+
+	# Arcade stages: alternate arenas, boss in the dojo.
+	var run := ArcadeRun.create(gs.roster[0], gs.roster, 1, 9, gs.stage_paths(), gs.DOJO_STAGE)
+	check("Arcade: stages alternate, the boss fight is in the dojo", run.stages[0].stage_path == gs.STAGES[0].path
+		and run.stages[1].stage_path == gs.STAGES[1].path and run.stages[-1].stage_path == gs.DOJO_STAGE)
+	gs.stage_path = gs.DEFAULT_STAGE
