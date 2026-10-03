@@ -88,6 +88,9 @@ func _ready() -> void:
 	Audio.music(&"fight")
 	start_match()
 	_update_debug_text()
+	if "--smoke-test" in OS.get_cmdline_user_args():
+		print("SMOKE TEST: fight ready (%s vs %s, %d moves loaded)" % [p1.data.display_name, p2.data.display_name, p1.data.moves.size()])
+		round_ended.connect(func(_w: Fighter, reason: String) -> void: print("SMOKE TEST: round ended (%s)" % reason))
 
 
 func _spawn_fighter(character: CharacterData, controller: FighterController) -> Fighter:
@@ -371,7 +374,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_tree().paused = true
 		hud.show_pause()
 		get_viewport().set_input_as_handled()
-	elif event is InputEventKey and event.pressed and not event.echo:
+	elif OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_F1:
 				_cycle_cpu_mode()
@@ -408,6 +411,9 @@ func _cycle_cpu_mode() -> void:
 
 
 func _update_debug_text() -> void:
+	if not OS.is_debug_build():
+		hud.set_debug_text("") # release builds: no debug overlay or debug keys
+		return
 	var cpu := "AI" if cpu_mode < 0 else "Dummy " + dummy.mode_name()
 	hud.set_debug_text("F1 CPU: %s  ·  F4 AI: %s  ·  F2 Hurtboxes: %s  ·  F3 Action Cam: %s  ·  F5 Restart  ·  Esc Pause" % [
 		cpu, ai.difficulty_name(), "On" if debug_draw else "Off", camera.mode_name()])

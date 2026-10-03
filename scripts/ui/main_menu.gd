@@ -14,6 +14,9 @@ func _ready() -> void:
 	options_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(OPTIONS_SCENE))
 	start_button.grab_focus()
 	Audio.music(&"menu")
+	# `3DFighter.exe -- --smoke-test` jumps straight into a fight (packaging checks).
+	if "--smoke-test" in OS.get_cmdline_user_args():
+		get_tree().change_scene_to_file.call_deferred("res://scenes/fight.tscn")
 
 
 func _on_start_pressed() -> void:
