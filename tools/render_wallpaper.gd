@@ -1,5 +1,5 @@
 extends SceneTree
-## Renders the key-art wallpaper: the three fighters posed mid-move on the rooftop stage
+## Renders the key-art wallpaper: the four fighters posed mid-move on the rooftop stage
 ## with the skyline behind them. Saves res://assets/ui/wallpaper.png (no text; used by the
 ## loading screen and main menu) and res://assets/ui/splash.png (with the title; used as
 ## the boot splash). Run windowed at 1920×1080:
@@ -10,9 +10,10 @@ const WALLPAPER := "res://assets/ui/wallpaper.png"
 const SPLASH := "res://assets/ui/splash.png"
 ## [character index, clip, clip time, position, yaw (radians; 0 = facing away from the camera)]
 const POSES := [
-	[0, &"fight/palm_blast", 0.22, Vector3(-1.5, 0, 0.35), PI + 0.8], # Kenji: Ki Blast at Rhea
-	[1, &"fight/high_kick", 0.27, Vector3(0.15, 0, -0.6), PI - 1.0], # Rhea: head kick at Kenji
-	[2, &"fight/victory_flex", 2.0, Vector3(1.45, 0, 0.45), PI + 0.45], # Brutus: double-biceps flex
+	[0, &"fight/palm_blast", 0.22, Vector3(-2.0, 0, 0.3), PI + 0.8], # Kenji: Ki Blast at Rhea
+	[1, &"fight/high_kick", 0.27, Vector3(-0.45, 0, -0.55), PI - 1.0], # Rhea: head kick at Kenji
+	[3, &"fight/lariat", 0.40, Vector3(0.95, 0, -0.2), PI + 0.3], # Valka: Spinning Lariat, arms out
+	[2, &"fight/victory_flex", 2.0, Vector3(2.15, 0, 0.5), PI + 0.45], # Brutus: double-biceps flex
 ]
 
 
@@ -62,9 +63,9 @@ func _initialize() -> void:
 	world.add_child(orb)
 
 	var camera := Camera3D.new()
-	camera.fov = 42.0
+	camera.fov = 46.0
 	world.add_child(camera)
-	camera.look_at_from_position(Vector3(0.0, 0.85, 4.6), Vector3(0.0, 1.35, 0.0))
+	camera.look_at_from_position(Vector3(0.0, 0.85, 5.0), Vector3(0.05, 1.35, 0.0))
 	camera.current = true
 
 	for frame in 40:
