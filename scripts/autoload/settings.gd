@@ -11,6 +11,9 @@ var ai_difficulty: AIController.Difficulty = AIController.Difficulty.NORMAL
 var fullscreen := false
 ## Give gamepad 1 to Player 2 (useful with a single pad in Versus).
 var swap_pads := false
+## Online: the name shown to opponents, and the last address joined.
+var player_name := ""
+var last_join_address := ""
 
 
 func _ready() -> void:
@@ -29,6 +32,8 @@ func load_settings() -> void:
 	ai_difficulty = cfg.get_value("game", "ai_difficulty", ai_difficulty)
 	fullscreen = cfg.get_value("video", "fullscreen", fullscreen)
 	swap_pads = cfg.get_value("input", "swap_pads", swap_pads)
+	player_name = cfg.get_value("online", "player_name", player_name)
+	last_join_address = cfg.get_value("online", "last_join_address", last_join_address)
 	InputSetup.load_bindings(cfg)
 
 
@@ -41,8 +46,18 @@ func save_settings() -> void:
 	cfg.set_value("game", "ai_difficulty", ai_difficulty)
 	cfg.set_value("video", "fullscreen", fullscreen)
 	cfg.set_value("input", "swap_pads", swap_pads)
+	cfg.set_value("online", "player_name", player_name)
+	cfg.set_value("online", "last_join_address", last_join_address)
 	InputSetup.save_bindings(cfg)
 	cfg.save(PATH)
+
+
+## The online name: the saved one, else the computer's user name.
+func online_name() -> String:
+	if player_name.strip_edges() != "":
+		return player_name.strip_edges().left(24)
+	var user := OS.get_environment("USERNAME") if OS.has_environment("USERNAME") else OS.get_environment("USER")
+	return user.left(24) if user != "" else "Player"
 
 
 func apply() -> void:

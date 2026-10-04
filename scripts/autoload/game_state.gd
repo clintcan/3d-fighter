@@ -25,7 +25,7 @@ const STAGES := [
 const ROUNDS_TO_WIN := 2
 const ROUND_TIME_SECONDS := 99
 
-enum Mode { VS_CPU, VERSUS, TRAINING, ARCADE }
+enum Mode { VS_CPU, VERSUS, TRAINING, ARCADE, ONLINE }
 
 var roster: Array[CharacterData] = []
 ## VS_CPU: P2 is the AI. VERSUS: P2 is a second local player. TRAINING: P2 is the
@@ -108,6 +108,40 @@ func stage_name(path: String) -> String:
 
 func is_arcade() -> bool:
 	return mode == Mode.ARCADE and arcade != null
+
+
+func is_online() -> bool:
+	return mode == Mode.ONLINE
+
+
+func game_version() -> String:
+	return str(ProjectSettings.get_setting("application/config/version", "0"))
+
+
+## A hash of every character's stats and moves. Online peers must match exactly, or the
+## same inputs would play out differently on each machine.
+func content_hash() -> int:
+	var parts := []
+	for character in roster:
+		parts.append(_stored_values(character))
+		for move in character.moves:
+			parts.append(_stored_values(move))
+	return hash(var_to_bytes(parts)) & 0xFFFFFFFF
+
+
+func _stored_values(resource: Resource) -> Array:
+	var out := []
+	for property in resource.get_property_list():
+		var key: String = property.name
+		if not (property.usage & PROPERTY_USAGE_STORAGE) or key.begins_with("resource_") or key == "script":
+			continue
+		var value: Variant = resource.get(key)
+		if value is Resource:
+			value = (value as Resource).resource_path
+		elif value is Array:
+			value = (value as Array).map(func(v: Variant) -> Variant: return v.resource_path if v is Resource else v)
+		out.append([key, value])
+	return out
 
 
 ## Fills missing selections so a scene can be run directly from the editor (F6).

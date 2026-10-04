@@ -380,7 +380,10 @@ func _set_letterbox(amount: float) -> void:
 
 func show_result() -> void:
 	result_panel.visible = true
-	%RematchButton.grab_focus()
+	for button: Button in [%RematchButton, %ResultSelectButton, %ResultMenuButton]:
+		if button.visible:
+			button.grab_focus()
+			break
 
 
 func hide_result() -> void:

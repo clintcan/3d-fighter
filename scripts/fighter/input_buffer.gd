@@ -105,6 +105,17 @@ func double_tapped(target_dir: int, window: int) -> bool:
 	return false
 
 
+## Rollback snapshot: everything needed to restore this buffer exactly.
+func save_state() -> Array:
+	return [_frames.duplicate(), _frame, _consumed_until.duplicate()]
+
+
+func load_state(state: Array) -> void:
+	_frames = (state[0] as PackedInt32Array).duplicate()
+	_frame = state[1]
+	_consumed_until = (state[2] as Dictionary).duplicate()
+
+
 func _at(ago: int) -> int:
 	if ago > _frame or ago >= SIZE:
 		return pack(NEUTRAL, 0)

@@ -54,6 +54,20 @@ func _ready() -> void:
 		_cards[i].focus_neighbor_right = _cards[(i + 1) % _cards.size()].get_path()
 	var current := GameState.STAGES.map(func(s: Dictionary) -> String: return s.path).find(GameState.stage_path)
 	_cards[maxi(current, 0)].grab_focus()
+	if GameState.is_online():
+		Net.lobby_changed.connect(_on_lobby_changed)
+
+
+func _exit_tree() -> void:
+	if Net.lobby_changed.is_connected(_on_lobby_changed):
+		Net.lobby_changed.disconnect(_on_lobby_changed)
+
+
+## Online (host): the guest changed their mind; back to character select.
+func _on_lobby_changed() -> void:
+	if not Net.both_picked() and not _leaving:
+		_leaving = true
+		get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE)
 
 
 func _make_card(entry: Dictionary) -> Button:
@@ -111,6 +125,9 @@ func _choose(path: String) -> void:
 	if path == "":
 		path = (GameState.STAGES.pick_random() as Dictionary).path
 	GameState.stage_path = path
+	if GameState.is_online():
+		Net.start_match(path) # tells the guest and moves both to the VS screen
+		return
 	if GameState.mode == GameState.Mode.TRAINING:
 		GameState.go_to_fight(get_tree())
 	else:
@@ -120,6 +137,9 @@ func _choose(path: String) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and not _leaving:
 		Audio.sfx(&"ui_back", -4.0)
+		_leaving = true
+		if GameState.is_online():
+			Net.pick(-1) # the host picks again
 		get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE)
 
 

@@ -38,23 +38,24 @@ func setup(fight_manager: Node) -> void:
 		_sparks.append(_make_sparks())
 	for i in DUST_POOL:
 		_dust.append(_make_dust())
-	manager.hit_landed.connect(_on_hit_landed)
-	manager.super_flash.connect(_on_super_flash)
-	manager.projectile_clashed.connect(func(point: Vector3) -> void:
+	# All effects are cosmetic: manager.cosmetic() skips them during rollback re-simulation.
+	manager.hit_landed.connect(manager.cosmetic(_on_hit_landed))
+	manager.super_flash.connect(manager.cosmetic(_on_super_flash))
+	manager.projectile_clashed.connect(manager.cosmetic(func(point: Vector3) -> void:
 		spark(point, SUPER_COLOR, 1.4)
-		Audio.sfx(&"hit_heavy", 0.0, 1.2))
-	manager.throw_landed.connect(func(_a: Fighter, _d: Fighter) -> void: Audio.sfx(&"block", -4.0, 0.8))
+		Audio.sfx(&"hit_heavy", 0.0, 1.2)))
+	manager.throw_landed.connect(manager.cosmetic(func(_a: Fighter, _d: Fighter) -> void: Audio.sfx(&"block", -4.0, 0.8)))
 	for fighter: Fighter in manager.fighters:
-		fighter.attack_started.connect(_on_attack_started.bind(fighter))
-		fighter.move_active.connect(_on_move_active)
-		fighter.knocked_out.connect(func(f: Fighter) -> void: Audio.shout(f.data.id, "ko"))
-		fighter.combo_changed.connect(func(hits: int) -> void:
+		fighter.attack_started.connect(manager.cosmetic(_on_attack_started.bind(fighter)))
+		fighter.move_active.connect(manager.cosmetic(_on_move_active))
+		fighter.knocked_out.connect(manager.cosmetic(func(f: Fighter) -> void: Audio.shout(f.data.id, "ko")))
+		fighter.combo_changed.connect(manager.cosmetic(func(hits: int) -> void:
 			if hits == 5:
-				Audio.voice("combo"))
+				Audio.voice("combo")))
 		_trails[fighter] = _make_trail()
 		_strike_sparks[fighter] = _make_strike_sparks()
-		fighter.landed_hard.connect(_on_landed_hard)
-		fighter.throw_impact.connect(_on_throw_impact)
+		fighter.landed_hard.connect(manager.cosmetic(_on_landed_hard))
+		fighter.throw_impact.connect(manager.cosmetic(_on_throw_impact))
 
 
 func _on_hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult) -> void:

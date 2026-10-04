@@ -92,13 +92,22 @@ func total_frames() -> int:
 
 
 ## Motion part of a special input ("236" of "236P"), or "" for normals.
+var _motion := ""
+var _motion_parsed := false
+
+
+## The motion part of a special's input ("236" of "236P"), or "" for normals. Parsed once:
+## it's checked every tick.
 func motion() -> String:
-	var digits := ""
-	for c in input:
-		if not c.is_valid_int():
-			break
-		digits += c
-	return digits if digits.length() >= 3 else ""
+	if not _motion_parsed:
+		var digits := ""
+		for c in input:
+			if not c.is_valid_int():
+				break
+			digits += c
+		_motion = digits if digits.length() >= 3 else ""
+		_motion_parsed = true
+	return _motion
 
 
 func is_special() -> bool:

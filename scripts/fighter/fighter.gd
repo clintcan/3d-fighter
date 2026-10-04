@@ -107,6 +107,14 @@ const ATTACK_BUTTONS := [InputBuffer.HK, InputBuffer.HP, InputBuffer.LK, InputBu
 const NEUTRAL_STATES := [State.IDLE, State.WALK_FWD, State.WALK_BACK, State.CROUCH]
 const BLOCKING_STATES := [State.IDLE, State.WALK_FWD, State.WALK_BACK, State.CROUCH, State.BLOCKSTUN]
 const INVULNERABLE_STATES := [State.KNOCKDOWN, State.GETUP, State.KO, State.THROWN]
+## Every field the simulation reads or writes, saved and restored for rollback netcode
+## (plus the transform, input buffer and projectile). Add new simulation fields here.
+const SIM_FIELDS := [&"input_locked", &"view_right", &"view_depth", &"state", &"state_frame",
+	&"crouching", &"health", &"forward", &"velocity", &"hitstop", &"stun", &"combo_hits",
+	&"juggle_hits", &"air_attack_used", &"throw_grab_frame", &"grab_move", &"throw_techable",
+	&"current_move", &"move_has_hit", &"hits_landed", &"next_hit_frame", &"meter", &"frozen",
+	&"_landing_frames", &"sidestep_dir", &"victory", &"last_hit_level", &"immortal"]
+## (victory_clip is cosmetic: each machine picks its own victory animation.)
 
 var data: CharacterData
 var controller: FighterController
@@ -164,6 +172,8 @@ var alt := false
 var immortal := false
 
 var _flash_color := Color.WHITE
+## This character's specials in MOTION_PRIORITY order: [move, motion, sequence, buttons, window].
+var _specials: Array[Array] = []
 var _material: StandardMaterial3D
 
 @onready var visual: Node3D = $Visual
@@ -178,6 +188,12 @@ func setup(character: CharacterData, fighter_controller: FighterController, alt_
 	alt = alt_look
 	name = character.display_name
 	health = character.max_health
+	_specials.clear()
+	for motion: String in MOTION_PRIORITY:
+		for move in data.moves:
+			if move.motion() == motion:
+				var window := SUPER_MOTION_WINDOW if move.super_move or motion.length() >= 5 else MOTION_WINDOW
+				_specials.append([move, motion, _motion_sequence(motion), _special_buttons(move.input.substr(motion.length())), window])
 
 
 func _ready() -> void:
@@ -234,6 +250,48 @@ func reset_to(spawn_position: Vector3) -> void:
 	health_changed.emit(health, data.max_health)
 	visual.rotation = Vector3.ZERO
 	reset_physics_interpolation()
+
+
+## Rollback snapshot of this fighter's whole simulation state.
+func save_state() -> Dictionary:
+	var state := {transform = transform, input = input.save_state(),
+		projectile = projectile.save_state() if projectile else []}
+	for field in SIM_FIELDS:
+		state[field] = get(field)
+	return state
+
+
+## Restores a snapshot from save_state(). The HUD is refreshed through the usual signals.
+func load_state(state: Dictionary) -> void:
+	var old_health := health
+	var old_meter := meter
+	var old_combo := combo_hits
+	for field in SIM_FIELDS:
+		set(field, state[field])
+	transform = state.transform
+	input.load_state(state.input)
+	var saved_projectile: Array = state.projectile
+	if saved_projectile.is_empty():
+		if projectile:
+			projectile.queue_free()
+			projectile = null
+	else:
+		if not projectile:
+			projectile = Projectile.new()
+			projectile.owner_fighter = self
+			projectile.move = saved_projectile[0]
+			projectile.name = "Projectile"
+			add_sibling(projectile)
+			projectile.load_state(saved_projectile)
+			projectile.reset_physics_interpolation()
+		else:
+			projectile.load_state(saved_projectile)
+	if health != old_health:
+		health_changed.emit(health, data.max_health)
+	if meter != old_meter:
+		meter_changed.emit(meter, MAX_METER)
+	if combo_hits != old_combo:
+		combo_changed.emit(combo_hits)
 
 
 # --- Simulation (60 Hz, called by FightManager) ---------------------------------
@@ -408,6 +466,14 @@ func _tick_attack() -> void:
 ## Starts a buffered attack. With `cancel_only` (the current move connected), only its
 ## cancel_into moves, specials (from a normal) or a super (from a special) are allowed.
 func _try_attack(cancel_only: bool) -> bool:
+	# Every normal and special needs a fresh attack press: skip the lookups without one.
+	var any_press := false
+	for button: int in ATTACK_BUTTONS:
+		if input.pressed_within(button, BUFFER_WINDOW):
+			any_press = true
+			break
+	if not any_press:
+		return false
 	var airborne := state == State.JUMP
 	if not airborne and _try_special(cancel_only):
 		return true
@@ -430,27 +496,26 @@ func _try_special(cancel_only: bool) -> bool:
 		var since_active := state_frame - current_move.startup - current_move.active
 		if current_move.super_move or since_active > SPECIAL_CANCEL_WINDOW or position.y > 0.0:
 			return false
-	for motion: String in MOTION_PRIORITY:
-		for move in data.moves:
-			if move.motion() != motion:
-				continue
-			if cancel_only and current_move.is_special() and not move.super_move:
-				continue
-			if move.super_move and meter < MAX_METER:
-				continue
-			if move.projectile_speed > 0.0 and projectile != null:
-				continue
-			var pressed := _special_buttons(move.input.substr(motion.length())).filter(
-				func(b: int) -> bool: return input.pressed_within(b, BUFFER_WINDOW))
-			if pressed.is_empty():
-				continue
-			var window := SUPER_MOTION_WINDOW if move.super_move or motion.length() >= 5 else MOTION_WINDOW
-			if not input.motion(_motion_sequence(motion), window, MOTION_FINISH + BUFFER_WINDOW):
-				continue
-			for b: int in pressed:
-				input.consume(b)
-			_start_move(move, false)
-			return true
+	for special: Array in _specials:
+		var move: MoveData = special[0]
+		if cancel_only and current_move.is_special() and not move.super_move:
+			continue
+		if move.super_move and meter < MAX_METER:
+			continue
+		if move.projectile_speed > 0.0 and projectile != null:
+			continue
+		var pressed := []
+		for b: int in special[3]:
+			if input.pressed_within(b, BUFFER_WINDOW):
+				pressed.append(b)
+		if pressed.is_empty():
+			continue
+		if not input.motion(special[2], special[4], MOTION_FINISH + BUFFER_WINDOW):
+			continue
+		for b: int in pressed:
+			input.consume(b)
+		_start_move(move, false)
+		return true
 	return false
 
 
@@ -849,7 +914,8 @@ func is_actionable() -> bool:
 ## True if being pushed along `direction` would be stopped by the ring edge.
 func is_pinned_against_bounds(direction: Vector3) -> bool:
 	var limit := bounds_half_extent - 0.01
-	return (direction.x > 0.1 and position.x >= limit) or (direction.x < -0.1 and position.x <= -limit) 			or (direction.z > 0.1 and position.z >= limit) or (direction.z < -0.1 and position.z <= -limit)
+	return (direction.x > 0.1 and position.x >= limit) or (direction.x < -0.1 and position.x <= -limit) \
+			or (direction.z > 0.1 and position.z >= limit) or (direction.z < -0.1 and position.z <= -limit)
 
 
 func clamp_to_bounds() -> void:

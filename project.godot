@@ -28,6 +28,7 @@ GameState="*res://scripts/autoload/game_state.gd"
 Audio="*res://scripts/autoload/audio.gd"
 InputSetup="*res://scripts/autoload/input_setup.gd"
 Settings="*res://scripts/autoload/settings.gd"
+Net="*res://scripts/autoload/net.gd"
 
 [display]
 

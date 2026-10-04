@@ -69,6 +69,11 @@ var freeze_ticks := 0
 var last_hit_point := Vector3.ZERO
 ## Arcade: whether P1 won the match that just ended.
 var _arcade_won := false
+## True while rollback netcode re-runs frames that were already shown: the simulation
+## runs as normal, but announcements, sounds, camera moves and effects are skipped.
+var resimulating := false
+## The online match driver (ONLINE mode only).
+var netplay: NetplayMatch
 
 @onready var camera: ActionCamera = $ActionCamera
 @onready var hud: FightHud = $HUD
@@ -84,7 +89,9 @@ func _ready() -> void:
 	dummy = DummyController.new()
 	var p1 := _spawn_fighter(GameState.player_character, PlayerController.new("p1_"))
 	var p2_controller: FighterController = ai
-	if is_versus():
+	if is_online():
+		p2_controller = NetInputController.new() # replaced by the session's own
+	elif is_versus():
 		p2_controller = PlayerController.new("p2_")
 	elif is_training():
 		p2_controller = TrainingDummyController.new()
@@ -106,7 +113,11 @@ func _ready() -> void:
 		hud.p2_name.text = "%s (%s)" % [GameState.arcade.opponent_title(), "BOSS" if stage_entry.boss else "CPU"]
 	hud.rematch_pressed.connect(_on_rematch_pressed)
 	hud.restart_pressed.connect(start_match)
-	hud.character_select_pressed.connect(_go_to.bind(CHARACTER_SELECT_SCENE))
+	hud.character_select_pressed.connect(func() -> void:
+		if is_online():
+			Net.back_to_lobby()
+		else:
+			_go_to(CHARACTER_SELECT_SCENE))
 	hud.main_menu_pressed.connect(_on_main_menu_pressed)
 	camera.setup(self)
 	camera.mode = Settings.camera_mode
@@ -121,14 +132,23 @@ func _ready() -> void:
 		add_child(training)
 		training.setup(self)
 	start_match()
+	if is_online():
+		netplay = NetplayMatch.new()
+		add_child(netplay)
+		netplay.setup(self)
 	_update_debug_text()
 	if "--smoke-test" in OS.get_cmdline_user_args():
 		print("SMOKE TEST: fight ready (%s vs %s, %d moves loaded)" % [p1.data.display_name, p2.data.display_name, p1.data.moves.size()])
 		round_ended.connect(func(_w: Fighter, reason: String) -> void: print("SMOKE TEST: round ended (%s)" % reason))
 
 
+## Two humans (local Versus or online).
 func is_versus() -> bool:
-	return GameState.mode == GameState.Mode.VERSUS
+	return GameState.mode == GameState.Mode.VERSUS or is_online()
+
+
+func is_online() -> bool:
+	return GameState.mode == GameState.Mode.ONLINE
 
 
 func is_training() -> bool:
@@ -181,7 +201,7 @@ func _start_round() -> void:
 		fighter.input_locked = true
 	if is_arcade() and GameState.arcade.current().boss:
 		fighters[1].add_meter(Fighter.MAX_METER) # the boss starts every round with a super ready
-	if is_training():
+	if is_training() or resimulating:
 		return # no round call-outs; start_match skips straight to the fight
 	var final := round_wins[0] == GameState.ROUNDS_TO_WIN - 1 and round_wins[1] == GameState.ROUNDS_TO_WIN - 1
 	hud.announce("FINAL ROUND" if final else "ROUND %d" % round_number)
@@ -192,7 +212,8 @@ func _start_round() -> void:
 func start_fight_immediately() -> void:
 	phase = Phase.FIGHT
 	phase_ticks = 0
-	hud.announce("")
+	if not resimulating:
+		hud.announce("")
 	for fighter in fighters:
 		fighter.input_locked = false
 
@@ -203,9 +224,10 @@ func _tick_round() -> void:
 		Phase.INTRO:
 			if phase_ticks >= INTRO_TICKS:
 				start_fight_immediately()
-				hud.announce("FIGHT!", "", true)
-				Audio.voice("fight")
-				Audio.sfx(&"bell", -6.0)
+				if not resimulating:
+					hud.announce("FIGHT!", "", true)
+					Audio.voice("fight")
+					Audio.sfx(&"bell", -6.0)
 		Phase.FIGHT:
 			if is_training():
 				pass # endless: no timer, no K.O.
@@ -224,7 +246,7 @@ func _tick_round() -> void:
 			if phase_ticks >= ROUND_OVER_TICKS:
 				_after_round()
 		Phase.MATCH_OVER:
-			if match_winner:
+			if match_winner and not resimulating:
 				if phase_ticks == VICTORY_TITLE_TICKS:
 					if is_versus():
 						hud.announce("PLAYER %d WINS" % (fighters.find(match_winner) + 1), match_winner.data.display_name.to_upper(), true)
@@ -271,14 +293,15 @@ func _finish_round(winner: Fighter, reason: String) -> void:
 			hud.set_score(GameState.arcade.score)
 	else:
 		sub = "DRAW"
-	hud.announce(reason, sub, true)
-	Audio.sfx(&"bell", -3.0)
-	if reason == "TIME":
-		Audio.voice("time")
-	elif sub == "PERFECT":
-		Audio.voice("flawless_victory")
-	elif sub == "DRAW":
-		Audio.voice("its_a_tie")
+	if not resimulating:
+		hud.announce(reason, sub, true)
+		Audio.sfx(&"bell", -3.0)
+		if reason == "TIME":
+			Audio.voice("time")
+		elif sub == "PERFECT":
+			Audio.voice("flawless_victory")
+		elif sub == "DRAW":
+			Audio.voice("its_a_tie")
 	round_ended.emit(winner, reason)
 
 
@@ -292,7 +315,7 @@ func _after_round() -> void:
 			_arcade_match_over(round_wins[0] > round_wins[1])
 		if round_wins[0] != round_wins[1]:
 			_start_victory(fighters[0] if round_wins[0] > round_wins[1] else fighters[1])
-		else:
+		elif not resimulating:
 			Audio.voice("its_a_tie")
 			hud.announce("DRAW GAME", "", true)
 			hud.show_result()
@@ -307,10 +330,14 @@ func _start_victory(winner: Fighter) -> void:
 	match_winner = winner
 	var clips := winner.data.victory_animations
 	winner.start_victory(clips[_cosmetic_rng.randi() % clips.size()] if not clips.is_empty() else &"")
+	if resimulating:
+		return
 	camera.start_victory(winner)
 	hud.announce("")
 	hud.start_cinematic()
-	if is_versus():
+	if is_online():
+		Audio.voice("you_win" if fighters.find(winner) == Net.local_index else "you_lose")
+	elif is_versus():
 		Audio.voice_sequence(["player_%d" % (fighters.find(winner) + 1), "winner"])
 	else:
 		Audio.voice("you_win" if winner == fighters[0] else "you_lose")
@@ -332,7 +359,9 @@ func _arcade_match_over(p1_won: bool) -> void:
 
 
 func _on_rematch_pressed() -> void:
-	if not is_arcade():
+	if is_online():
+		netplay.request_rematch()
+	elif not is_arcade():
 		start_match()
 	elif GameState.arcade.cleared:
 		_go_to(ARCADE_END_SCENE)
@@ -347,7 +376,9 @@ func _on_rematch_pressed() -> void:
 ## The result menu's last button ends an Arcade run on the results screen; the pause
 ## menu's "Main Menu" abandons it.
 func _on_main_menu_pressed() -> void:
-	if is_arcade() and phase == Phase.MATCH_OVER:
+	if is_online():
+		netplay.leave()
+	elif is_arcade() and phase == Phase.MATCH_OVER:
 		_go_to(ARCADE_END_SCENE)
 	else:
 		_go_to(MAIN_MENU_SCENE)
@@ -369,6 +400,8 @@ func _reset_round() -> void:
 	# Facing depends on the opponent's position, so face once both are placed.
 	for fighter in fighters:
 		fighter.face_opponent()
+	if resimulating:
+		return
 	hud.announce("")
 	if camera.manager:
 		camera.snap()
@@ -377,6 +410,12 @@ func _reset_round() -> void:
 # --- Simulation ------------------------------------------------------------------
 
 func _physics_process(_delta: float) -> void:
+	step()
+
+
+## One 60 Hz simulation tick. Netplay drives this itself (see RollbackSession) instead
+## of _physics_process.
+func step() -> void:
 	_update_view()
 	for fighter in fighters:
 		fighter.read_input()
@@ -403,6 +442,8 @@ func _set_freeze(ticks: int) -> void:
 
 func _on_super_started(fighter: Fighter, move: MoveData) -> void:
 	_set_freeze(SUPER_FREEZE_TICKS)
+	if resimulating:
+		return
 	super_flash.emit(fighter, move)
 	hud.super_flash(fighters.find(fighter), move.name)
 	camera.start_super(fighter)
@@ -471,8 +512,9 @@ func _resolve_throws() -> void:
 	if a.is_throw_grab_frame() and b.is_throw_grab_frame():
 		a.tech_apart()
 		b.tech_apart()
-		hud.note(0, "TECH")
-		hud.note(1, "TECH")
+		if not resimulating:
+			hud.note(0, "TECH")
+			hud.note(1, "TECH")
 		return
 	for attacker in fighters:
 		if not attacker.is_throw_grab_frame():
@@ -536,7 +578,7 @@ func _resolve_hits() -> void:
 			if defender.is_pinned_against_bounds(attacker.forward) and attacker.position.y <= 0.0:
 				attacker.velocity -= attacker.forward * move.knockback.x * CORNER_PUSHBACK
 		_award_meter(attacker, defender, move, result, health_before - defender.health)
-		if result == Fighter.HitResult.COUNTER:
+		if result == Fighter.HitResult.COUNTER and not resimulating:
 			hud.note(fighters.find(attacker), "COUNTER")
 		last_hit_point = hit[2]
 		hit_landed.emit(attacker, defender, move, result)
@@ -556,7 +598,71 @@ func _on_knocked_out(loser: Fighter) -> void:
 
 
 func _on_throw_teched(defender: Fighter) -> void:
-	hud.note(fighters.find(defender), "TECH")
+	if not resimulating:
+		hud.note(fighters.find(defender), "TECH")
+
+
+# --- Rollback support ------------------------------------------------------------
+
+## Wraps a cosmetic signal handler (effects, camera, sounds) so it's skipped while
+## rollback netcode re-simulates frames that were already shown.
+func cosmetic(handler: Callable) -> Callable:
+	return func(...args: Array) -> void:
+		if not resimulating:
+			handler.callv(args)
+
+
+## Snapshot of the whole simulation: round flow plus both fighters. Rollback netcode saves
+## one per tick and restores it to re-run frames with corrected inputs.
+func save_state() -> Dictionary:
+	var knocked: Array[int] = []
+	for f in _knocked_out:
+		knocked.append(fighters.find(f))
+	return {view_dir = view_dir, phase = phase, phase_ticks = phase_ticks, round_number = round_number,
+		round_wins = round_wins.duplicate(), timer_ticks = timer_ticks,
+		round_winner = fighters.find(round_winner), match_winner = fighters.find(match_winner),
+		knocked_out = knocked, freeze_ticks = freeze_ticks, last_hit_point = last_hit_point,
+		fighters = [fighters[0].save_state(), fighters[1].save_state()]}
+
+
+func load_state(state: Dictionary) -> void:
+	view_dir = state.view_dir
+	phase = state.phase
+	phase_ticks = state.phase_ticks
+	round_number = state.round_number
+	round_wins.assign(state.round_wins)
+	timer_ticks = state.timer_ticks
+	round_winner = fighters[state.round_winner] if state.round_winner >= 0 else null
+	match_winner = fighters[state.match_winner] if state.match_winner >= 0 else null
+	_knocked_out.clear()
+	for i: int in state.knocked_out:
+		_knocked_out.append(fighters[i])
+	freeze_ticks = state.freeze_ticks
+	last_hit_point = state.last_hit_point
+	for i in 2:
+		fighters[i].load_state(state.fighters[i])
+	hud.set_round_wins(round_wins)
+	if not is_training():
+		hud.set_timer(ceili(timer_ticks / float(TICKS_PER_SECOND)))
+
+
+## A 32-bit hash of a snapshot, compared between peers to detect desyncs. Resources
+## (moves) are hashed by their path, so it's the same on every machine.
+static func checksum(state: Dictionary) -> int:
+	return hash(var_to_bytes(_portable(state)))
+
+
+static func _portable(value: Variant) -> Variant:
+	if value is Dictionary:
+		var out := []
+		for key in value:
+			out.append([str(key), _portable(value[key])])
+		return out
+	if value is Array:
+		return (value as Array).map(_portable)
+	if value is Resource:
+		return (value as Resource).resource_path
+	return value
 
 
 func _flat(v: Vector3) -> Vector3:
@@ -566,7 +672,10 @@ func _flat(v: Vector3) -> Vector3:
 # --- Debug / scene input ------------------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("pause") and phase != Phase.MATCH_OVER:
+	if event.is_action_pressed("pause") and is_online():
+		netplay.toggle_leave_prompt() # an online match can't pause
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("pause") and phase != Phase.MATCH_OVER:
 		get_tree().paused = true
 		hud.show_pause()
 		get_viewport().set_input_as_handled()
@@ -586,7 +695,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				debug_draw = not debug_draw
 				for fighter in fighters:
 					fighter.debug_draw = debug_draw
-			KEY_F5:
+			KEY_F5 when not is_online():
 				start_match()
 			_:
 				return
@@ -607,8 +716,8 @@ func _cycle_cpu_mode() -> void:
 
 
 func _update_debug_text() -> void:
-	if is_training() or is_arcade():
-		hud.set_debug_text("") # training shows its own status line; arcade its score
+	if is_training() or is_arcade() or is_online():
+		hud.set_debug_text("") # training shows its own status line; arcade its score; online the connection
 		return
 	if not OS.is_debug_build():
 		hud.set_debug_text("") # release builds: no debug overlay or debug keys

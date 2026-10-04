@@ -46,6 +46,25 @@ damage, time left, health left and perfect rounds; lose and you can
 continue (the stage restarts). Clear it to see your results, your best
 score for that fighter, and the credits.
 
+ONLINE - choose "Online" in the main menu
+One player chooses Host Game. On the same network the other player sees
+the game under "Games on your network" and picks it; otherwise they type
+the host's address and choose Join. The host is asked to accept each
+player who tries to join. Both pick a fighter, the host picks the stage, and you fight
+with rollback netcode (the game hides network lag by predicting your
+opponent's input and correcting it instantly when it arrives).
+- Same network: the host's address is shown on the Host screen
+  (e.g. 192.168.1.20).
+- Over the internet: the host forwards UDP port 7777 on their router and
+  shares their public IP address.
+- Allow the game through your firewall if asked.
+- Both players need the same version of the game.
+- The connection is encrypted. Both screens show a 6-digit security code
+  (character select, and in the leave prompt): if the codes match, nobody
+  is listening in; if they differ, leave the match.
+- Esc during an online match asks before leaving (an online match can't
+  pause). The bar at the bottom shows ping, rollback and connection quality.
+
 TRAINING - choose "Training" in the main menu
 Pick your fighter, then the training dummy. Endless health, no timer.
 Tab (gamepad Back): training menu - dummy stance (stand / crouch / jump /

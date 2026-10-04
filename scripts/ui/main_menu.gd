@@ -4,6 +4,7 @@ const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const OPTIONS_SCENE := "res://scenes/options.tscn"
 const BEST_SCORES_SCENE := "res://scenes/best_scores.tscn"
 const CREDITS_SCENE := "res://scenes/credits.tscn"
+const ONLINE_SCENE := "res://scenes/online_menu.tscn"
 
 @onready var start_button: Button = %StartButton
 @onready var arcade_button: Button = %ArcadeButton
@@ -28,6 +29,15 @@ func _ready() -> void:
 	arcade_button.pressed.connect(_start.bind(GameState.Mode.ARCADE))
 	versus_button.pressed.connect(_start.bind(GameState.Mode.VERSUS))
 	training_button.pressed.connect(_start.bind(GameState.Mode.TRAINING))
+	# Online sits under Versus; built from it so it shares the menu's look.
+	var online_button := versus_button.duplicate(0) as Button # 0: without Versus's signal connections
+	online_button.name = "OnlineButton"
+	online_button.unique_name_in_owner = false
+	online_button.text = "Online"
+	versus_button.add_sibling(online_button)
+	online_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(ONLINE_SCENE))
+	if Net.peer:
+		Net.leave() # back at the main menu: any online session is over
 	quit_button.pressed.connect(_on_quit_pressed)
 	options_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(OPTIONS_SCENE))
 	best_scores_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(BEST_SCORES_SCENE))
@@ -36,6 +46,13 @@ func _ready() -> void:
 	Audio.music(&"menu")
 	# `3DFighter.exe -- --smoke-test` jumps straight into a fight (packaging checks).
 	if "--smoke-test" in OS.get_cmdline_user_args():
+		if _online_smoke_test():
+			return
+		if "--determinism" in OS.get_cmdline_user_args():
+			(func() -> void:
+				DeterminismCheck.run(get_tree())
+				get_tree().quit()).call_deferred()
+			return
 		if "--versus" in OS.get_cmdline_user_args():
 			GameState.mode = GameState.Mode.VERSUS
 		elif "--training" in OS.get_cmdline_user_args():
@@ -45,6 +62,20 @@ func _ready() -> void:
 			GameState.ensure_selections()
 			GameState.start_arcade(GameState.player_character)
 		get_tree().change_scene_to_file.call_deferred("res://scenes/fight.tscn")
+
+
+## `-- --smoke-test --online-host` / `--online-join=IP[:port]`: two processes connect, pick,
+## fight with random inputs and print a checksum each (they must match).
+func _online_smoke_test() -> bool:
+	for arg in OS.get_cmdline_user_args():
+		if arg == "--online-host" or arg.begins_with("--online-join="):
+			Net.smoke = true
+			var err := Net.host() if arg == "--online-host" else Net.join(arg.get_slice("=", 1))
+			print("SMOKE TEST: online %s (%s)" % ["hosting" if arg == "--online-host" else "joining", error_string(err)])
+			if err != OK:
+				get_tree().quit(1)
+			return true
+	return false
 
 
 ## Key art behind the menu, darkened toward the center so the buttons stay readable.

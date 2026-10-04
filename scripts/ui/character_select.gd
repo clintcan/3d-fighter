@@ -6,12 +6,15 @@ extends Control
 ## Light Punch to confirm, Heavy Punch to go back), then the VS screen.
 ## Training: pick your fighter, then the training dummy, then straight into the fight.
 ## Arcade: pick your fighter; the ladder of opponents is generated (GameState.arcade).
+## Online: each player picks on their own machine; once both have, the host picks the
+## stage and the guest waits (Net autoload). Back un-picks, then leaves.
 ## Vs CPU, Versus and Training continue to the stage select.
 
 const VS_SCENE := "res://scenes/vs_screen.tscn"
 const STAGE_SELECT_SCENE := "res://scenes/stage_select.tscn"
 const FIGHT_SCENE := "res://scenes/fight.tscn"
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
+const ONLINE_MENU_SCENE := "res://scenes/online_menu.tscn"
 const HEALTH_SCALE := 1200.0 # max_health shown as a full bar
 
 @onready var roster_box: VBoxContainer = %Roster
@@ -64,6 +67,15 @@ func _ready() -> void:
 		_refresh_versus()
 	else:
 		(roster_box.get_child(start) as Button).grab_focus()
+	if GameState.is_online():
+		_add_security_badge()
+		Net.lobby_changed.connect(_refresh_online)
+		_refresh_online()
+
+
+func _exit_tree() -> void:
+	if Net.lobby_changed.is_connected(_refresh_online):
+		Net.lobby_changed.disconnect(_refresh_online)
 
 
 func _process(delta: float) -> void:
@@ -74,6 +86,14 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _versus:
 		_versus_input(event)
+	elif GameState.is_online() and event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		Audio.sfx(&"ui_back", -4.0)
+		if Net.local_pick >= 0:
+			Net.pick(-1) # change your mind
+		else:
+			Net.leave()
+			get_tree().change_scene_to_file(ONLINE_MENU_SCENE)
 	elif event.is_action_pressed("ui_cancel"):
 		if _picking_dummy:
 			Audio.sfx(&"ui_back", -4.0)
@@ -270,7 +290,45 @@ As CPU: %s, %s." % [character.description, style.name, style.blurb]
 	signature_label.text = "\n".join(lines)
 
 
+## Online: the connection's security code, top right. Both players should see the same
+## number; if they don't, someone is intercepting the connection.
+func _add_security_badge() -> void:
+	var badge := Label.new()
+	badge.text = "SECURITY CODE  %s\nShould match your opponent's screen" % Net.security_code()
+	badge.add_theme_font_size_override("font_size", 20)
+	badge.add_theme_color_override("font_color", Color(1.0, 0.82, 0.3))
+	badge.add_theme_constant_override("outline_size", 6)
+	badge.add_theme_color_override("font_outline_color", Color.BLACK)
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	badge.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	badge.offset_top = 18
+	badge.offset_right = -24
+	add_child(badge)
+
+
+## Online: titles for where the lobby stands; the host moves on once both have picked.
+func _refresh_online() -> void:
+	var hint := $Margin/VBox/Hint as Label
+	var opponent := Net.opponent_name()
+	var their_status := "choosing..." if Net.remote_pick < 0 else "ready"
+	hint.text = "Online vs %s  ·  Opponent: %s  ·  Enter / A to select  ·  Esc to %s" % [
+		opponent, their_status, "change your pick" if Net.local_pick >= 0 else "leave"]
+	if Net.local_pick < 0:
+		title_label.text = "SELECT YOUR FIGHTER"
+	elif not Net.both_picked():
+		title_label.text = "WAITING FOR %s..." % opponent.to_upper()
+	elif Net.is_host():
+		get_tree().change_scene_to_file(STAGE_SELECT_SCENE)
+	else:
+		title_label.text = "%s IS CHOOSING THE STAGE..." % opponent.to_upper()
+
+
 func _select(character: CharacterData) -> void:
+	if GameState.is_online():
+		Audio.sfx(&"ui_accept", -4.0)
+		Net.pick(GameState.roster.find(character))
+		return
 	if GameState.mode == GameState.Mode.TRAINING:
 		if not _picking_dummy:
 			GameState.player_character = character

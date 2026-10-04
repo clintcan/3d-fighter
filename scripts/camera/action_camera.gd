@@ -109,10 +109,10 @@ func setup(fight_manager: Node) -> void:
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_noise.frequency = 1.0
-	manager.hit_landed.connect(_on_hit_landed)
-	manager.throw_landed.connect(_on_throw_landed)
+	manager.hit_landed.connect(manager.cosmetic(_on_hit_landed))
+	manager.throw_landed.connect(manager.cosmetic(_on_throw_landed))
 	for fighter: Fighter in manager.fighters:
-		fighter.knocked_out.connect(_on_knocked_out)
+		fighter.knocked_out.connect(manager.cosmetic(_on_knocked_out))
 	snap()
 
 

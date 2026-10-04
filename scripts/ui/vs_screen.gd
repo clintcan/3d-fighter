@@ -22,7 +22,7 @@ func _ready() -> void:
 	GameState.ensure_selections()
 	left_portrait.texture = GameState.player_character.portrait
 	right_portrait.texture = GameState.p2_character.portrait
-	var versus := GameState.mode == GameState.Mode.VERSUS
+	var versus := GameState.mode == GameState.Mode.VERSUS or GameState.is_online()
 	left_name.text = ("P1  " if versus else "") + GameState.player_character.display_name.to_upper()
 	right_name.text = "%s (%s)" % [GameState.p2_character.display_name.to_upper(), "P2" if versus else "CPU"]
 	if GameState.is_arcade():
@@ -113,7 +113,8 @@ func _show_arcade_ladder() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_accept"):
+	# Online, both players go on together when the timer ends (no skipping).
+	if event.is_action_pressed("ui_accept") and not GameState.is_online():
 		_go()
 
 

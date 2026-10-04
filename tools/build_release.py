@@ -89,6 +89,29 @@ def check_smoke(output: str, label: str) -> None:
         fail(f"{label} smoke test printed a script error")
 
 
+_reference_checksum = None
+
+
+def determinism_checksum(output: str) -> str:
+    match = re.search(r"determinism combined ([0-9a-f]{8})", output)
+    return match.group(1) if match else ""
+
+
+def check_determinism(output: str, label: str) -> None:
+    """Online play needs every build to simulate identically: the packaged build must print
+    the same --determinism checksum as the editor."""
+    global _reference_checksum
+    if _reference_checksum is None:
+        _reference_checksum = determinism_checksum(
+            run([godot(), "--headless", "--path", ROOT, "--", "--smoke-test", "--determinism"], timeout=300).stdout)
+        if not _reference_checksum:
+            fail("the editor's determinism check printed no checksum")
+    got = determinism_checksum(output)
+    if got != _reference_checksum:
+        fail(f"{label} simulates differently from the editor (determinism {got or 'missing'} vs {_reference_checksum}): online play would desync")
+    print(f"  {label} determinism checksum {got} matches the editor")
+
+
 # --- Version bump ------------------------------------------------------------------
 
 def bump_version(new: str) -> None:
@@ -145,6 +168,7 @@ def build_windows(version: str) -> str:
     exe = os.path.join(BUILD, "windows", "3DFighter.exe")
     export("Windows Desktop", exe)
     check_smoke(run([exe, "--headless", "--", "--smoke-test"], timeout=40).stdout, "Windows")
+    check_determinism(run([exe, "--headless", "--", "--smoke-test", "--determinism"], timeout=300).stdout, "Windows")
     out = os.path.join(DIST, f"3DFighter-v{version}-windows.zip")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         z.write(exe, "3DFighter/3DFighter.exe")
@@ -204,15 +228,19 @@ def smoke_linux(tarball: str) -> None:
         return
     drive, rest = os.path.splitdrive(os.path.abspath(tarball))
     wsl_path = f"/mnt/{drive[0].lower()}{rest.replace(os.sep, '/')}"
-    script = ("set -e; rm -rf /tmp/3dfighter-smoke && mkdir -p /tmp/3dfighter-smoke && cd /tmp/3dfighter-smoke; "
-              f"tar -xzf '{wsl_path}'; cd 3DFighter; "
-              "timeout 40 stdbuf -oL -eL ./3DFighter.x86_64 --headless -- --smoke-test 2>&1 || true")
+    # Each WSL call extracts afresh: WSL may shut down between calls, and /tmp goes with it.
+    prepare = ("set -e; rm -rf /tmp/3dfighter-smoke && mkdir -p /tmp/3dfighter-smoke && cd /tmp/3dfighter-smoke; "
+               f"tar -xzf '{wsl_path}'; cd 3DFighter; ")
+    script = prepare + "timeout 40 stdbuf -oL -eL ./3DFighter.x86_64 --headless -- --smoke-test 2>&1 || true"
     result = run(["wsl", "--", "bash", "-c", script], timeout=120)
     if "fight ready" not in result.stdout and result.returncode not in (0, -1):
         print("(WSL couldn't run the Linux build here; skipping)")
         print(result.stdout[-800:])
         return
     check_smoke(result.stdout, "Linux (WSL)")
+    determinism = run(["wsl", "--", "bash", "-c", prepare + "timeout 300 stdbuf -oL -eL "
+                       "./3DFighter.x86_64 --headless -- --smoke-test --determinism 2>&1 || true"], timeout=360)
+    check_determinism(determinism.stdout, "Linux (WSL)")
 
 
 # --- Main ------------------------------------------------------------------------

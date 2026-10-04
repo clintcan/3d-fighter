@@ -106,6 +106,20 @@ func tick(bounds_half_extent: float) -> bool:
 	return ticks_left > 0 and absf(position.x) <= limit and absf(position.z) <= limit
 
 
+## Rollback snapshot of the simulation fields (the visuals rebuild themselves).
+func save_state() -> Array:
+	return [move, direction, speed, ticks_left, radius, position]
+
+
+func load_state(state: Array) -> void:
+	move = state[0]
+	direction = state[1]
+	speed = state[2]
+	ticks_left = state[3]
+	radius = state[4]
+	position = state[5]
+
+
 ## Approaching `target` and close enough that they should be blocking.
 func is_threatening(target: Fighter) -> bool:
 	var to_target := target.position - position
