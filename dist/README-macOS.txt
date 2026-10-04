@@ -1,4 +1,4 @@
-3D FIGHTER  -  v0.2.0 (prototype)  -  macOS
+3D FIGHTER  -  v0.3.0 (prototype)  -  macOS
 ===========================================
 
 A one-on-one 3D fighting game inspired by Street Fighter and Tekken, with a
