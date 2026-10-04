@@ -1,0 +1,88 @@
+# Runs the headless simulation tests (tests/sim_test.gd) on every push and pull request.
+#
+# Hardening:
+# - The token is read-only and nothing is published; checkout doesn't keep credentials.
+# - Actions are pinned to full commit SHAs (tag in the comment), not movable tags.
+# - Godot is downloaded from the official godot-builds release and checked against a
+#   pinned SHA-512 before it runs.
+# - Uses pull_request (not pull_request_target), so pull requests from forks run with no
+#   secrets and a read-only token, and repository settings require the owner to approve
+#   runs from outside contributors.
+# - .github/ is owned by @clintcan (CODEOWNERS) and main requires code-owner review, so
+#   this workflow can't be changed through a pull request without the owner's approval.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.2
+  GODOT_SHA512: 9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65
+
+jobs:
+  tests:
+    name: tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          lfs: false
+
+      # Git LFS assets (models, textures, audio) are cached by content so repeat runs
+      # don't spend LFS bandwidth.
+      - name: List LFS objects
+        run: git lfs ls-files --long | cut -d' ' -f1 | sort > .lfs-assets-id
+
+      - name: Restore LFS cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+
+      - name: Pull LFS objects
+        run: git lfs pull
+
+      - name: Restore Godot cache
+        id: godot-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_SHA512 }}
+
+      - name: Download and verify Godot
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot
+          curl -fsSL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          echo "${GODOT_SHA512}  /tmp/godot.zip" | sha512sum --check --strict -
+          unzip -q /tmp/godot.zip -d ~/godot
+
+      - name: Import project
+        run: |
+          GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          chmod +x "$GODOT"
+          timeout 600 "$GODOT" --headless --path . --import || true
+
+      - name: Run simulation tests
+        run: |
+          GODOT=~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+          set -o pipefail
+          timeout 900 "$GODOT" --headless --path . -s res://tests/sim_test.gd 2>&1 | tee tests.log
+          if grep -E "^FAIL" tests.log; then exit 1; fi
+          grep -q "0 failure(s)" tests.log
+          echo "Passed: $(grep -c '^PASS' tests.log) checks" >> "$GITHUB_STEP_SUMMARY"

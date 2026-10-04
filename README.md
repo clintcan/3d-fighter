@@ -1,5 +1,7 @@
 # 3D Fighter
 
+[![tests](https://github.com/clintcan/3d-fighter/actions/workflows/tests.yml/badge.svg)](https://github.com/clintcan/3d-fighter/actions/workflows/tests.yml)
+
 A one-on-one 3D fighting game inspired by Street Fighter and Tekken, built in **Godot 4**.
 Its signature is a **dynamic action camera** that orbits and dollies in on every big hit.
 

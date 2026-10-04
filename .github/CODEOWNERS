@@ -1,0 +1,5 @@
+# Changes to CI, repository automation and this file need the owner's review
+# (enforced by branch protection on main: "Require review from Code Owners").
+/.github/ @clintcan
+/tools/build_release.py @clintcan
+/tools/macos_sign_notarize.py @clintcan
