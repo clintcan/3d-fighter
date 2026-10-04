@@ -37,6 +37,7 @@ func _ready() -> void:
 	fullscreen_check.toggled.connect(func(on: bool) -> void: _change(&"fullscreen", on))
 	swap_pads_check.toggled.connect(func(on: bool) -> void: _change(&"swap_pads", on))
 	%BackButton.pressed.connect(_back)
+	%ControlsButton.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/controls.tscn"))
 	music_slider.grab_focus()
 
 

@@ -78,6 +78,8 @@ SUPER: landing and taking hits fills the SUPER meter (bottom corners).
 When it's full, do down, down-forward, forward twice + P (Kenji, Brutus)
 or + K (Rhea) for the character's super. Valka's super is a command grab. Sidestep dodges fireballs.
 
+Remap any key or gamepad button (triggers too) in Options -> Controls.
+
 Options (main menu): music / effects / announcer volume, action camera
 (Off / Subtle / Full), CPU difficulty (Easy / Normal / Hard), fullscreen.
 

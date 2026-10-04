@@ -37,6 +37,7 @@ Its signature is a **dynamic action camera** that orbits and dollies in on every
 
 - **Specials** use motion inputs (for example ↓↘→ + P), and a full super meter enables ↓↘→↓↘→ + P/K. Each fighter's moves are listed in the pause menu.
 - **Player 2** uses the arrow keys with numpad 4/5 (punches), 1/2 (kicks) and 6 (sidestep), or a second gamepad.
+- **Remapping:** every key and gamepad button can be changed per player in **Options → Controls**, which shows a controller diagram. The triggers can be bound too.
 
 ## Run from source
 

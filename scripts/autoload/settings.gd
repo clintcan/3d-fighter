@@ -29,6 +29,7 @@ func load_settings() -> void:
 	ai_difficulty = cfg.get_value("game", "ai_difficulty", ai_difficulty)
 	fullscreen = cfg.get_value("video", "fullscreen", fullscreen)
 	swap_pads = cfg.get_value("input", "swap_pads", swap_pads)
+	InputSetup.load_bindings(cfg)
 
 
 func save_settings() -> void:
@@ -40,6 +41,7 @@ func save_settings() -> void:
 	cfg.set_value("game", "ai_difficulty", ai_difficulty)
 	cfg.set_value("video", "fullscreen", fullscreen)
 	cfg.set_value("input", "swap_pads", swap_pads)
+	InputSetup.save_bindings(cfg)
 	cfg.save(PATH)
 
 

@@ -319,6 +319,7 @@ func _initialize() -> void:
 	await valka_tests()
 	await temple_tests()
 	await scores_credits_tests()
+	await controls_tests()
 
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -1128,3 +1129,63 @@ func scores_credits_tests() -> void:
 	for i in 30: await process_frame
 	check("Credits screen: the roll scrolls and credits the creator", roll.rolling and roll.position.y < y0
 		and CreditsRoll.CREDITS.any(func(e): return e[1] == "Clint Christopher Canada"))
+
+
+func _has_key(action: String, key: int) -> bool:
+	return InputMap.action_get_events(action).any(func(e): return e is InputEventKey and e.physical_keycode == key)
+
+
+func _has_pad(action: String, button: int) -> bool:
+	return InputMap.action_get_events(action).any(func(e): return e is InputEventJoypadButton and e.button_index == button)
+
+
+func controls_tests() -> void:
+	var setup = root.get_node("InputSetup")
+	var settings = root.get_node("Settings")
+	var saved: Dictionary = setup.bindings.duplicate(true)
+	# The Controls screen saves settings; snapshot the player's file and put it back after.
+	var settings_file: String = settings.PATH
+	var had_settings := FileAccess.file_exists(settings_file)
+	var settings_bytes := FileAccess.get_file_as_bytes(settings_file) if had_settings else PackedByteArray()
+	setup.reset_player("p1")
+	check("Controls: defaults (P1 LP = U / X)", _has_key("p1_lp", KEY_U) and _has_pad("p1_lp", JOY_BUTTON_X))
+
+	setup.set_binding("p1", "lp", "key", KEY_O)
+	check("Controls: rebinding a key updates the action", _has_key("p1_lp", KEY_O) and not _has_key("p1_lp", KEY_U))
+	setup.set_binding("p1", "lp", "key", KEY_K) # K is Heavy Kick's: they swap
+	check("Controls: a taken key swaps with its action", _has_key("p1_lp", KEY_K) and _has_key("p1_hk", KEY_O),
+		"lp %s hk %s" % [setup.key_name(setup.bindings.p1.lp.key), setup.key_name(setup.bindings.p1.hk.key)])
+	setup.set_binding("p1", "sidestep", "pad", setup.PAD_TRIGGER_RIGHT)
+	var trigger: bool = InputMap.action_get_events("p1_sidestep").any(func(e): return e is InputEventJoypadMotion and e.axis == JOY_AXIS_TRIGGER_RIGHT)
+	check("Controls: a trigger can be bound", trigger)
+
+	# Saved and loaded with the settings file.
+	var cfg := ConfigFile.new()
+	setup.save_bindings(cfg)
+	setup.reset_player("p1")
+	setup.load_bindings(cfg)
+	setup.apply(false)
+	check("Controls: bindings survive save / load", _has_key("p1_lp", KEY_K) and setup.bindings.p1.sidestep.pad == setup.PAD_TRIGGER_RIGHT)
+
+	# The screen: capturing a new gamepad button through the UI.
+	change_scene_to_file("res://scenes/controls.tscn")
+	await process_frame; await process_frame
+	var screen = current_scene
+	var button: Button
+	for b in screen._list.get_children():
+		if b is Button and b.get_meta(&"action", "") == "hp" and b.get_meta(&"kind", "") == "pad":
+			button = b
+	screen._start_capture("hp", "pad", button)
+	screen.finish_capture(JOY_BUTTON_LEFT_SHOULDER)
+	check("Controls screen: capture binds the button and the controller shows it", _has_pad("p1_hp", JOY_BUTTON_LEFT_SHOULDER)
+		and screen._controller.player == "p1" and screen._list.get_child_count() > 9)
+
+	# Restore the player's real bindings and settings file exactly.
+	setup.bindings = saved
+	setup.apply(false)
+	if had_settings:
+		var f := FileAccess.open(settings_file, FileAccess.WRITE)
+		f.store_buffer(settings_bytes)
+		f.close()
+	else:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(settings_file))
