@@ -6,6 +6,7 @@ const DEFAULT_STAGE := "res://scenes/stages/ring.tscn"
 const DOJO_STAGE := "res://scenes/stages/dojo.tscn"
 const ROOFTOP_STAGE := "res://scenes/stages/rooftop.tscn"
 const TEMPLE_STAGE := "res://scenes/stages/temple.tscn"
+const BEACH_STAGE := "res://scenes/stages/beach.tscn"
 ## Selectable stages: scene, display name, select-screen thumbnail (rendered by
 ## tools/render_stage_thumbs.gd) and a one-line description.
 const STAGES := [
@@ -17,6 +18,8 @@ const STAGES := [
 		blurb = "A helipad high above the city lights."},
 	{path = TEMPLE_STAGE, name = "Temple", thumb = "res://assets/ui/stages/temple.png",
 		blurb = "A mountain courtyard at sunset, under falling blossom."},
+	{path = BEACH_STAGE, name = "Beach", thumb = "res://assets/ui/stages/beach.png",
+		blurb = "Sun, sand and turquoise surf, ringed by tiki torches."},
 ]
 
 const ROUNDS_TO_WIN := 2

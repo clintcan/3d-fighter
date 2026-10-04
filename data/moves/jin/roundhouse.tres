@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_h2hym"]
+
+[resource]
+script = ExtResource("1_h2hym")
+name = "Roundhouse"
+input = "HK"
+animation = &"fight/high_kick"
+animation_impact = 0.26
+startup = 13
+active = 4
+recovery = 22
+damage = 105
+hit_level = 0
+hitstun = 22
+blockstun = 16
+hitstop = 10
+knockback = Vector2(3.6749997, 0)
+hitbox_radius = 0.22
+hitbox_offset = Vector3(-0.08, 1.5, -0.952)
+camera_intensity = 0.2

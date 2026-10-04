@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_23kmq"]
+
+[resource]
+script = ExtResource("1_23kmq")
+name = "Tornado Kick"
+input = "623K"
+animation = &"fight/tornado_kick"
+animation_impact = 0.13
+animation_end = 0.71
+startup = 4
+active = 14
+recovery = 14
+hitstun = 0
+blockstun = 16
+hitstop = 8
+knockback = Vector2(1, 6.5)
+launches = true
+chip_damage = 6
+hits = 2
+hit_interval = 7
+travel = 1.0
+rise = 6.5
+landing_recovery = 14
+invuln_frames = 6
+hitbox_radius = 0.42
+hitbox_offset = Vector3(0, 1.4, -0.55)
+camera_intensity = 0.3

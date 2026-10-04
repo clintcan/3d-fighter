@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/characters/base/T_Superhero_Male_Light.png" id="1_5wv7d"]
+[ext_resource type="Texture2D" path="res://assets/characters/jin/T_Jin_Body.png" id="2_jdp5k"]
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Buzzed.gltf" id="3_6ny7v"]
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Eyebrows_Regular.gltf" id="4_700ar"]
+[ext_resource type="PackedScene" path="res://assets/characters/base/Superhero_Male_FullBody.gltf" id="5_yesxv"]
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="6_433y7"]
+[ext_resource type="Resource" path="res://data/moves/jin/jab.tres" id="7_5kvxu"]
+[ext_resource type="Resource" path="res://data/moves/jin/straight.tres" id="8_k247t"]
+[ext_resource type="Resource" path="res://data/moves/jin/mid_kick.tres" id="9_i24qo"]
+[ext_resource type="Resource" path="res://data/moves/jin/roundhouse.tres" id="10_w3n8t"]
+[ext_resource type="Resource" path="res://data/moves/jin/crouch_jab.tres" id="11_1r3i1"]
+[ext_resource type="Resource" path="res://data/moves/jin/low_kick.tres" id="12_431gu"]
+[ext_resource type="Resource" path="res://data/moves/jin/uppercut.tres" id="13_y0p8c"]
+[ext_resource type="Resource" path="res://data/moves/jin/sweep.tres" id="14_73kpu"]
+[ext_resource type="Resource" path="res://data/moves/jin/jump_jab.tres" id="15_htym4"]
+[ext_resource type="Resource" path="res://data/moves/jin/jump_hammer.tres" id="16_dehp4"]
+[ext_resource type="Resource" path="res://data/moves/jin/jump_kick.tres" id="17_52wnm"]
+[ext_resource type="Resource" path="res://data/moves/jin/flying_kick.tres" id="18_4hkyq"]
+[ext_resource type="Resource" path="res://data/moves/jin/axe_kick.tres" id="19_aebfc"]
+[ext_resource type="Resource" path="res://data/moves/jin/push_kick.tres" id="20_tjyc3"]
+[ext_resource type="Resource" path="res://data/moves/jin/spinning_back_kick.tres" id="21_qy7dr"]
+[ext_resource type="Resource" path="res://data/moves/jin/tornado_kick.tres" id="22_qgigs"]
+[ext_resource type="Resource" path="res://data/moves/jin/hurricane_kicks.tres" id="23_4ixq8"]
+[ext_resource type="Resource" path="res://data/moves/jin/hurricane_finish.tres" id="24_gpeku"]
+[ext_resource type="Texture2D" path="res://assets/ui/portraits/jin.png" id="25_iebd8"]
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="26_2anx2"]
+
+[resource]
+script = ExtResource("26_2anx2")
+id = &"jin"
+display_name = "Jin"
+archetype = "Kicker"
+description = "Tae Kwon Do kicker. Controls the space at kick range and punishes anyone who steps in."
+select_order = 4
+portrait = ExtResource("25_iebd8")
+model_scene = ExtResource("5_yesxv")
+hair_scenes = Array[PackedScene]([ExtResource("3_6ny7v"), ExtResource("4_700ar")])
+body_albedo = ExtResource("2_jdp5k")
+model_scale = 1.02
+hair_color = Color(0.05, 0.04, 0.04, 1)
+alt_body_albedo = ExtResource("1_5wv7d")
+alt_hair_color = Color(0.5, 0.33, 0.15, 1)
+victory_animations = Array[StringName]([&"fight/victory_point", &"fight/victory_fist_pump"])
+placeholder_color = Color(0.2, 0.7, 0.55, 1)
+max_health = 980
+walk_speed = 2.2
+back_walk_speed = 1.8
+dash_speed = 6.5
+jump_velocity = 6.2
+weight = 0.95
+throw_damage = 110
+power_rating = 0.6
+speed_rating = 0.65
+moves = Array[ExtResource("6_433y7")]([ExtResource("7_5kvxu"), ExtResource("8_k247t"), ExtResource("9_i24qo"), ExtResource("10_w3n8t"), ExtResource("11_1r3i1"), ExtResource("12_431gu"), ExtResource("13_y0p8c"), ExtResource("14_73kpu"), ExtResource("15_htym4"), ExtResource("16_dehp4"), ExtResource("17_52wnm"), ExtResource("18_4hkyq"), ExtResource("19_aebfc"), ExtResource("20_tjyc3"), ExtResource("21_qy7dr"), ExtResource("22_qgigs"), ExtResource("23_4ixq8"), ExtResource("24_gpeku")])

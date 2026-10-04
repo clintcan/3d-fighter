@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_uno3v"]
+
+[resource]
+script = ExtResource("1_uno3v")
+name = "Hurricane Kicks"
+input = "~hurricane_finish"
+animation = &"fight/axe_kick"
+animation_impact = 0.3
+animation_end = 0.75
+startup = 6
+active = 4
+recovery = 22
+damage = 130
+hitstun = 0
+blockstun = 20
+hitstop = 14
+knockdown = true
+chip_damage = 12
+hitbox_radius = 0.32
+hitbox_offset = Vector3(0.04, 1.1, -1)
+camera_intensity = 0.6

@@ -132,6 +132,37 @@ const CHARACTERS := {
 				{super_move = true, command_grab = true, grab_range = 1.15, invuln_frames = 8, camera_intensity = 0.6, impact_fx = &"shockwave"}],
 		},
 	},
+	"jin": {
+		startup = 0, damage = 0.95, knockback = 1.05, hitstop = 0,
+		reach = 1.12, # long legs: base moves reach 12% further
+		create = {display_name = "Jin", archetype = "Kicker", select_order = 4,
+			description = "Tae Kwon Do kicker. Controls the space at kick range and punishes anyone who steps in.",
+			model_scene = "res://assets/characters/base/Superhero_Male_FullBody.gltf",
+			hair_scenes = ["res://assets/characters/hair/Hair_Buzzed.gltf", "res://assets/characters/hair/Eyebrows_Regular.gltf"],
+			body_albedo = "res://assets/characters/jin/T_Jin_Body.png", # deeper skin, teal shorts (from the CC0 texture)
+			model_scale = 1.02, hair_color = Color(0.05, 0.04, 0.04), placeholder_color = Color(0.2, 0.7, 0.55)},
+		stats = {max_health = 980, walk_speed = 2.2, back_walk_speed = 1.8, dash_speed = 6.5,
+			jump_velocity = 6.2, weight = 0.95, throw_damage = 110, power_rating = 0.6, speed_rating = 0.65,
+			victory_animations = [&"fight/victory_point", &"fight/victory_fist_pump"],
+			alt_body_albedo = "res://assets/characters/base/T_Superhero_Male_Light.png", alt_hair_color = Color(0.5, 0.33, 0.15)},
+		signatures = {
+			# Overhead from kick range: must be blocked standing.
+			"axe_kick": ["Axe Kick", "6HK", &"fight/axe_kick", 0.30, 0.75, 16, 4, 18, 100, H.OVERHEAD, 24, 16, 10, Vector2(2.0, 0), Vector3(0.04, 1.1, -1.0), 0.26, {camera_intensity = 0.25}],
+			"push_kick": ["Push Kick", "6LK", &"fight/front_kick", 0.20, 0.0, 9, 3, 16, 55, H.MID, 16, 13, 7, Vector2(3.2, 0), Vector3(0.05, 1.0, -1.12), 0.2, {lunge = 2.5, camera_intensity = 0.1}],
+		},
+		specials = {
+			# Turns and drives the heel back: long-reaching, big pushback, slightly unsafe.
+			"spinning_back_kick": ["Spinning Back Kick", "236K", &"fight/spin_back_kick", 0.22, 0.66, 12, 3, 20, 90, H.MID, 22, 16, 11, Vector2(4.0, 0), Vector3(-0.05, 1.06, -0.92), 0.27,
+				{lunge = 4.5, chip_damage = 10, camera_intensity = 0.25}], # steps in as it turns
+			# Rising spin kick anti-air: invincible start, two hits, launches.
+			"tornado_kick": ["Tornado Kick", "623K", &"fight/tornado_kick", 0.13, 0.71, 4, 14, 14, 50, H.MID, 0, 16, 8, Vector2(1.0, 6.5), Vector3(0, 1.4, -0.55), 0.42,
+				{hits = 2, hit_interval = 7, launches = true, rise = 6.5, travel = 1.0, invuln_frames = 6, landing_recovery = 14, chip_damage = 6, camera_intensity = 0.3}],
+			"hurricane_kicks": ["Hurricane Kicks", "236236K", &"fight/hurricane_kicks", 0.10, 0.775, 5, 30, 22, 24, H.MID, 22, 16, 4, Vector2(0.6, 0), Vector3(0.0, 1.3, -0.98), 0.32,
+				{super_move = true, hits = 7, hit_interval = 4, travel = 1.8, invuln_frames = 11, chip_damage = 5, followup = "~hurricane_finish", camera_intensity = 0.15}],
+			"hurricane_finish": ["Hurricane Kicks", "~hurricane_finish", &"fight/axe_kick", 0.30, 0.75, 6, 4, 22, 130, H.MID, 0, 20, 14, Vector2(1.5, 0), Vector3(0.04, 1.1, -1.0), 0.32,
+				{knockdown = true, chip_damage = 12, camera_intensity = 0.6}],
+		},
+	},
 }
 
 
@@ -147,6 +178,8 @@ func _initialize() -> void:
 			move.damage = roundi(move.damage * spec.damage)
 			move.knockback *= spec.knockback
 			move.hitstop = maxi(3, move.hitstop + spec.hitstop)
+			var reach: float = spec.get("reach", 1.0)
+			move.hitbox_offset.z *= reach # longer limbs push the hitbox further out
 			moves.append(_save(move, dir + file + ".tres"))
 		for file: String in spec.signatures:
 			moves.append(_save(_make(spec.signatures[file]), dir + file + ".tres"))

@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_jecrh"]
+
+[resource]
+script = ExtResource("1_jecrh")
+name = "Sweep"
+input = "2HK"
+animation = &"fight/spin_sweep"
+startup = 9
+active = 4
+recovery = 26
+damage = 76
+hit_level = 2
+hitstun = 0
+blockstun = 14
+hitstop = 8
+knockback = Vector2(1.05, 0)
+knockdown = true
+hitbox_radius = 0.22
+hitbox_offset = Vector3(0, 0.15, -0.87359995)
+camera_intensity = 0.2

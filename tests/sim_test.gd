@@ -321,6 +321,8 @@ func _initialize() -> void:
 	await loading_tests()
 	await valka_tests()
 	await temple_tests()
+	await jin_tests()
+	await beach_tests()
 	await scores_credits_tests()
 	await controls_tests()
 
@@ -813,9 +815,9 @@ func stage_tests() -> void:
 
 	# Arcade stages: alternate arenas, boss in the dojo.
 	var run := ArcadeRun.create(gs.roster[0], gs.roster, 1, 9, gs.arcade_arenas(), gs.DOJO_STAGE)
-	check("Arcade: ring, rooftop, temple, then the boss in the dojo", run.stages[0].stage_path == gs.DEFAULT_STAGE
+	check("Arcade: ring, rooftop, temple, beach, then the boss in the dojo", run.stages[0].stage_path == gs.DEFAULT_STAGE
 		and run.stages[1].stage_path == gs.ROOFTOP_STAGE and run.stages[2].stage_path == gs.TEMPLE_STAGE
-		and run.stages[-1].stage_path == gs.DOJO_STAGE)
+		and run.stages[3].stage_path == gs.BEACH_STAGE and run.stages[-1].stage_path == gs.DOJO_STAGE)
 	# The rooftop: loads, fights, and its sky shader compiles.
 	gs.stage_path = gs.ROOFTOP_STAGE
 	change_scene_to_file("res://scenes/fight.tscn")
@@ -837,7 +839,7 @@ func polish_tests() -> void:
 	gs.mode = gs.Mode.VS_CPU
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 	# Each stage brings its own music.
-	for entry in [[gs.DOJO_STAGE, &"dojo"], [gs.ROOFTOP_STAGE, &"rooftop"], [gs.TEMPLE_STAGE, &"temple"], [gs.DEFAULT_STAGE, &"fight"]]:
+	for entry in [[gs.DOJO_STAGE, &"dojo"], [gs.ROOFTOP_STAGE, &"rooftop"], [gs.TEMPLE_STAGE, &"temple"], [gs.BEACH_STAGE, &"beach"], [gs.DEFAULT_STAGE, &"fight"]]:
 		gs.stage_path = entry[0]
 		change_scene_to_file("res://scenes/fight.tscn")
 		await process_frame; await process_frame
@@ -1008,7 +1010,7 @@ class Masher extends FighterController:
 func valka_tests() -> void:
 	var gs = root.get_node("GameState")
 	var valka: CharacterData = gs.roster.filter(func(c): return c.id == &"valka").front()
-	check("Valka: in the roster as the fourth fighter", valka != null and gs.roster.size() == 4 and gs.roster[3] == valka)
+	check("Valka: in the roster as the fourth fighter", valka != null and gs.roster[3] == valka)
 	gs.mode = gs.Mode.VS_CPU
 	gs.player_character = valka; gs.p2_character = gs.roster[0]
 	gs.stage_path = gs.DEFAULT_STAGE
@@ -1080,6 +1082,25 @@ func valka_tests() -> void:
 	step(m.SUPER_FREEZE_TICKS + 60)
 	check("Thunder Valkyrie: super grab through a block", p2.health == hp - dmg(p1, "236236P") and p1.meter == 0, "hp %d -> %d" % [hp, p2.health])
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+
+
+func beach_tests() -> void:
+	var gs = root.get_node("GameState")
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+	gs.stage_path = gs.BEACH_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	reset(DummyController.Mode.STAND); approach(1.1)
+	var hp := p2.health
+	press(InputBuffer.LP); step(6)
+	check("Beach: loads with the standard bounds and combat works", m.stage.name == "Beach" and m.stage.bounds_half_extent == 3.6
+		and p2.health == hp - dmg(p1, "LP"), "hp %d -> %d" % [hp, p2.health])
+	gs.stage_path = gs.DEFAULT_STAGE
 
 
 func temple_tests() -> void:
@@ -1193,3 +1214,50 @@ func controls_tests() -> void:
 		f.close()
 	else:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(settings_file))
+
+
+func jin_tests() -> void:
+	var gs = root.get_node("GameState")
+	var jin: CharacterData = gs.roster.filter(func(c): return c.id == &"jin").front()
+	check("Jin: in the roster as the fifth fighter", jin != null and gs.roster.size() == 5 and gs.roster[4] == jin)
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = jin; gs.p2_character = gs.roster[0]
+	gs.stage_path = gs.DEFAULT_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	var cpu := AIController.new()
+	cpu.attach(p1)
+	check("Jin: Footsies CPU personality", cpu.personality_name() == "Footsies")
+
+	# Long legs: his normals out-reach the same move on Kenji.
+	var kenji: CharacterData = gs.roster[0]
+	var kenji_hk: MoveData = kenji.moves.filter(func(mv): return mv.input == "HK").front()
+	check("Jin: kicks reach further than Kenji's", absf(p1._move_for_input("HK").hitbox_offset.z) > absf(kenji_hk.hitbox_offset.z) + 0.05)
+
+	# Axe kick is an overhead: crouch-blocking doesn't stop it.
+	reset(DummyController.Mode.CROUCH_BLOCK); step(20); approach(1.3)
+	step(16) # forward again right after walking would be a dash
+	var hp := p2.health
+	press(InputBuffer.HK, 6); step(30)
+	check("Jin: Axe Kick hits through a crouch block (overhead)", p2.health == hp - dmg(p1, "6HK"), "hp %d -> %d" % [hp, p2.health])
+	step(60)
+
+	# Spinning back kick travels in from range.
+	reset(DummyController.Mode.STAND); p1.position.x = -1.1; p2.position.x = 1.1
+	hp = p2.health
+	motion("236", InputBuffer.HK)
+	wait_until(func() -> bool: return p2.health < hp, 40)
+	check("Jin: Spinning Back Kick steps in from 2.2 m", p2.health == hp - dmg(p1, "236K"), "hp %d -> %d" % [hp, p2.health])
+	step(80)
+
+	# Tornado kick: invincible start, rises, launches.
+	reset(DummyController.Mode.STAND); approach(1.0); step(16)
+	motion("623", InputBuffer.HK)
+	check("Jin: Tornado Kick starts invincible", p1.current_move != null and p1.current_move.name == "Tornado Kick" and p1.is_invulnerable())
+	wait_until(func() -> bool: return p2.state == Fighter.State.AIR_HIT, 30)
+	check("Jin: Tornado Kick launches", p2.state == Fighter.State.AIR_HIT, state_name(p2))
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]

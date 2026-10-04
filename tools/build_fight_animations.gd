@@ -71,6 +71,10 @@ func _initialize() -> void:
 	lib.add_animation("kick_flurry", build_kick_flurry())
 	lib.add_animation("rising_kick", build_rising_kick())
 	lib.add_animation("ground_pound", build_ground_pound())
+	lib.add_animation("axe_kick", build_axe_kick())
+	lib.add_animation("spin_back_kick", build_spin_back_kick())
+	lib.add_animation("tornado_kick", build_tornado_kick())
+	lib.add_animation("hurricane_kicks", build_hurricane_kicks())
 	lib.add_animation("lariat", build_lariat())
 	lib.add_animation("knee_lift", build_knee_lift())
 	lib.add_animation("slide_kick",build_in_place_ranges([[ual2.get_animation("Slide_Start"), 0.2, 0.83], [ual2.get_animation("Slide_Exit"), 0.0, 0.3]], crouch, 0.25))
@@ -860,6 +864,116 @@ func build_ground_pound() -> Animation:
 
 	return make_animation([[0.0, guard], [0.18, raise], [0.27, raise], [0.33, slam],
 		[0.55, hold], [0.85, guard]], false)
+
+
+## Axe kick (Jin): the straight rear leg swings up past the head, then chops down onto
+## the opponent's head/shoulder with the heel; the torso leans back as it rises and
+## forward as it drops. Impact 0.30 s (heel at chest height on the way down).
+func build_axe_kick() -> Animation:
+	var s := rear_sign()
+	var lead_foot := global_origin(guard, "foot_" + lead)
+	var raise := duplicate_pose(guard)
+	move_bone(raise, "pelvis", Vector3(0, 0.02, 0.06))
+	hip_turn(raise, 12.0)
+	lean(raise, 18.0, 4.0)
+	plant_foot(raise, lead, lead_foot)
+	pivot_support_foot(raise, 15.0, true)
+	var hip := global_origin(raise, "thigh_" + rear)
+	solve_ik(raise, "thigh_" + rear, "calf_" + rear, "foot_" + rear, Vector3(hip.x * 0.4, 2.05, hip.z + 0.45), Vector3(0, 0.3, 1))
+	point_foot(raise, rear, Vector3(0, 0.6, 0.8))
+	swing_rear_arm(raise, 0.7)
+
+	var chop := duplicate_pose(guard)
+	move_bone(chop, "pelvis", Vector3(0, -0.04, 0.12))
+	hip_turn(chop, 15.0)
+	lean(chop, -12.0, 2.0)
+	plant_foot(chop, lead, lead_foot)
+	pivot_support_foot(chop, 15.0, false)
+	hip = global_origin(chop, "thigh_" + rear)
+	solve_ik(chop, "thigh_" + rear, "calf_" + rear, "foot_" + rear, Vector3(hip.x * 0.4, 1.15, hip.z + 0.9), Vector3(0, 1, 0.2))
+	point_foot(chop, rear, Vector3(0, -0.3, 1))
+	swing_rear_arm(chop, 0.4)
+
+	var land := duplicate_pose(guard)
+	move_bone(land, "pelvis", Vector3(0, -0.06, 0.1))
+	lean(land, -8.0, 0.0)
+	plant_both(land, lead_foot, global_origin(guard, "foot_" + rear) + Vector3(0, 0, 0.55))
+
+	return make_animation([[0.0, guard], [0.18, raise], [0.30, chop], [0.38, chop], [0.52, land], [0.75, guard]], false)
+
+
+## Spinning back kick (Jin): turns the back to the opponent on the lead foot, looks over
+## the shoulder, and drives the rear heel straight back into them (a side-on thrust),
+## then completes the turn. Impact 0.22 s.
+func build_spin_back_kick() -> Animation:
+	var s := rear_sign()
+	var lead_foot := global_origin(guard, "foot_" + lead)
+	var turn := duplicate_pose(guard)
+	move_bone(turn, "pelvis", Vector3(0, -0.03, 0.04))
+	rotate_bone(turn, "pelvis", Vector3.UP, s * 120.0)
+	rotate_bone(turn, "neck_01", Vector3.UP, -s * 70.0) # eyes stay on the target
+	plant_foot(turn, lead, lead_foot)
+	var kick := duplicate_pose(guard)
+	move_bone(kick, "pelvis", Vector3(0, -0.02, 0.06))
+	rotate_bone(kick, "pelvis", Vector3.UP, s * 175.0)
+	rotate_bone(kick, "neck_01", Vector3.UP, -s * 90.0)
+	lean(kick, -18.0, 0.0)
+	plant_foot(kick, lead, lead_foot)
+	var hip := global_origin(kick, "thigh_" + rear)
+	solve_ik(kick, "thigh_" + rear, "calf_" + rear, "foot_" + rear, Vector3(hip.x * 0.3, 1.1, hip.z + 1.0), Vector3(0, 1, 0))
+	point_foot(kick, rear, Vector3(0, -1.0, 0.1)) # heel leads
+	var through := duplicate_pose(guard)
+	rotate_bone(through, "pelvis", Vector3.UP, s * 300.0)
+	plant_foot(through, lead, lead_foot)
+	return make_animation([[0.0, guard], [0.12, turn], [0.22, kick], [0.32, kick], [0.48, through], [0.66, guard]], false)
+
+
+## Tornado kick (Jin): springs up spinning a full turn, the rear leg swinging round in a
+## high crescent as the body rotates; lands back in guard. The fighter rises (MoveData.rise).
+## First impact 0.10 s.
+func build_tornado_kick() -> Animation:
+	var s := rear_sign()
+	var keys := [[0.0, guard]]
+	var air := merge(sample(ual1.get_animation("Jump_Start"), 0.5), guard, arm_bones())
+	var t := 0.06
+	for q in range(5):
+		var pose := duplicate_pose(air)
+		lean(pose, 14.0, 6.0)
+		var hip := global_origin(pose, "thigh_" + rear)
+		solve_ik(pose, "thigh_" + rear, "calf_" + rear, "foot_" + rear, Vector3(hip.x * 0.3, 1.55, hip.z + 0.85), Vector3(0, 1, 0.2))
+		point_foot(pose, rear, Vector3(0, 0.2, 1))
+		swing_rear_arm(pose, 0.8)
+		rotate_bone(pose, "pelvis", Vector3.UP, -s * (q * 90.0 - 60.0))
+		keys.append([t, pose])
+		t += 0.07
+	keys.append([t + 0.12, air])
+	keys.append([t + 0.3, guard])
+	return make_animation(keys, false)
+
+
+## Hurricane kicks (Jin's super): planted on alternate legs, rapid high kicks left, right,
+## left... each snapping out to head height, then ends chambered for the axe-kick finisher.
+## First impact 0.10 s.
+func build_hurricane_kicks() -> Animation:
+	var keys := [[0.0, guard]]
+	var t := 0.1
+	for i in 7:
+		var side := rear if i % 2 == 0 else lead
+		var other := lead if side == rear else rear
+		var pose := duplicate_pose(guard)
+		move_bone(pose, "pelvis", Vector3(0, -0.02, 0.05))
+		hip_turn(pose, 30.0 if side == rear else -30.0)
+		lean(pose, 14.0, 0.0)
+		plant_foot(pose, other, global_origin(guard, "foot_" + other))
+		var hip := global_origin(pose, "thigh_" + side)
+		var target := Vector3(hip.x * 0.4, 1.25 + 0.15 * (i % 3), hip.z + 0.95)
+		solve_ik(pose, "thigh_" + side, "calf_" + side, "foot_" + side, target, Vector3(0, 1, 0.2))
+		point_foot(pose, side, Vector3(0, 0.3, 1))
+		keys.append([t, pose])
+		keys.append([t + 0.04, guard])
+		t += 0.085
+	keys.append([t + 0.08, guard])
+	return make_animation(keys, false)
 
 
 ## Spinning lariat (Valka): both arms flung out straight at shoulder height, fists

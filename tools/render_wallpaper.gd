@@ -1,19 +1,22 @@
 extends SceneTree
-## Renders the key-art wallpaper: the four fighters posed mid-move on the rooftop stage
+## Renders the key-art wallpaper: the five fighters posed mid-move on the rooftop stage
 ## with the skyline behind them. Saves res://assets/ui/wallpaper.png (no text; used by the
 ## loading screen and main menu) and res://assets/ui/splash.png (with the title; used as
-## the boot splash). Run windowed at 1920×1080:
+## the boot splash), plus the itch.io cover (dist/itch/01_cover_630x500.png, a taller
+## framing with the title). Run windowed at 1920×1080:
 ##   godot --path . --resolution 1920x1080 -s res://tools/render_wallpaper.gd
 
 const STAGE := "res://scenes/stages/rooftop.tscn"
 const WALLPAPER := "res://assets/ui/wallpaper.png"
 const SPLASH := "res://assets/ui/splash.png"
+const COVER := "res://dist/itch/01_cover_630x500.png"
 ## [character index, clip, clip time, position, yaw (radians; 0 = facing away from the camera)]
 const POSES := [
-	[0, &"fight/palm_blast", 0.22, Vector3(-2.0, 0, 0.3), PI + 0.8], # Kenji: Ki Blast at Rhea
-	[1, &"fight/high_kick", 0.27, Vector3(-0.45, 0, -0.55), PI - 1.0], # Rhea: head kick at Kenji
-	[3, &"fight/lariat", 0.40, Vector3(0.95, 0, -0.2), PI + 0.3], # Valka: Spinning Lariat, arms out
-	[2, &"fight/victory_flex", 2.0, Vector3(2.15, 0, 0.5), PI + 0.45], # Brutus: double-biceps flex
+	[0, &"fight/palm_blast", 0.22, Vector3(-2.45, 0, 0.3), PI + 0.8], # Kenji: Ki Blast at Rhea
+	[1, &"fight/high_kick", 0.27, Vector3(-0.9, 0, -0.55), PI - 1.0], # Rhea: head kick at Kenji
+	[3, &"fight/lariat", 0.40, Vector3(1.4, 0, -0.2), PI + 0.3], # Valka: Spinning Lariat, arms out
+	[2, &"fight/victory_flex", 2.0, Vector3(2.65, 0, 0.5), PI + 0.45], # Brutus: double-biceps flex
+	[4, &"fight/axe_kick", 0.22, Vector3(0.3, 0, -1.4), PI - 1.15], # Jin: axe kick raised high
 ]
 
 
@@ -95,6 +98,21 @@ func _initialize() -> void:
 	for frame in 3:
 		await process_frame
 	_save(SPLASH)
+
+	# itch.io cover: 630×500 is much taller than 16:9, so pull the camera back to keep all
+	# five fighters in frame and shrink the title to fit the narrower width.
+	root.size = Vector2i(1260, 1000)
+	DisplayServer.window_set_size(root.size)
+	camera.look_at_from_position(Vector3(0.1, 0.9, 6.9), Vector3(0.1, 1.85, 0.0))
+	title.add_theme_font_size_override("font_size", 215)
+	title.add_theme_constant_override("outline_size", 36)
+	title.offset_top = 30
+	for frame in 6:
+		await process_frame
+	var cover := root.get_texture().get_image()
+	cover.resize(630, 500, Image.INTERPOLATE_LANCZOS)
+	cover.save_png(COVER)
+	print("saved ", COVER)
 	quit()
 
 

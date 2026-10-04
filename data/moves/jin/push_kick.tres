@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_gv8ar"]
+
+[resource]
+script = ExtResource("1_gv8ar")
+name = "Push Kick"
+input = "6LK"
+animation = &"fight/front_kick"
+startup = 9
+recovery = 16
+damage = 55
+hitstun = 16
+blockstun = 13
+hitstop = 7
+knockback = Vector2(3.2, 0)
+lunge = 2.5
+hitbox_radius = 0.2
+hitbox_offset = Vector3(0.05, 1, -1.12)
+camera_intensity = 0.1

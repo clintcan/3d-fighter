@@ -68,6 +68,13 @@ const PERSONALITIES := {
 		weights = {grab = 2.5, approach = 2.0, dash = 0.6, jump = 0.5, throw = 1.5, poke = 0.9,
 			wait = 0.6, retreat = 0.3, sidestep = 0.6},
 	},
+	&"jin": {
+		name = "Footsies", blurb = "keeps you at kick range and punishes every step in", preferred_range = 1.9,
+		aggression = 0.0, block = 0.1, punish = 0.15, anti_air = 0.2,
+		rising_anti_air = 0.85, pressure = 0.3, far_punish = 0.6,
+		weights = {poke = 2.4, rush = 1.4, retreat = 1.3, approach = 1.0, dash = 0.6, jump = 0.4,
+			throw = 0.7, string = 0.7, sidestep = 0.8},
+	},
 	&"brutus": {
 		name = "Punisher", blurb = "waits patiently, then punishes every mistake", preferred_range = 1.6,
 		aggression = -0.2, block = 0.15, punish = 0.2, anti_air = 0.0,
@@ -365,7 +372,7 @@ func _react(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 func _punish(fighter: Fighter, dist: float, target_crouching: bool) -> void:
 	var super_move := _special_with(func(m: MoveData) -> bool: return m.super_move)
 	var launcher := _move("2HP")
-	var rush := _special_with(func(m: MoveData) -> bool: return m.travel > 0.0 and m.rise == 0.0 and not m.super_move)
+	var rush := _special_with(func(m: MoveData) -> bool: return (m.travel > 0.0 or m.lunge > 0.0) and m.rise == 0.0 and not m.super_move)
 	if super_move and fighter.meter >= Fighter.MAX_METER and dist <= reach(super_move) and _rng.randf() < 0.8:
 		_queue_special(super_move)
 	elif rush and dist > reach(_move("HK")) and dist <= reach(rush) and _rng.randf() < personality.far_punish:
@@ -403,7 +410,7 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 
 	var options: Array = []
 	var projectile_move := _special_with(func(m: MoveData) -> bool: return m.projectile_speed > 0.0)
-	var rush := _special_with(func(m: MoveData) -> bool: return m.travel > 0.0 and m.rise == 0.0 and not m.super_move)
+	var rush := _special_with(func(m: MoveData) -> bool: return (m.travel > 0.0 or m.lunge > 0.0) and m.rise == 0.0 and not m.super_move)
 	var ground_special := _special_with(func(m: MoveData) -> bool: return m.motion() == "214")
 	var grab := _special_with(func(m: MoveData) -> bool: return m.command_grab and not m.super_move)
 	var can_fireball := projectile_move != null and fighter.projectile == null

@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_vc3bf"]
+
+[resource]
+script = ExtResource("1_vc3bf")
+name = "Spinning Back Kick"
+input = "236K"
+animation = &"fight/spin_back_kick"
+animation_impact = 0.22
+animation_end = 0.66
+startup = 12
+recovery = 20
+damage = 90
+hitstun = 22
+blockstun = 16
+hitstop = 11
+knockback = Vector2(4, 0)
+lunge = 4.5
+chip_damage = 10
+hitbox_radius = 0.27
+hitbox_offset = Vector3(-0.05, 1.06, -0.92)
+camera_intensity = 0.25

@@ -30,7 +30,7 @@ On the character select screen each player picks in turn with
 Light Punch (select) and Heavy Punch (back).
 
 STAGES: after picking fighters, choose the Boxing Ring, the Dojo, the Rooftop,
-the Temple or Random.
+the Temple, the Beach or Random.
 
 ARCADE - choose "Arcade" in the main menu
 Fight your way up a ladder of CPU opponents to the final boss: your own
@@ -65,11 +65,14 @@ SPECIAL MOVES (P = either punch, K = either kick; written facing right)
   Valka   forward, half-circle to back + P .. Valkyrie Slam (command grab:
                                               unblockable, can't be broken)
           forward, down, down-forward + P ... Spinning Lariat (through fireballs)
+  Jin     down, down-forward, forward + K ... Spinning Back Kick
+          forward, down, down-forward + K ... Tornado Kick (invincible anti-air)
+          forward + Heavy Kick .............. Axe Kick (overhead)
 Normal attacks that connect can be cancelled into a special.
 
 SUPER: landing and taking hits fills the SUPER meter (bottom corners).
 When it's full, do down, down-forward, forward twice + P (Kenji, Brutus)
-or + K (Rhea) for the character's super. Valka's super is a command grab. Sidestep dodges fireballs.
+or + K (Rhea, Jin) for the character's super. Valka's super is a command grab. Sidestep dodges fireballs.
 
 Remap any key or gamepad button (triggers too) in Options -> Controls.
 
@@ -90,10 +93,13 @@ All third-party assets are CC0 (public domain), credited with thanks:
   Dimitrios Savva, Rico Cilliers), White Plaster 02 (Rob Tuytel);
   Rooftop skyline: "Shanghai Bund" HDRI by Greg Zaal; Temple: "Belfast Sunset"
   sky (Greg Zaal, Dimitrios Savva, Jarod Guest), Monastery Stone Floor (Amal
-  Kumar), Japanese Stone Wall, Gravel Floor 03, Grey Roof Tiles
+  Kumar), Japanese Stone Wall, Gravel Floor 03, Grey Roof Tiles; Beach:
+  "Kloofendal 48d Partly Cloudy" sky (Greg Zaal, Jarod Guest), Coast Sand
+  01, Thatch Roof Angled (Rob Tuytel, Dimitrios Savva), Palm Tree Bark
+  (Dimitrios Savva, Rico Cilliers), Bamboo Wall (Amal Kumar)
 - Music: "Heavy Battle 2" and "Space Battle" by MintoDog; "Determination" by
   HydroGene (dojo); "Midnight Drive" by congusbongus (rooftop); "Boss_Koto"
-  by G_P (temple)
+  by G_P (temple); "Funky House" by Of Far Different Nature (beach)
   - https://opengameart.org
 - Fighter voices: "Male Grunt/Yelling sounds" by HaelDB, "Female Hurt Grunts &
   Groans" by AuraVoice - https://opengameart.org
