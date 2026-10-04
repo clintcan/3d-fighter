@@ -1,4 +1,4 @@
-3D FIGHTER  -  v0.3.1 (prototype)
+3D FIGHTER  -  v0.4.0 (prototype)
 =================================
 
 A one-on-one 3D fighting game inspired by Street Fighter and Tekken, with a
