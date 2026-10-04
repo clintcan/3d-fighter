@@ -37,7 +37,7 @@ const BASE := {
 ## startup: frames added to every base move (min 3). damage / knockback: multipliers.
 const CHARACTERS := {
 	"kenji": {
-		startup = 0, damage = 1.0, knockback = 1.0, hitstop = 0,
+		startup = 0, damage = 1.05, knockback = 1.0, hitstop = 0,
 		stats = {max_health = 1000, walk_speed = 2.0, back_walk_speed = 1.6, dash_speed = 6.0,
 			jump_velocity = 6.0, weight = 1.0, throw_damage = 120, power_rating = 0.55, speed_rating = 0.55,
 			victory_animations = [&"fight/victory_bow", &"fight/victory_fist_pump"],
@@ -48,7 +48,7 @@ const CHARACTERS := {
 		},
 		specials = {
 			# Fireball: slow enough to walk behind, fast enough to zone with.
-			"ki_blast": ["Ki Blast", "236P", &"fight/palm_blast", 0.20, 0.65, 12, 1, 30, 60, H.MID, 18, 14, 7, Vector2(1.8, 0), Vector3(0, 1.2, -0.6), 0.3,
+			"ki_blast": ["Ki Blast", "236P", &"fight/palm_blast", 0.20, 0.65, 10, 1, 27, 70, H.MID, 18, 14, 7, Vector2(1.8, 0), Vector3(0, 1.2, -0.6), 0.3,
 				{projectile_speed = 6.5, projectile_lifetime = 100, chip_damage = 8, camera_intensity = 0.1}],
 			# Invincible anti-air / reversal; very punishable when it misses.
 			"rising_dragon": ["Rising Dragon", "623P", &"fight/rising_uppercut", 0.09, 0.7, 4, 12, 14, 110, H.MID, 0, 18, 10, Vector2(1.0, 7.0), Vector3(-0.15, 1.55, -0.35), 0.38,
@@ -60,8 +60,8 @@ const CHARACTERS := {
 		},
 	},
 	"rhea": {
-		startup = -1, damage = 0.85, knockback = 0.9, hitstop = -1,
-		stats = {max_health = 900, walk_speed = 2.6, back_walk_speed = 2.0, dash_speed = 7.5,
+		startup = -1, damage = 0.95, knockback = 0.9, hitstop = -1,
+		stats = {max_health = 960, walk_speed = 2.6, back_walk_speed = 2.0, dash_speed = 7.5,
 			jump_velocity = 6.4, weight = 0.85, throw_damage = 100, power_rating = 0.35, speed_rating = 0.9,
 			victory_animations = [&"fight/victory_point", &"fight/victory_fist_pump"],
 			alt_body_albedo = "res://assets/characters/base/T_Superhero_Female_Light_BaseColor.png", alt_hair_color = Color(0.07, 0.07, 0.1)},
@@ -71,7 +71,7 @@ const CHARACTERS := {
 		},
 		specials = {
 			# Feet-first slide along the canvas: low, slides under highs, knocks down.
-			"gale_slide": ["Gale Slide", "236K", &"fight/slide_kick", 0.15, 1.25, 8, 16, 18, 70, H.LOW, 0, 14, 8, Vector2(1.5, 0), Vector3(-0.07, 0.15, -0.85), 0.28,
+			"gale_slide": ["Gale Slide", "236K", &"fight/slide_kick", 0.15, 1.25, 8, 16, 14, 70, H.LOW, 0, 14, 8, Vector2(1.5, 0), Vector3(-0.07, 0.15, -0.85), 0.28,
 				{knockdown = true, travel = 5.5, low_profile = true, chip_damage = 8, camera_intensity = 0.2}],
 			"crescent_rise": ["Crescent Rise", "623K", &"fight/rising_kick", 0.09, 0.7, 4, 10, 14, 85, H.MID, 0, 16, 9, Vector2(1.0, 7.0), Vector3(-0.04, 1.75, -0.5), 0.36,
 				{launches = true, rise = 7.5, travel = 1.0, invuln_frames = 6, landing_recovery = 14, chip_damage = 10, camera_intensity = 0.3}],
@@ -82,8 +82,8 @@ const CHARACTERS := {
 		},
 	},
 	"brutus": {
-		startup = 2, damage = 1.3, knockback = 1.25, hitstop = 2,
-		stats = {max_health = 1150, walk_speed = 1.5, back_walk_speed = 1.2, dash_speed = 4.5,
+		startup = 2, damage = 1.25, knockback = 1.25, hitstop = 2,
+		stats = {max_health = 1100, walk_speed = 1.5, back_walk_speed = 1.2, dash_speed = 4.5,
 			jump_velocity = 5.6, weight = 1.3, throw_damage = 160, power_rating = 0.95, speed_rating = 0.25,
 			victory_animations = [&"fight/victory_flex", &"fight/victory_fist_pump"],
 			alt_body_albedo = "res://assets/characters/base/T_Superhero_Male_Light.png", alt_hair_color = Color(0.42, 0.42, 0.44)},
@@ -113,7 +113,7 @@ const CHARACTERS := {
 			hair_scenes = ["res://assets/characters/hair/Hair_Long.gltf", "res://assets/characters/hair/Eyebrows_Female.gltf"],
 			body_albedo = "res://assets/characters/base/T_Superhero_Female_Light_BaseColor.png",
 			model_scale = 1.06, hair_color = Color(0.93, 0.86, 0.68), placeholder_color = Color(0.85, 0.75, 0.3)},
-		stats = {max_health = 1100, walk_speed = 1.8, back_walk_speed = 1.4, dash_speed = 5.0,
+		stats = {max_health = 1050, walk_speed = 1.8, back_walk_speed = 1.4, dash_speed = 5.0,
 			jump_velocity = 5.8, weight = 1.15, throw_damage = 150, power_rating = 0.8, speed_rating = 0.4,
 			victory_animations = [&"fight/victory_flex", &"fight/victory_fist_pump"],
 			alt_body_albedo = "res://assets/characters/base/T_Superhero_Female_Dark_BaseColor.png", alt_hair_color = Color(0.62, 0.12, 0.06)},
@@ -123,13 +123,13 @@ const CHARACTERS := {
 		},
 		specials = {
 			# Command grab: unblockable and untechable, but a whiff is very punishable.
-			"valkyrie_slam": ["Valkyrie Slam", "63214P", &"fight/throw", 0.08, 0.85, 5, 3, 30, 200, H.MID, 0, 0, 12, Vector2.ZERO, Vector3(0, 1.0, -0.6), 0.3,
-				{command_grab = true, grab_range = 1.15, camera_intensity = 0.4}],
+			"valkyrie_slam": ["Valkyrie Slam", "63214P", &"fight/throw", 0.08, 0.85, 8, 3, 36, 150, H.MID, 0, 0, 12, Vector2.ZERO, Vector3(0, 1.0, -0.6), 0.3,
+				{command_grab = true, grab_range = 0.95, camera_intensity = 0.4}],
 			# Spins through fireballs; three hits, the last one pops the opponent up.
 			"spinning_lariat": ["Spinning Lariat", "623P", &"fight/lariat", 0.12, 0.93, 7, 32, 16, 45, H.MID, 18, 14, 6, Vector2(2.0, 4.0), Vector3(0, 1.35, -0.35), 0.6,
 				{hits = 3, hit_interval = 8, travel = 1.2, projectile_immune = true, launches = true, chip_damage = 6, camera_intensity = 0.2}],
-			"thunder_valkyrie": ["Thunder Valkyrie", "236236P", &"fight/throw", 0.08, 0.85, 4, 4, 34, 330, H.MID, 0, 0, 16, Vector2.ZERO, Vector3(0, 1.0, -0.6), 0.3,
-				{super_move = true, command_grab = true, grab_range = 1.4, invuln_frames = 6, camera_intensity = 0.6, impact_fx = &"shockwave"}],
+			"thunder_valkyrie": ["Thunder Valkyrie", "236236P", &"fight/throw", 0.08, 0.85, 7, 4, 34, 240, H.MID, 0, 0, 16, Vector2.ZERO, Vector3(0, 1.0, -0.6), 0.3,
+				{super_move = true, command_grab = true, grab_range = 1.15, invuln_frames = 8, camera_intensity = 0.6, impact_fx = &"shockwave"}],
 		},
 	},
 }

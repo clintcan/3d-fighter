@@ -12,7 +12,6 @@ animation_end = 0.4
 startup = 6
 active = 8
 recovery = 6
-damage = 52
 hit_level = 3
 hitstun = 14
 hitstop = 7

@@ -9,6 +9,7 @@ input = "LK"
 animation = &"fight/front_kick"
 startup = 7
 recovery = 14
+damage = 53
 hitstun = 17
 blockstun = 12
 knockback = Vector2(1.8, 0)

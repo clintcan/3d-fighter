@@ -46,6 +46,9 @@ func approach(target: float) -> void:
 
 func state_name(f: Fighter) -> String: return Fighter.State.keys()[f.state]
 
+## A move's damage from the character's data, so balance changes don't break the tests.
+func dmg(f: Fighter, input: String) -> int: return f._move_for_input(input).damage
+
 ## Inputs a motion (numpad digits, one tick each) with `button` on the last direction.
 func motion(digits: String, button: int) -> void:
 	for i in digits.length():
@@ -108,7 +111,7 @@ func milestone4_tests() -> void:
 	ctl2.buttons = InputBuffer.HK; step(3)
 	var hp := p2.health
 	press(InputBuffer.LP); step(6)
-	check("counter hit: +25% damage", p2.health == hp - 38, "hp %d -> %d" % [hp, p2.health])
+	check("counter hit: +25% damage", p2.health == hp - roundi(dmg(p1, "LP") * Fighter.COUNTER_DAMAGE_SCALE), "hp %d -> %d" % [hp, p2.health])
 	p2.controller = dummy; ctl2.dir = 5; step(40)
 
 	# Combo scaling: second hit of jab -> straight does 90%
@@ -116,7 +119,7 @@ func milestone4_tests() -> void:
 	hp = p2.health
 	press(InputBuffer.LP); step(5)
 	press(InputBuffer.HP); step(20)
-	check("combo scaling (30 + 80*0.9)", p2.health == hp - 102, "hp %d -> %d" % [hp, p2.health])
+	check("combo scaling (jab + straight at 90%)", p2.health == hp - dmg(p1, "LP") - roundi(dmg(p1, "HP") * 0.9), "hp %d -> %d" % [hp, p2.health])
 
 	# Sweep knocks down
 	reset(D.STAND); approach(1.0)
@@ -220,13 +223,13 @@ func _initialize() -> void:
 	reset(D.STAND); approach(1.1)
 	var hp := p2.health
 	press(InputBuffer.LP); step(6)
-	check("jab hits", p2.health == hp - 30, "hp %d -> %d, p2 %s" % [hp, p2.health, state_name(p2)])
+	check("jab hits", p2.health == hp - dmg(p1, "LP"), "hp %d -> %d, p2 %s" % [hp, p2.health, state_name(p2)])
 
 	# Chain jab -> straight via cancel
 	reset(D.STAND); approach(1.0)
 	press(InputBuffer.LP); step(5)
 	press(InputBuffer.HP); step(20)
-	check("jab -> straight cancel combo", p2.combo_hits == 2 or p2.health == p2.data.max_health - 110, "combo %d, hp %d" % [p2.combo_hits, p2.health])
+	check("jab -> straight cancel combo", p2.combo_hits == 2 or p2.health == p2.data.max_health - dmg(p1, "LP") - dmg(p1, "HP"), "combo %d, hp %d" % [p2.combo_hits, p2.health])
 
 	# Standing block stops a high
 	reset(D.STAND_BLOCK); approach(1.1)
@@ -239,7 +242,7 @@ func _initialize() -> void:
 	reset(D.STAND_BLOCK); approach(1.1)
 	hp = p2.health
 	press(InputBuffer.LK, 2); step(10)
-	check("low kick (low) beats stand block", p2.health == hp - 35, "hp %d -> %d" % [hp, p2.health])
+	check("low kick (low) beats stand block", p2.health == hp - dmg(p1, "2LK"), "hp %d -> %d" % [hp, p2.health])
 
 	# Crouching dodges highs
 	reset(D.CROUCH); approach(1.1)
@@ -596,7 +599,7 @@ func specials_tests() -> void:
 	check("Ki Blast fires a projectile", p1.projectile != null)
 	var hp := p2.health
 	wait_until(func() -> bool: return p1.projectile == null, 90)
-	check("projectile hits for 60", p2.health == hp - 60 and p2.state == Fighter.State.HITSTUN, "hp %d -> %d" % [hp, p2.health])
+	check("projectile hits for its damage", p2.health == hp - dmg(p1, "236P") and p2.state == Fighter.State.HITSTUN, "hp %d -> %d" % [hp, p2.health])
 
 	# One projectile at a time: from long range the first is still flying when P1 recovers.
 	reset(D.STAND)
@@ -613,7 +616,8 @@ func specials_tests() -> void:
 	motion("236", InputBuffer.HP)
 	wait_until(func() -> bool: return p1.projectile == null and p1.state != Fighter.State.ATTACK, 120)
 	check("blocked projectile deals chip damage", p2.health == p2.data.max_health - 8, "hp %d" % p2.health)
-	check("meter: special start + blocked hit, defender gains too", p1.meter == Fighter.METER_PER_SPECIAL + 30 and p2.meter == 5, "p1 %d p2 %d" % [p1.meter, p2.meter])
+	check("meter: special start + blocked hit, defender gains too", p1.meter == Fighter.METER_PER_SPECIAL + roundi(dmg(p1, "236P") * Fighter.METER_PER_DAMAGE_BLOCKED)
+		and p2.meter == roundi(p1._move_for_input("236P").chip_damage * Fighter.METER_PER_DAMAGE_TAKEN), "p1 %d p2 %d" % [p1.meter, p2.meter])
 
 	# Cancel a jab into a special during its hitstop.
 	reset(D.STAND); approach(1.0)
@@ -802,7 +806,7 @@ func stage_tests() -> void:
 	reset(DummyController.Mode.STAND); approach(1.1)
 	var hp := p2.health
 	press(InputBuffer.LP); step(6)
-	check("Dojo: combat works the same", p2.health == hp - 30, "hp %d -> %d" % [hp, p2.health])
+	check("Dojo: combat works the same", p2.health == hp - dmg(p1, "LP"), "hp %d -> %d" % [hp, p2.health])
 	m.stage.update_camera_occlusion(Vector3(0, 2, 7.0))
 	var front: Array = get_nodes_in_group(&"ring_side_1")
 	check("Dojo: students between the camera and the fight hide", not front.is_empty() and front.all(func(n: Node3D) -> bool: return not n.visible))
@@ -823,7 +827,7 @@ func stage_tests() -> void:
 	reset(DummyController.Mode.STAND); approach(1.1)
 	hp = p2.health
 	press(InputBuffer.LP); step(6)
-	check("Rooftop: loads and combat works", m.stage.name == "Rooftop" and p2.health == hp - 30, "hp %d -> %d" % [hp, p2.health])
+	check("Rooftop: loads and combat works", m.stage.name == "Rooftop" and p2.health == hp - dmg(p1, "LP"), "hp %d -> %d" % [hp, p2.health])
 	gs.stage_path = gs.DEFAULT_STAGE
 
 
@@ -1019,22 +1023,22 @@ func valka_tests() -> void:
 	check("Valka: Grappler CPU personality", cpu.personality_name() == "Grappler")
 
 	# Command grab: unblockable.
-	reset(DummyController.Mode.STAND_BLOCK); p1.position.x = -0.5; p2.position.x = 0.5
+	reset(DummyController.Mode.STAND_BLOCK); p1.position.x = -0.4; p2.position.x = 0.4
 	var hp := p2.health
 	motion("63214", InputBuffer.HP)
 	wait_until(func() -> bool: return p2.state == Fighter.State.THROWN, 12)
 	check("Valka Slam grabs a blocking opponent", p2.state == Fighter.State.THROWN and p1.state == Fighter.State.THROW, "%s / %s" % [state_name(p1), state_name(p2)])
 	wait_until(func() -> bool: return p2.state == Fighter.State.AIR_HIT, 60)
-	check("Valka Slam deals its damage and slams", p2.health == hp - 200 and p2.state == Fighter.State.AIR_HIT, "hp %d -> %d" % [hp, p2.health])
+	check("Valka Slam deals its damage and slams", p2.health == hp - dmg(p1, "63214P") and p2.state == Fighter.State.AIR_HIT, "hp %d -> %d" % [hp, p2.health])
 	step(150)
 
 	# ...and can't be teched.
-	reset(DummyController.Mode.STAND); p1.position.x = -0.5; p2.position.x = 0.5
+	reset(DummyController.Mode.STAND); p1.position.x = -0.4; p2.position.x = 0.4
 	p2.controller = Masher.new()
 	hp = p2.health
 	motion("63214", InputBuffer.HP)
 	step(50)
-	check("Valka Slam can't be teched", p2.health == hp - 200 and p2.state != Fighter.State.TECH, "hp %d, %s" % [p2.health, state_name(p2)])
+	check("Valka Slam can't be teched", p2.health == hp - dmg(p1, "63214P") and p2.state != Fighter.State.TECH, "hp %d, %s" % [p2.health, state_name(p2)])
 	step(150)
 	# Control: the same masher does break a normal throw.
 	reset(DummyController.Mode.STAND); p1.position.x = -0.4; p2.position.x = 0.4
@@ -1069,12 +1073,12 @@ func valka_tests() -> void:
 	step(90)
 
 	# Super command grab.
-	reset(DummyController.Mode.STAND_BLOCK); p1.position.x = -0.6; p2.position.x = 0.6
+	reset(DummyController.Mode.STAND_BLOCK); p1.position.x = -0.5; p2.position.x = 0.5
 	p1.add_meter(Fighter.MAX_METER)
 	hp = p2.health
 	motion("236236", InputBuffer.HP)
 	step(m.SUPER_FREEZE_TICKS + 60)
-	check("Thunder Valkyrie: super grab through a block", p2.health == hp - 330 and p1.meter == 0, "hp %d -> %d" % [hp, p2.health])
+	check("Thunder Valkyrie: super grab through a block", p2.health == hp - dmg(p1, "236236P") and p1.meter == 0, "hp %d -> %d" % [hp, p2.health])
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 
 
@@ -1093,7 +1097,7 @@ func temple_tests() -> void:
 	var hp := p2.health
 	press(InputBuffer.LP); step(6)
 	check("Temple: loads with the standard bounds and combat works", m.stage.name == "Temple" and m.stage.bounds_half_extent == 3.6
-		and p2.health == hp - 30, "hp %d -> %d" % [hp, p2.health])
+		and p2.health == hp - dmg(p1, "LP"), "hp %d -> %d" % [hp, p2.health])
 	gs.stage_path = gs.DEFAULT_STAGE
 
 
