@@ -111,6 +111,7 @@ func _initialize() -> void:
 		await process_frame
 	var cover := root.get_texture().get_image()
 	cover.resize(630, 500, Image.INTERPOLATE_LANCZOS)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(COVER.get_base_dir())) # the kit is git-ignored
 	cover.save_png(COVER)
 	print("saved ", COVER)
 	quit()

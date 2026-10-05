@@ -128,13 +128,16 @@ def bump_version(new: str) -> None:
             (r'application/version="[^"]+"', f'application/version="{new}"'),
             (r'3DFighter-v[\d.]+-macos\.zip', f"3DFighter-v{new}-macos.zip"),
         ],
-        # Upload file names in the itch kit (the devlog history keeps its own versions).
+        # Upload file names in the itch kit (local only, git-ignored; the devlog history keeps its own versions).
         "dist/itch/page.md": [(r"`3DFighter-v[\d.]+-(windows\.zip|macos\.zip|linux\.tar\.gz)`", f"`3DFighter-v{new}-\\1`")],
     }
     for readme in ["dist/README.txt", "dist/README-macOS.txt", "dist/README-Linux.txt"]:
         edits[readme] = [(r"^(3D FIGHTER  -  )v[\d.]+", f"\\1v{new}")]
     for path, rules in edits.items():
         full = os.path.join(ROOT, path)
+        if path.startswith("dist/itch/") and not os.path.exists(full):
+            print(f"  skipped {path} (no local itch kit)")
+            continue
         text = open(full, encoding="utf-8").read()
         for pattern, replacement in rules:
             text, count = re.subn(pattern, replacement, text, flags=re.MULTILINE)
