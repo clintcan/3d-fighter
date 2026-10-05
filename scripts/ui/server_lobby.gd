@@ -1,6 +1,10 @@
 extends Control
 ## Internet lobby: connect to a lobby server, browse its rooms, open one, join one (by the
-## list or by its code) or watch a match in one. When the server matches two players the
+## list or by its code) or watch a match in one.
+## The server address comes filled in: the official one from SERVER_LIST_URL (a file in the
+## game's repository, so the server can move without a game update), else DEFAULT_SERVER.
+## Players can type their own; only an address that differs from the official one is saved,
+## so everyone else follows the list when the server moves. When the server matches two players the
 ## Net autoload connects them (directly or through the server's relay) and both go on to
 ## character select, as on a LAN. Spectators go straight to the fight they watch.
 
@@ -12,6 +16,8 @@ const DIM := Color(0.72, 0.75, 0.82)
 const BAD := Color(1.0, 0.55, 0.45)
 const LIST_ROWS := 6
 const REFRESH_MS := 3000
+const DEFAULT_SERVER := "wss://104-248-147-130.sslip.io/v1/ws"
+const SERVER_LIST_URL := "https://raw.githubusercontent.com/clintcan/3d-fighter/main/online/servers.json"
 
 var _name_edit: LineEdit
 var _url_edit: LineEdit
@@ -34,6 +40,9 @@ var _accept_button: Button
 var _request_id := ""
 var _last_refresh := -REFRESH_MS
 var _connecting := false
+## The official server address (DEFAULT_SERVER until the list says otherwise).
+var _official := DEFAULT_SERVER
+var _list_request: HTTPRequest
 
 
 func _ready() -> void:
@@ -46,6 +55,7 @@ func _ready() -> void:
 	Net.connect_failed.connect(_on_peer_failed)
 	Net.spectate_closed.connect(_on_spectate_closed)
 	NetPeer.prepare_host_key()
+	_fetch_server_list()
 	if Net.last_reason != "":
 		_set_status(Net.last_reason, BAD)
 		Net.last_reason = ""
@@ -90,7 +100,7 @@ func _toggle_connection() -> void:
 	if not url.contains("/v1/ws"):
 		url = url.trim_suffix("/") + "/v1/ws"
 	_url_edit.text = url
-	Settings.server_url = url
+	Settings.server_url = url if url != _official else "" # the official one follows the list
 	Settings.player_name = _name_edit.text.strip_edges().left(24)
 	Settings.relay_only = _relay_check.button_pressed
 	Settings.save_settings()
@@ -419,7 +429,7 @@ func _build() -> void:
 
 	var url_row := _row(column)
 	url_row.add_child(_label("Server", 24, Color.WHITE, 170))
-	_url_edit = _line_edit(Settings.server_url, "ws://lobby.example.com:8080/v1/ws")
+	_url_edit = _line_edit(Settings.server_url if Settings.server_url != "" else DEFAULT_SERVER, "wss://lobby.example.com/v1/ws")
 	_url_edit.text_submitted.connect(func(_t: String) -> void: _toggle_connection())
 	url_row.add_child(_url_edit)
 	_connect_button = _button("Connect", 24)
@@ -503,6 +513,36 @@ func _build() -> void:
 	decline.custom_minimum_size.x = 240
 	decline.pressed.connect(_answer.bind(false))
 	_join_prompt.add_child(decline)
+
+
+## Asks the game's repository for the official server address (it can move).
+func _fetch_server_list() -> void:
+	_list_request = HTTPRequest.new()
+	_list_request.timeout = 6.0
+	add_child(_list_request)
+	_list_request.request_completed.connect(func(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+		var url := official_server(body.get_string_from_utf8()) if result == HTTPRequest.RESULT_SUCCESS and code == 200 else ""
+		if url == "":
+			return
+		var following := _url_edit.text.strip_edges() == _official
+		_official = url
+		if following and not Net.is_server_open() and not _connecting:
+			_url_edit.text = url)
+	_list_request.request(SERVER_LIST_URL)
+
+
+## The first usable server address in a servers.json ({"servers": [{"name", "url"}]}),
+## or "" if there's none.
+static func official_server(json_text: String) -> String:
+	var parsed: Variant = JSON.parse_string(json_text)
+	if not parsed is Dictionary or not parsed.get("servers") is Array:
+		return ""
+	for entry: Variant in parsed.servers:
+		if entry is Dictionary:
+			var url := str(entry.get("url", "")).strip_edges()
+			if (url.begins_with("wss://") or url.begins_with("ws://")) and url.length() <= 200 and not url.contains(" "):
+				return url
+	return ""
 
 
 func _set_status(text: String, color: Color) -> void:

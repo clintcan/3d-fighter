@@ -1,4 +1,4 @@
-3D FIGHTER  -  v0.4.1 (prototype)  -  macOS
+3D FIGHTER  -  v0.5.0 (prototype)  -  macOS
 ===========================================
 
 A one-on-one 3D fighting game inspired by Street Fighter and Tekken, with a
@@ -50,8 +50,15 @@ with rollback netcode (the game hides network lag by predicting your
 opponent's input and correcting it instantly when it arrives).
 - Same network: the host's address is shown on the Host screen
   (e.g. 192.168.1.20).
-- Over the internet: the host forwards UDP port 7777 on their router and
-  shares their public IP address.
+- Over the internet, the easy way: Online -> Internet Lobby. Press Connect
+  (the server address is filled in), then Open a Room, or pick a room from
+  the list, or type a friend's 6-letter room code. No port forwarding: the
+  game connects you directly when it can and through the server's relay
+  when it can't. Tick "Hide my IP address" to always use the relay.
+  Rooms that allow spectators have a Watch button: spectators see the match
+  live with a 3-second delay and can send reactions with keys 1-6.
+- Over the internet without the lobby: the host forwards UDP port 7777 on
+  their router and shares their public IP address.
 - Allow the game through your firewall if asked.
 - Both players need the same version of the game.
 - The connection is encrypted. Both screens show a 6-digit security code

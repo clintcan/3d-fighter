@@ -2606,6 +2606,14 @@ func server_tests() -> void:
 	lobby_server.tcp.stop()
 	check("server error codes read as sentences", LobbyClient.error_text({code = "wrong_password"}) == "Wrong password"
 		and LobbyClient.error_text({code = "something_new", message = "x"}) == "x")
+	var lobby_screen: GDScript = load("res://scripts/ui/server_lobby.gd")
+	check("the official server address comes from servers.json", lobby_screen.official_server(
+		'{"version": 1, "servers": [{"name": "Asia", "url": "wss://lobby.example.com/v1/ws"}]}') == "wss://lobby.example.com/v1/ws"
+		and lobby_screen.official_server('{"servers": [{"url": "http://evil"}, {"url": "ws://ok/v1/ws"}]}') == "ws://ok/v1/ws"
+		and lobby_screen.official_server("not json") == "" and lobby_screen.official_server('{"servers": 5}') == "")
+	var shipped := FileAccess.get_file_as_string("res://online/servers.json")
+	check("online/servers.json in the repository names the default server", lobby_screen.official_server(shipped) == lobby_screen.DEFAULT_SERVER,
+		lobby_screen.official_server(shipped))
 	check("room codes are typed in any case", net._room_key(" kx7q2m ") == "KX7Q2M" and net._room_key("r_7f3a9c2e") == "r_7f3a9c2e")
 	gs.mode = gs.Mode.VS_CPU
 	await process_frame

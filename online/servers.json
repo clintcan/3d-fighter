@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "servers": [
+    {"name": "Asia (Singapore)", "url": "wss://104-248-147-130.sslip.io/v1/ws"}
+  ]
+}
