@@ -345,6 +345,7 @@ func _initialize() -> void:
 	await beach_tests()
 	await scores_credits_tests()
 	await controls_tests()
+	await outfit_tests()
 	await rollback_tests()
 	await net_tests()
 
@@ -1284,6 +1285,83 @@ func jin_tests() -> void:
 	wait_until(func() -> bool: return p2.state == Fighter.State.AIR_HIT, 30)
 	check("Jin: Tornado Kick launches", p2.state == Fighter.State.AIR_HIT, state_name(p2))
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+
+
+## Generated clothing (tools/build_outfits.gd): every fighter is dressed, the outfit is
+## a valid skinned mesh on the body's skin, the covered skin is removed, and mirror
+## matches get the alternate colours.
+func outfit_tests() -> void:
+	var gs = root.get_node("GameState")
+	for character: CharacterData in gs.roster:
+		var id := String(character.id)
+		var outfit := character.outfit_mesh as ArrayMesh
+		check("%s has an outfit" % id, outfit != null and character.outfit_body_mesh != null and outfit.get_surface_count() >= 2)
+		if outfit == null:
+			continue
+		var names := []
+		for surface in outfit.get_surface_count():
+			names.append(outfit.surface_get_name(surface))
+		check("%s outfit surfaces are colour slots with colours and fabrics" % id,
+			names.all(func(n): return n in ["main", "trim", "accent"]) and character.outfit_colors.size() == 3
+			and character.alt_outfit_colors.size() == 3 and character.outfit_fabrics.size() == 3
+			and character.alt_outfit_colors != character.outfit_colors, "%s" % [names])
+		var base_triangles := 0
+		var base_scene := character.model_scene.instantiate()
+		var bind_count := 0
+		for mi: MeshInstance3D in base_scene.find_children("*", "MeshInstance3D", true, false):
+			var material := mi.mesh.surface_get_material(0)
+			if material and material.resource_name.begins_with("MI_Superhero"):
+				base_triangles = mi.mesh.surface_get_array_index_len(0) / 3
+				bind_count = mi.skin.get_bind_count()
+		base_scene.free()
+		var body_triangles := (character.outfit_body_mesh as ArrayMesh).surface_get_array_index_len(0) / 3
+		check("%s: the skin under the clothes is removed" % id, body_triangles < base_triangles and body_triangles > base_triangles / 3,
+			"%d of %d triangles kept" % [body_triangles, base_triangles])
+		var weights_ok := true
+		for surface in outfit.get_surface_count():
+			var arrays := outfit.surface_get_arrays(surface)
+			var bones: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+			var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+			for v in weights.size() / 4:
+				var total := weights[v * 4] + weights[v * 4 + 1] + weights[v * 4 + 2] + weights[v * 4 + 3]
+				if absf(total - 1.0) > 0.01:
+					weights_ok = false
+				for k in 4:
+					if bones[v * 4 + k] < 0 or bones[v * 4 + k] >= bind_count:
+						weights_ok = false
+		check("%s outfit vertices have valid bone weights" % id, weights_ok)
+
+	# FighterModel dresses the fighter on the body's skin, with alt colours for mirrors.
+	var kenji: CharacterData = gs.roster[0]
+	for alt in [false, true]:
+		var model := FighterModel.new()
+		root.add_child(model)
+		model.build(kenji, alt)
+		var dressed := model.skeleton.get_node_or_null("Outfit") as MeshInstance3D
+		var body: MeshInstance3D
+		for mi: MeshInstance3D in model.skeleton.find_children("*", "MeshInstance3D", true, false):
+			if mi.mesh == kenji.outfit_body_mesh:
+				body = mi
+		var colors := kenji.alt_outfit_colors if alt else kenji.outfit_colors
+		var expected: Color = colors[0]
+		var brightest := maxf(expected.r, maxf(expected.g, expected.b))
+		if brightest > FighterModel.MAX_FABRIC_ALBEDO:
+			expected = Color(expected * (FighterModel.MAX_FABRIC_ALBEDO / brightest), 1.0)
+		var material := dressed.get_surface_override_material(0) as StandardMaterial3D if dressed else null
+		check("FighterModel dresses Kenji%s on the body's skin" % (" (alt)" if alt else ""),
+			dressed != null and body != null and dressed.skin == body.skin and dressed.get_node_or_null(dressed.skeleton) == model.skeleton
+			and material != null and material.albedo_color.is_equal_approx(expected) and material.normal_texture != null)
+		var max_specular := 0.0
+		var max_albedo := 0.0
+		for surface in dressed.mesh.get_surface_count():
+			var cloth := dressed.get_surface_override_material(surface) as StandardMaterial3D
+			max_specular = maxf(max_specular, cloth.metallic_specular)
+			max_albedo = maxf(max_albedo, maxf(cloth.albedo_color.r, maxf(cloth.albedo_color.g, cloth.albedo_color.b)))
+		check("Kenji%s's outfit is matte (low specular, no blown-out whites)" % (" (alt)" if alt else ""),
+			max_specular <= 0.35 and max_albedo <= FighterModel.MAX_FABRIC_ALBEDO + 0.001, "specular %.2f, albedo %.2f" % [max_specular, max_albedo])
+		model.queue_free()
+	await process_frame
+
 
 
 # --- Rollback netcode -------------------------------------------------------------

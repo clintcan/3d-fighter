@@ -25,6 +25,8 @@
 [ext_resource type="Resource" path="res://data/moves/rhea/crescent_rise.tres" id="21_loo3t"]
 [ext_resource type="Resource" path="res://data/moves/rhea/tempest_kicks.tres" id="22_u5vpa"]
 [ext_resource type="Resource" path="res://data/moves/rhea/tempest_finish.tres" id="23_v5xfu"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/rhea_body.res" id="24_u5vpa"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/rhea_outfit.res" id="25_v5xfu"]
 
 [resource]
 script = ExtResource("1_char")
@@ -39,6 +41,11 @@ hair_scenes = Array[PackedScene]([ExtResource("1_is8na"), ExtResource("2_028q6")
 hair_color = Color(0.5, 0.16, 0.08, 1)
 alt_body_albedo = ExtResource("1_v8o8g")
 alt_hair_color = Color(0.07, 0.07, 0.1, 1)
+outfit_mesh = ExtResource("25_v5xfu")
+outfit_body_mesh = ExtResource("24_u5vpa")
+outfit_colors = PackedColorArray(0.8, 0.12, 0.16, 1, 0.08, 0.08, 0.1, 1, 0.8, 0.79, 0.75, 1)
+outfit_fabrics = Array[StringName]([&"stretch", &"stretch", &"cotton"])
+alt_outfit_colors = PackedColorArray(0.12, 0.32, 0.78, 1, 0.8, 0.8, 0.82, 1, 0.15, 0.15, 0.18, 1)
 victory_animations = Array[StringName]([&"fight/victory_point", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.9, 0.25, 0.4, 1)
 max_health = 960

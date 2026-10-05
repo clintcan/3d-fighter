@@ -25,6 +25,8 @@
 [ext_resource type="Resource" path="res://data/moves/brutus/earthquake.tres" id="21_gxjex"]
 [ext_resource type="Resource" path="res://data/moves/brutus/titan_rush.tres" id="22_utyi1"]
 [ext_resource type="Resource" path="res://data/moves/brutus/titan_finish.tres" id="23_t86aj"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/brutus_body.res" id="24_utyi1"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/brutus_outfit.res" id="25_t86aj"]
 
 [resource]
 script = ExtResource("1_char")
@@ -40,6 +42,11 @@ model_scale = 1.08
 hair_color = Color(0.22, 0.13, 0.07, 1)
 alt_body_albedo = ExtResource("1_063lg")
 alt_hair_color = Color(0.42, 0.42, 0.44, 1)
+outfit_mesh = ExtResource("25_t86aj")
+outfit_body_mesh = ExtResource("24_utyi1")
+outfit_colors = PackedColorArray(0.34, 0.37, 0.2, 1, 0.15, 0.18, 0.26, 1, 0.08, 0.06, 0.05, 1)
+outfit_fabrics = Array[StringName]([&"cotton", &"denim", &"leather"])
+alt_outfit_colors = PackedColorArray(0.52, 0.52, 0.54, 1, 0.22, 0.32, 0.52, 1, 0.27, 0.16, 0.08, 1)
 victory_animations = Array[StringName]([&"fight/victory_flex", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.95, 0.6, 0.15, 1)
 max_health = 1100

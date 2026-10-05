@@ -25,6 +25,8 @@
 [ext_resource type="Resource" path="res://data/moves/kenji/rising_dragon.tres" id="21_hp42r"]
 [ext_resource type="Resource" path="res://data/moves/kenji/dragon_barrage.tres" id="22_26eyd"]
 [ext_resource type="Resource" path="res://data/moves/kenji/dragon_finish.tres" id="23_xn3v5"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/kenji_body.res" id="24_26eyd"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/kenji_outfit.res" id="25_xn3v5"]
 
 [resource]
 script = ExtResource("1_char")
@@ -39,6 +41,11 @@ body_albedo = ExtResource("1_8alh3")
 hair_color = Color(0.09, 0.07, 0.06, 1)
 alt_body_albedo = ExtResource("1_bthns")
 alt_hair_color = Color(0.55, 0.38, 0.18, 1)
+outfit_mesh = ExtResource("25_xn3v5")
+outfit_body_mesh = ExtResource("24_26eyd")
+outfit_colors = PackedColorArray(0.8, 0.79, 0.76, 1, 0.07, 0.07, 0.08, 1, 0.78, 0.07, 0.07, 1)
+outfit_fabrics = Array[StringName]([&"cotton", &"cotton", &"cotton"])
+alt_outfit_colors = PackedColorArray(0.15, 0.16, 0.2, 1, 0.42, 0.24, 0.1, 1, 0.8, 0.8, 0.78, 1)
 victory_animations = Array[StringName]([&"fight/victory_bow", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.2, 0.45, 0.9, 1)
 power_rating = 0.55

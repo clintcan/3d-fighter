@@ -24,8 +24,10 @@
 [ext_resource type="Resource" path="res://data/moves/jin/tornado_kick.tres" id="22_qgigs"]
 [ext_resource type="Resource" path="res://data/moves/jin/hurricane_kicks.tres" id="23_4ixq8"]
 [ext_resource type="Resource" path="res://data/moves/jin/hurricane_finish.tres" id="24_gpeku"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/jin_body.res" id="25_6ny7v"]
 [ext_resource type="Texture2D" path="res://assets/ui/portraits/jin.png" id="25_iebd8"]
 [ext_resource type="Script" path="res://scripts/character_data.gd" id="26_2anx2"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/jin_outfit.res" id="26_700ar"]
 
 [resource]
 script = ExtResource("26_2anx2")
@@ -42,6 +44,11 @@ model_scale = 1.02
 hair_color = Color(0.05, 0.04, 0.04, 1)
 alt_body_albedo = ExtResource("1_5wv7d")
 alt_hair_color = Color(0.5, 0.33, 0.15, 1)
+outfit_mesh = ExtResource("26_700ar")
+outfit_body_mesh = ExtResource("25_6ny7v")
+outfit_colors = PackedColorArray(0.8, 0.8, 0.8, 1, 0.06, 0.06, 0.07, 1, 0, 0, 0, 1)
+outfit_fabrics = Array[StringName]([&"cotton", &"cotton", &"cotton"])
+alt_outfit_colors = PackedColorArray(0.1, 0.1, 0.11, 1, 0.72, 0.1, 0.1, 1, 0, 0, 0, 1)
 victory_animations = Array[StringName]([&"fight/victory_point", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.2, 0.7, 0.55, 1)
 max_health = 980

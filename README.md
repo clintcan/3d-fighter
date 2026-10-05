@@ -15,6 +15,7 @@ Its signature is a **dynamic action camera** that orbits and dollies in on every
   - **Brutus**: punisher;
   - **Valka**: grappler with an unblockable command grab;
   - **Jin**: Tae Kwon Do kicker who controls kick range.
+- **Outfits** that fit each style: a karate gi with headband, a Tae Kwon Do dobok, kickboxing gear, a wrestling singlet with knee pads and boots, a brawler's tank top and work pants. Mirror matches get alternate colours.
 - **5 stages**: Boxing Ring, Dojo, Rooftop, Temple, Beach. Each has its own music.
 - **Modes**: Vs CPU, Arcade (ladder, scoring, shadow boss), local 2-player Versus, **Online** (rollback netcode, LAN discovery or join by IP), and Training (frame data, input display, record/playback).
 - **Fighting-game systems**: super meter with cinematic super freezes, counter hits, combos, juggles, throws and throw breaks, high/mid/low blocking, and Tekken-style sidesteps.
@@ -26,7 +27,7 @@ Its signature is a **dynamic action camera** that orbits and dollies in on every
 |---|---|
 | ![Jin's Tornado Kick on the beach](docs/screenshots/beach.jpg) | ![Jin's Hurricane Kicks super](docs/screenshots/jin_super.jpg) |
 | ![Temple stage](docs/screenshots/temple.jpg) | ![Super flash](docs/screenshots/super.jpg) |
-| ![Earthquake in the dojo](docs/screenshots/dojo.jpg) | ![Ki Blast on the rooftop](docs/screenshots/rooftop.jpg) |
+| ![Earthquake in the dojo](docs/screenshots/dojo.jpg) | ![Thunder Valkyrie on the rooftop](docs/screenshots/rooftop.jpg) |
 | ![Character select](docs/screenshots/character_select.jpg) | ![Stage select](docs/screenshots/stage_select.jpg) |
 
 ## Controls

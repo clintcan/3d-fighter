@@ -10,6 +10,23 @@ const LIBRARIES := {
 	&"fight": preload("res://assets/animations/fight_anims.res"),
 }
 const BLEND_TIME := 0.08
+## Outfit fabrics: weave normal map, roughness map ("" = flat roughness), UV tiling,
+## roughness (multiplies the map) and specular. Cloth is matte: full roughness from the
+## maps (about 0.8-0.9) and low specular, so the ring's spotlights don't make it glare.
+## Leather keeps a soft satin sheen with a flat roughness (its map has near-mirror specks).
+## Colour comes from the character's outfit_colors (CC0 Poly Haven textures).
+const FABRICS := {
+	&"cotton": ["res://assets/characters/outfits/textures/cotton_jersey_nor_gl_1k.jpg",
+		"res://assets/characters/outfits/textures/cotton_jersey_rough_1k.jpg", 6.0, 1.0, 0.12],
+	&"stretch": ["res://assets/characters/outfits/textures/bi_stretch_nor_gl_1k.jpg",
+		"res://assets/characters/outfits/textures/bi_stretch_rough_1k.jpg", 8.0, 1.0, 0.12],
+	&"denim": ["res://assets/characters/outfits/textures/denim_fabric_06_nor_gl_1k.jpg",
+		"res://assets/characters/outfits/textures/denim_fabric_06_rough_1k.jpg", 5.0, 1.0, 0.12],
+	&"leather": ["res://assets/stages/ring/textures/fabric_leather_02_nor_gl_1k.jpg", "", 3.0, 0.55, 0.35],
+}
+## Brightest fabric albedo: real white cloth reflects about 80%; brighter blooms under the
+## stage lights.
+const MAX_FABRIC_ALBEDO := 0.72
 ## Bones whose lowest point must stay above the floor, with the distance from each bone
 ## to the sole measured in the rest pose (filled in build()).
 const CONTACT_BONES := [&"foot_l", &"foot_r", &"ball_l", &"ball_r"]
@@ -42,6 +59,8 @@ func build(data: CharacterData, alt: bool = false) -> void:
 		_attach_skinned(hair_scene)
 	var albedo := data.alt_body_albedo if alt and data.alt_body_albedo else data.body_albedo
 	_customize_materials(albedo, data.alt_hair_color if alt else data.hair_color)
+	if data.outfit_mesh:
+		_dress(data, alt)
 
 	player = AnimationPlayer.new()
 	body.add_child(player)
@@ -102,6 +121,51 @@ func flash(color: Color, duration: float) -> void:
 	_flash_material.albedo_color = Color(color, 0.4)
 	_flash_tween = create_tween()
 	_flash_tween.tween_property(_flash_material, "albedo_color:a", 0.0, duration)
+
+
+## Clothing: swaps in the body without the covered skin and adds the outfit mesh on the
+## same skeleton and skin (its vertices carry the body's bone weights).
+func _dress(data: CharacterData, alt: bool) -> void:
+	var body_mesh: MeshInstance3D
+	for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
+		var material := mesh.mesh.surface_get_material(0)
+		if material and material.resource_name.begins_with("MI_Superhero"):
+			body_mesh = mesh
+	if body_mesh == null:
+		return
+	if data.outfit_body_mesh:
+		var skin_material := body_mesh.get_surface_override_material(0)
+		body_mesh.mesh = data.outfit_body_mesh
+		body_mesh.set_surface_override_material(0, skin_material)
+	var outfit := MeshInstance3D.new()
+	outfit.name = "Outfit"
+	outfit.mesh = data.outfit_mesh
+	outfit.skin = body_mesh.skin
+	skeleton.add_child(outfit)
+	outfit.skeleton = outfit.get_path_to(skeleton)
+	var colors := data.alt_outfit_colors if alt and not data.alt_outfit_colors.is_empty() else data.outfit_colors
+	for surface in data.outfit_mesh.get_surface_count():
+		var slot := ["main", "trim", "accent"].find(data.outfit_mesh.surface_get_name(surface))
+		if slot < 0:
+			slot = surface
+		var fabric_name: StringName = data.outfit_fabrics[slot] if slot < data.outfit_fabrics.size() else &"cotton"
+		var fabric: Array = FABRICS.get(fabric_name, FABRICS[&"cotton"])
+		var color: Color = colors[slot] if slot < colors.size() else Color.WHITE
+		var brightest := maxf(color.r, maxf(color.g, color.b))
+		if brightest > MAX_FABRIC_ALBEDO:
+			color = Color(color * (MAX_FABRIC_ALBEDO / brightest), 1.0)
+		var cloth := StandardMaterial3D.new()
+		cloth.albedo_color = color
+		cloth.normal_enabled = true
+		cloth.normal_texture = load(fabric[0])
+		cloth.normal_scale = 0.8
+		if fabric[1] != "":
+			cloth.roughness_texture = load(fabric[1])
+		cloth.roughness = fabric[3]
+		cloth.metallic_specular = fabric[4]
+		cloth.uv1_scale = Vector3.ONE * fabric[2]
+		cloth.cull_mode = BaseMaterial3D.CULL_DISABLED # the inside shows at hems and sleeves
+		outfit.set_surface_override_material(surface, cloth)
 
 
 func _attach_skinned(scene: PackedScene) -> void:

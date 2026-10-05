@@ -23,8 +23,10 @@
 [ext_resource type="Resource" path="res://data/moves/valka/valkyrie_slam.tres" id="21_3aess"]
 [ext_resource type="Resource" path="res://data/moves/valka/spinning_lariat.tres" id="22_u03mm"]
 [ext_resource type="Resource" path="res://data/moves/valka/thunder_valkyrie.tres" id="23_m6gqs"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/valka_body.res" id="24_2nnx0"]
 [ext_resource type="Script" path="res://scripts/character_data.gd" id="24_cyr4a"]
 [ext_resource type="Texture2D" path="res://assets/ui/portraits/valka.png" id="24_me1hj"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/valka_outfit.res" id="25_msfu8"]
 
 [resource]
 script = ExtResource("24_cyr4a")
@@ -41,6 +43,11 @@ model_scale = 1.06
 hair_color = Color(0.93, 0.86, 0.68, 1)
 alt_body_albedo = ExtResource("1_uw3yd")
 alt_hair_color = Color(0.62, 0.12, 0.06, 1)
+outfit_mesh = ExtResource("25_msfu8")
+outfit_body_mesh = ExtResource("24_2nnx0")
+outfit_colors = PackedColorArray(0.08, 0.1, 0.3, 1, 0.88, 0.67, 0.2, 1, 0.06, 0.06, 0.07, 1)
+outfit_fabrics = Array[StringName]([&"stretch", &"stretch", &"leather"])
+alt_outfit_colors = PackedColorArray(0.55, 0.05, 0.08, 1, 0.78, 0.78, 0.82, 1, 0.06, 0.06, 0.07, 1)
 victory_animations = Array[StringName]([&"fight/victory_flex", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.85, 0.75, 0.3, 1)
 max_health = 1050

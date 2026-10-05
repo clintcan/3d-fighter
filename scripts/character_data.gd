@@ -23,6 +23,16 @@ extends Resource
 ## Alternate look for mirror matches (P2 picks the same character).
 @export var alt_body_albedo: Texture2D
 @export var alt_hair_color: Color = Color.WHITE
+## Generated clothing (tools/build_outfits.gd): a skinned mesh on the body's skeleton with
+## one surface per colour slot (main, trim, accent), and the body with the covered skin
+## removed so nothing pokes through.
+@export var outfit_mesh: Mesh
+@export var outfit_body_mesh: Mesh
+## Per outfit surface: colour, fabric (&"cotton", &"stretch", &"denim", &"leather").
+@export var outfit_colors: PackedColorArray = PackedColorArray()
+@export var outfit_fabrics: Array[StringName] = []
+## Outfit colours for mirror matches.
+@export var alt_outfit_colors: PackedColorArray = PackedColorArray()
 ## Match-win animations ("library/clip"); one is picked at random.
 @export var victory_animations: Array[StringName] = []
 ## Tint used for graybox stand-ins and UI until real models/portraits exist.

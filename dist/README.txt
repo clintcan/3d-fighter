@@ -115,7 +115,9 @@ All third-party assets are CC0 (public domain), credited with thanks:
   Kumar), Japanese Stone Wall, Gravel Floor 03, Grey Roof Tiles; Beach:
   "Kloofendal 48d Partly Cloudy" sky (Greg Zaal, Jarod Guest), Coast Sand
   01, Thatch Roof Angled (Rob Tuytel, Dimitrios Savva), Palm Tree Bark
-  (Dimitrios Savva, Rico Cilliers), Bamboo Wall (Amal Kumar)
+  (Dimitrios Savva, Rico Cilliers), Bamboo Wall (Amal Kumar); outfit fabrics:
+  Cotton Jersey and Bi Stretch (colormass, Rico Cilliers), Denim Fabric 06
+  (Greg Zaal, Rico Cilliers)
 - Music: "Heavy Battle 2" and "Space Battle" by MintoDog; "Determination" by
   HydroGene (dojo); "Midnight Drive" by congusbongus (rooftop); "Boss_Koto"
   by G_P (temple); "Funky House" by Of Far Different Nature (beach)
