@@ -348,6 +348,7 @@ func _initialize() -> void:
 	await outfit_tests()
 	await rollback_tests()
 	await net_tests()
+	await server_tests()
 
 	check("no script errors during the run", errors.count == 0, "%d, first: %s" % [errors.count, errors.first])
 	print("\n%d failure(s)" % fails)
@@ -2202,3 +2203,409 @@ func crypto_tests() -> void:
 	check("a forged KEYOK fails the security check", failed[0].contains("security"), "%s (status %s)" % [failed[0], g3.status])
 	h3.close()
 	g3.close()
+
+
+# --- Internet lobby server (client side) -----------------------------------------------
+
+## A stand-in for the lobby server's UDP side (rendezvous + relay, AGENTS.md section 7):
+## BIND → BOUND with the address seen, RELAY [key] → RELAYED to the other player.
+class FakeRendezvous:
+	var socket := PacketPeerUDP.new()
+	var endpoints := {} # token hex -> [ip, port]
+	var keys := {} # relay key hex -> token hex of the sender
+	var peer_of := {} # token hex -> token hex
+	var relayed := 0
+	var binds := []
+
+	func _init() -> void:
+		socket.bind(0, "127.0.0.1")
+
+	func port() -> int:
+		return socket.get_local_port()
+
+	## Registers a matched pair: [token, key] for the host and the guest.
+	func pair(host_token: PackedByteArray, host_key: PackedByteArray, guest_token: PackedByteArray, guest_key: PackedByteArray) -> void:
+		keys[host_key.hex_encode()] = host_token.hex_encode()
+		keys[guest_key.hex_encode()] = guest_token.hex_encode()
+		peer_of[host_token.hex_encode()] = guest_token.hex_encode()
+		peer_of[guest_token.hex_encode()] = host_token.hex_encode()
+
+	func poll() -> void:
+		while socket.get_available_packet_count() > 0:
+			var bytes := socket.get_packet()
+			var ip := socket.get_packet_ip()
+			var from := socket.get_packet_port()
+			if bytes.is_empty():
+				continue
+			if bytes[0] == NetPeer.S_BIND and bytes.size() >= 19:
+				binds.append(bytes)
+				var token := bytes.slice(1, 17).hex_encode()
+				if not peer_of.has(token):
+					continue
+				endpoints[token] = [ip, from]
+				var bound := PackedByteArray([NetPeer.S_BOUND])
+				for part in ip.split("."):
+					bound.append(int(part))
+				bound.resize(7)
+				bound.encode_u16(5, from)
+				socket.set_dest_address(ip, from)
+				socket.put_packet(bound)
+			elif bytes[0] == NetPeer.S_RELAY and bytes.size() > 9:
+				var sender: String = keys.get(bytes.slice(1, 9).hex_encode(), "")
+				if sender == "" or endpoints.get(sender, []) != [ip, from]:
+					continue # unknown key, or not from the address that bound it
+				var to: Array = endpoints.get(peer_of[sender], [])
+				if to.is_empty():
+					continue
+				var out := PackedByteArray([NetPeer.S_RELAYED])
+				out.append_array(bytes.slice(9))
+				socket.set_dest_address(to[0], to[1])
+				socket.put_packet(out)
+				relayed += 1
+
+
+## Two NetPeers matched through a FakeRendezvous; `candidates` decides the path:
+## "relay" (none: the relay only), "direct" (each other's real address) or "dead" (an
+## address nobody answers: the guest must give up on it and fall back to the relay).
+func _server_pair(candidates: String) -> Dictionary:
+	var fake := FakeRendezvous.new()
+	var host := _net_peer("1.0", 42, "NetHost")
+	var guest := _net_peer("1.0", 42, "NetGuest")
+	host.auto_accept = false # the server already asked: no prompt needed, nobody else gets in
+	guest.auto_accept = false
+	var tokens := [Crypto.new().generate_random_bytes(16), Crypto.new().generate_random_bytes(16)]
+	var keys := [Crypto.new().generate_random_bytes(8), Crypto.new().generate_random_bytes(8)]
+	fake.pair(tokens[0], keys[0], tokens[1], keys[1])
+	host.host(0)
+	guest.join_via_server()
+	host.use_server("127.0.0.1", fake.port(), tokens[0], keys[0], true)
+	guest.use_server("127.0.0.1", fake.port(), tokens[1], keys[1], false)
+	for i in 10:
+		_pump([host, guest, fake], 1)
+	var bound := host.bound and guest.bound
+	var to_host := []
+	var to_guest := []
+	if candidates == "direct":
+		to_host = [{ip = "127.0.0.1", port = host.local_port()}]
+		to_guest = [{ip = "127.0.0.1", port = guest.local_port()}]
+	elif candidates == "dead":
+		var dead := PacketPeerUDP.new()
+		dead.bind(0, "127.0.0.1")
+		to_host = [{ip = "127.0.0.1", port = dead.get_local_port()}]
+		dead.close() # nothing listens there now
+	guest.set_peer_candidates(to_host, 100)
+	host.set_peer_candidates(to_guest, 100)
+	var rounds := 0
+	while rounds < 400 and not (host.is_connected_to_peer() and guest.is_connected_to_peer()):
+		_pump([host, guest, fake], 1)
+		rounds += 1
+	return {fake = fake, host = host, guest = guest, bound = bound, rounds = rounds}
+
+
+## A tiny stand-in for the lobby server's WebSocket side: accepts connections, answers
+## hello with welcome (counting resumes) and ping with pong, and can send anything.
+class FakeLobby:
+	var tcp := TCPServer.new()
+	var ws: WebSocketPeer
+	var hellos: Array[Dictionary] = []
+	var received: Array[Dictionary] = []
+	var binary: Array[PackedByteArray] = []
+
+	func _init() -> void:
+		tcp.listen(0, "127.0.0.1")
+
+	func url() -> String:
+		return "ws://127.0.0.1:%d/v1/ws" % tcp.get_local_port()
+
+	func poll() -> void:
+		if tcp.is_connection_available():
+			ws = WebSocketPeer.new()
+			ws.supported_protocols = PackedStringArray([LobbyClient.SUBPROTOCOL])
+			ws.accept_stream(tcp.take_connection())
+		if ws == null:
+			return
+		ws.poll()
+		while ws.get_ready_state() == WebSocketPeer.STATE_OPEN and ws.get_available_packet_count() > 0:
+			var bytes := ws.get_packet()
+			if not ws.was_string_packet():
+				binary.append(bytes)
+				continue
+			var msg: Dictionary = JSON.parse_string(bytes.get_string_from_utf8())
+			received.append(msg)
+			match msg.type:
+				"hello":
+					hellos.append(msg)
+					send({type = "welcome", protocol = 1, session_id = "s_1", resume_token = "tok%d" % hellos.size(),
+						server_time = 5000000, region = "test", udp = {host = "127.0.0.1", port = 7780},
+						limits = {max_room_name = 32, max_spectators = 50, reaction_interval_ms = 2000}})
+				"ping":
+					send({type = "pong", t = msg.t, server_time = 5000000})
+
+	func send(msg: Dictionary) -> void:
+		ws.send_text(JSON.stringify(msg))
+
+
+func _lobby_pump(lobby: FakeLobby, client: LobbyClient, rounds: int, until := Callable()) -> void:
+	for i in rounds:
+		_net_clock[0] += 16
+		lobby.poll()
+		client.poll()
+		if until.is_valid() and until.call():
+			return
+		OS.delay_msec(2)
+
+
+func server_tests() -> void:
+	var gs = root.get_node("GameState")
+	var net = root.get_node("Net")
+
+	# Feed frames: the byte layout from the server's AGENTS.md (its conformance vector).
+	var vector := SpectatorFeed.inputs(7, 0, PackedInt32Array([0x16, 0x16]), PackedInt32Array([5, 5]))
+	check("feed INPUTS matches the protocol vector", vector.hex_encode() == "02070000000000000002001600050016000500", vector.hex_encode())
+	var decoded := SpectatorFeed.decode(vector)
+	check("feed INPUTS decodes", decoded.get("type") == SpectatorFeed.F_INPUTS and decoded.match_id == 7 and decoded.first == 0
+		and decoded.p1 == PackedInt32Array([0x16, 0x16]) and decoded.p2 == PackedInt32Array([5, 5]))
+	var long_name := "龍".repeat(30) # 90 bytes of UTF-8: cut to whole characters within 64
+	var start := SpectatorFeed.decode(SpectatorFeed.match_start(0xDEADBEEF, 4, 4, 3,
+		PackedStringArray(["0.4.1", "beach", "jin", "valka", long_name, "Lufi" + char(0x202E)])))
+	check("feed MATCH_START round trip (long names cut, names cleaned)", start.get("match_id") == 0xDEADBEEF and start.stage == 4
+		and start.p1_id == "jin" and start.p2_id == "valka" and start.p1_name == "龍".repeat(21).left(24) and start.p2_name == "Lufi",
+		"%s / %s" % [start.get("p1_name"), start.get("p2_name")])
+	var bad_bits := SpectatorFeed.inputs(1, 0, PackedInt32Array([0x205]), PackedInt32Array([5]))
+	var no_dir := SpectatorFeed.inputs(1, 0, PackedInt32Array([0x10]), PackedInt32Array([5]))
+	check("feed decoding refuses bad input words, sizes and versions", SpectatorFeed.decode(bad_bits).is_empty()
+		and SpectatorFeed.decode(no_dir).is_empty() and SpectatorFeed.decode(vector.slice(0, vector.size() - 1)).is_empty()
+		and SpectatorFeed.decode(SpectatorFeed.checksum(1, 60, 5) + PackedByteArray([0])).is_empty()
+		and SpectatorFeed.decode(PackedByteArray([1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])).is_empty())
+	var garbage_errors := errors.count
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77
+	for i in 400:
+		var junk := PackedByteArray()
+		junk.resize(rng.randi_range(0, 80))
+		for j in junk.size():
+			junk[j] = rng.randi() % 256
+		if i % 3 == 0 and junk.size() > 0:
+			junk[0] = rng.randi_range(1, 5)
+		SpectatorFeed.decode(junk)
+	check("feed decoding survives garbage without errors", errors.count == garbage_errors)
+
+	# Publish a real netplay match and replay it as a spectator from the feed alone.
+	gs.mode = gs.Mode.VERSUS # the players' fights (the simulation is the same as online)
+	gs.player_character = gs.roster[0]
+	gs.p2_character = gs.roster[4]
+	gs.stage_path = gs.stage_paths()[2]
+	gs.match_seed = 4242
+	const TICKS := 1300
+	var inputs := [_net_inputs(TICKS + 40, 31, true), _net_inputs(TICKS + 40, 32, false)]
+	var fights := [_net_fight(), _net_fight()]
+	var sessions := [RollbackSession.new(fights[0], 0, 2, 4242), RollbackSession.new(fights[1], 1, 2, 4242)]
+	var frames: Array[PackedByteArray] = []
+	var publisher := SpectatorFeed.Publisher.new(sessions[0], func(b: PackedByteArray) -> void: frames.append(b))
+	# A second publisher flushing every tick, right after packets confirm new inputs:
+	# a checksum's tick can then be published before the session has computed it.
+	var eager_sums := {}
+	var eager := SpectatorFeed.Publisher.new(sessions[1], func(b: PackedByteArray) -> void:
+		var f := SpectatorFeed.decode(b)
+		if f.get("type") == SpectatorFeed.F_CHECKSUM:
+			eager_sums[f.tick] = f.checksum)
+	publisher.start(2, 0, 4, PackedStringArray([gs.game_version(), "rooftop", "kenji", "jin", "Host", "Guest"]))
+	var in_flight := [[], []]
+	var real := 0
+	while real < TICKS * 3 and sessions[0].confirmed_frame() < TICKS - 1:
+		real += 1
+		for i in 2:
+			var s: RollbackSession = sessions[i]
+			var index := s.frame + 2
+			s.advance(inputs[i][index] if index < inputs[i].size() else InputBuffer.pack(5, 0))
+			in_flight[1 - i].append([real + 3 + (real * 7 + i) % 3, s.make_packet()]) # ~50 ms with jitter: rollbacks happen
+		for i in 2:
+			var still := []
+			for packet: Array in in_flight[i]:
+				if packet[0] <= real:
+					sessions[i].receive_packet(packet[1])
+				else:
+					still.append(packet)
+			in_flight[i] = still
+		publisher.update(real * 16)
+		eager.update(real * 1000)
+	publisher.finish(SpectatorFeed.Result.DRAW, 0, 0, real * 16)
+	eager.finish(SpectatorFeed.Result.DRAW, 0, 0, real * 1000)
+	var guest_due := (sessions[1] as RollbackSession).checksums.keys().filter(func(t: int) -> bool: return t <= eager.published)
+	check("a publisher flushing every tick still sends every checksum", guest_due.size() >= TICKS / 60
+		and guest_due.all(func(t: int) -> bool: return eager_sums.get(t) == sessions[1].checksums[t]),
+		"%d of %d" % [eager_sums.size(), guest_due.size()])
+	var host_sums: Dictionary = (sessions[0] as RollbackSession).checksums.duplicate()
+	check("the published match had rollbacks to hide", sessions[0].rollbacks + sessions[1].rollbacks > 0)
+	for f in fights:
+		f.queue_free()
+	var log := SpectatorFeed.Log.new()
+	var fitted := frames.all(func(b: PackedByteArray) -> bool: return log.add(SpectatorFeed.decode(b)))
+	check("every published frame is valid and contiguous", fitted and log.ticks() == publisher.published and log.ticks() >= TICKS
+		and not log.end.is_empty() and log.end.final_tick == log.ticks(), "%d frames, %d ticks" % [frames.size(), log.ticks()])
+	var due := host_sums.keys().filter(func(t: int) -> bool: return t <= log.ticks())
+	check("feed carries every host checksum up to the last published tick", due.size() >= TICKS / 60
+		and due.all(func(t: int) -> bool: return log.checksums.get(t) == host_sums[t]),
+		"%d of %d" % [due.filter(func(t: int) -> bool: return log.checksums.has(t)).size(), due.size()])
+	var input_bytes := 0
+	for b in frames:
+		if b[0] == SpectatorFeed.F_INPUTS:
+			input_bytes += b.size()
+	check("feed is small (about 4 bytes a tick)", input_bytes < log.ticks() * 6, "%d bytes for %d ticks" % [input_bytes, log.ticks()])
+
+	# The fight scene makes its own SpectatorMatch when Net is spectating (ONLINE mode).
+	gs.mode = gs.Mode.ONLINE
+	net.spectating = true
+	net.feed = log
+	var watch := _net_fight()
+	var spectator: Node = watch.netplay
+	spectator.set_physics_process(false)
+	check("watching uses a SpectatorMatch", spectator.name == "SpectatorMatch")
+	var guard := 0
+	while spectator.frame < log.ticks() and not spectator.ended and guard < 2000:
+		spectator._physics_process(0.0)
+		guard += 1
+	check("a late spectator replays the whole match from the feed", spectator.frame >= log.ticks() and not spectator.diverged
+		and spectator.checks_passed == log.checksums.size(), "frame %d / %d, %d of %d checks, %d calls" % [spectator.frame, log.ticks(),
+		spectator.checks_passed, log.checksums.size(), guard])
+	check("the spectator caught up fast (fast-forward)", guard < log.ticks() / 4, "%d calls" % guard)
+	var behind: int = spectator.frame
+	for i in 30:
+		spectator._physics_process(0.0)
+	check("after MATCH_END the spectator plays on (victory scene)", spectator.frame == behind + 30 and not spectator.ended)
+	watch.queue_free()
+
+	# A tampered feed (one input changed) is caught by the next checksum.
+	var tampered := SpectatorFeed.Log.new()
+	for b in frames:
+		tampered.add(SpectatorFeed.decode(b))
+	tampered.p1[200] = InputBuffer.pack(9, InputBuffer.HK) if tampered.p1[200] != InputBuffer.pack(9, InputBuffer.HK) else InputBuffer.pack(1, 0)
+	tampered.p2[201] = InputBuffer.pack(3, InputBuffer.HP)
+	net.feed = tampered
+	var watch2 := _net_fight()
+	var spectator2: Node = watch2.netplay
+	spectator2.set_physics_process(false)
+	var warnings := errors.count
+	guard = 0
+	while not spectator2.ended and spectator2.frame < tampered.ticks() and guard < 2000:
+		spectator2._physics_process(0.0)
+		guard += 1
+	check("a feed that doesn't match the host's checksums stops the replay", spectator2.diverged and spectator2.frame <= 300,
+		"diverged %s at %d" % [spectator2.diverged, spectator2.frame])
+	errors.count = warnings # the divergence warning is expected
+	watch2.queue_free()
+	net.spectating = false
+	net.feed = SpectatorFeed.Log.new()
+	var ours := SpectatorFeed.decode(SpectatorFeed.match_start(1, 0, 0, 1, PackedStringArray([gs.game_version(), "ring",
+		str(gs.roster[0].id), str(gs.roster[1].id), "A", "B"])))
+	var other_version := ours.duplicate()
+	other_version.game_version = "0.0.1"
+	var other_fighter := ours.duplicate()
+	other_fighter.p2_id = "nobody"
+	check("watch_problem accepts this version and refuses others", net.watch_problem(ours) == ""
+		and net.watch_problem(other_version) != "" and net.watch_problem(other_fighter) != "")
+	await process_frame
+
+	# NetPeer through the lobby server's rendezvous: the relay, direct, and a dead address.
+	_wait_host_key()
+	var relay := _server_pair("relay")
+	var rh: NetPeer = relay.host
+	var rg: NetPeer = relay.guest
+	var fake: FakeRendezvous = relay.fake
+	check("both players BIND and get BOUND", relay.bound and rh.public_endpoint.begins_with("127.0.0.1:") and rg.public_endpoint.begins_with("127.0.0.1:"),
+		"%s / %s" % [rh.public_endpoint, rg.public_endpoint])
+	var bind: PackedByteArray = fake.binds[0]
+	check("BIND is token, role and up to 4 LAN candidates", bind.size() == 19 + bind[18] * 6 and bind[18] <= 4 and bind[17] <= 1)
+	check("no addresses: the players connect through the relay", rh.is_connected_to_peer() and rg.is_connected_to_peer()
+		and rh.connection_path() == "relay" and rg.connection_path() == "relay" and fake.relayed > 4,
+		"%s / %s, %d relayed" % [rh.status, rg.status, fake.relayed])
+	check("the relayed connection is encrypted end to end (same security code)", rh.security_code != "" and rh.security_code == rg.security_code)
+	var got := [""]
+	rg.message_received.connect(func(_t: int, p: PackedByteArray) -> void: got[0] = p.get_string_from_utf8())
+	rh.send_reliable(9, "through the relay".to_utf8_buffer())
+	_pump([rh, rg, fake], 10)
+	check("lobby messages cross the relay", got[0] == "through the relay")
+	# A stranger can't use the host's open port: in server mode only the matched peer gets in.
+	var strangers := _probe(rh, _hello_bytes("1.0", 42, "Stranger", 5, 0))
+	check("an internet host ignores everyone it wasn't matched with", strangers.is_empty(), "%d replies" % strangers.size())
+	var before := fake.relayed
+	rg.close()
+	_pump([rh, rg, fake], 10)
+	check("BYE goes through the relay too", rh.status == NetPeer.Status.CLOSED and fake.relayed > before)
+	rh.close()
+
+	var direct := _server_pair("direct")
+	var dh: NetPeer = direct.host
+	var dg: NetPeer = direct.guest
+	check("with each other's address the players connect directly (hole punched)", dh.is_connected_to_peer() and dg.is_connected_to_peer()
+		and dh.connection_path() == "direct" and dg.connection_path() == "direct" and (direct.fake as FakeRendezvous).relayed == 0,
+		"%s / %s via %s, %d relayed" % [dh.status, dg.status, dg.connection_path(), direct.fake.relayed])
+	check("direct connection security codes match", dh.security_code != "" and dh.security_code == dg.security_code)
+	dh.close()
+	dg.close()
+
+	var dead := _server_pair("dead")
+	check("an address that never answers falls back to the relay after %d ms" % NetPeer.PUNCH_TIMEOUT_MS,
+		dead.host.is_connected_to_peer() and dead.guest.is_connected_to_peer() and dead.guest.connection_path() == "relay"
+		and dead.rounds * 16 >= NetPeer.PUNCH_TIMEOUT_MS, "%s via %s after %d rounds" % [dead.guest.status, dead.guest.connection_path(), dead.rounds])
+	dead.host.close()
+	dead.guest.close()
+
+	# A guest whose server never sends the host's addresses gives up.
+	var lonely := _net_peer("1.0", 42, "Lonely")
+	var lonely_fail := [""]
+	lonely.connect_failed.connect(func(r: String) -> void: lonely_fail[0] = r)
+	lonely.join_via_server()
+	lonely.use_server("127.0.0.1", 9, Crypto.new().generate_random_bytes(16), Crypto.new().generate_random_bytes(8), false)
+	for i in 1000:
+		_net_clock[0] += 16
+		lonely.poll()
+		if lonely_fail[0] != "":
+			break
+	check("no peer endpoints from the server: the join gives up", lonely_fail[0] != "", lonely_fail[0])
+	lonely.close()
+
+	# LobbyClient against a stand-in WebSocket server.
+	var lobby_server := FakeLobby.new()
+	var client := LobbyClient.new()
+	client.clock = func() -> int: return _net_clock[0]
+	var welcomed := [{}]
+	var lost := [""]
+	var messages: Array[Dictionary] = []
+	var feed_in: Array[PackedByteArray] = []
+	client.connected.connect(func(w: Dictionary) -> void: welcomed[0] = w)
+	client.disconnected.connect(func(r: String) -> void: lost[0] = r)
+	client.message.connect(func(m: Dictionary) -> void: messages.append(m))
+	client.feed_frame.connect(func(b: PackedByteArray) -> void: feed_in.append(b))
+	client.open(lobby_server.url(), {game_version = "1.0", content_hash = 42, client_id = "c-1", name = "Tester"})
+	_lobby_pump(lobby_server, client, 300, func() -> bool: return client.is_open())
+	check("LobbyClient says hello and gets welcome", client.is_open() and welcomed[0].get("region") == "test"
+		and lobby_server.hellos.size() == 1 and lobby_server.hellos[0].protocol == 1 and lobby_server.hellos[0].name == "Tester",
+		"status %s" % client.status)
+	check("LobbyClient learns the server clock", absi(client.server_now() - 5000000) < 1000)
+	client.send("list_rooms", {status = "any"})
+	lobby_server.send({type = "rooms", rooms = [{id = "r_1", name = "A"}]})
+	lobby_server.ws.send(SpectatorFeed.checksum(3, 60, 9), WebSocketPeer.WRITE_MODE_BINARY)
+	_lobby_pump(lobby_server, client, 100, func() -> bool: return not feed_in.is_empty() and not messages.is_empty())
+	check("LobbyClient sends messages and passes on server messages and feed frames", lobby_server.received.any(func(m: Dictionary) -> bool:
+		return m.type == "list_rooms") and messages.any(func(m: Dictionary) -> bool: return m.type == "rooms") and feed_in.size() == 1)
+	_net_clock[0] += LobbyClient.KEEPALIVE_MS
+	_lobby_pump(lobby_server, client, 50, func() -> bool: return lobby_server.received.any(func(m: Dictionary) -> bool: return m.type == "ping"))
+	check("LobbyClient pings when it has been quiet (keeps the latency and clock fresh)", lobby_server.received.any(func(m: Dictionary) -> bool:
+		return m.type == "ping"))
+	# A dropped connection comes back with the resume token, without a second `connected`.
+	lobby_server.ws.close(1001, "going away")
+	_lobby_pump(lobby_server, client, 600, func() -> bool: return lobby_server.hellos.size() >= 2 and client.is_open())
+	check("a dropped lobby connection resumes with the token", lobby_server.hellos.size() == 2
+		and lobby_server.hellos[1].get("resume_token") == "tok1" and client.is_open() and lost[0] == "",
+		"%d hellos, status %s, lost '%s'" % [lobby_server.hellos.size(), client.status, lost[0]])
+	lobby_server.ws.close(4000, "banned")
+	_lobby_pump(lobby_server, client, 300, func() -> bool: return lost[0] != "")
+	check("a deliberate close from the server isn't retried", lost[0].contains("banned") and client.status == LobbyClient.Status.CLOSED, lost[0])
+	client.close()
+	lobby_server.tcp.stop()
+	check("server error codes read as sentences", LobbyClient.error_text({code = "wrong_password"}) == "Wrong password"
+		and LobbyClient.error_text({code = "something_new", message = "x"}) == "x")
+	check("room codes are typed in any case", net._room_key(" kx7q2m ") == "KX7Q2M" and net._room_key("r_7f3a9c2e") == "r_7f3a9c2e")
+	gs.mode = gs.Mode.VS_CPU
+	await process_frame

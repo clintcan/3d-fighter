@@ -38,6 +38,8 @@ func _ready() -> void:
 	online_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(ONLINE_SCENE))
 	if Net.peer:
 		Net.leave() # back at the main menu: any online session is over
+	if Net.lobby:
+		Net.disconnect_server()
 	quit_button.pressed.connect(_on_quit_pressed)
 	options_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(OPTIONS_SCENE))
 	best_scores_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(BEST_SCORES_SCENE))
@@ -66,8 +68,21 @@ func _ready() -> void:
 
 ## `-- --smoke-test --online-host` / `--online-join=IP[:port]`: two processes connect, pick,
 ## fight with random inputs and print a checksum each (they must match).
+## `--server=ws://HOST:PORT/v1/ws` with `--server-host` / `--server-join` / `--server-watch`:
+## the same through the internet lobby server, plus a spectator replaying the match.
 func _online_smoke_test() -> bool:
+	var server_url := ""
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--server="):
+			server_url = arg.get_slice("=", 1) if arg.get_slice_count("=") == 2 else arg.substr(9)
+	for arg in OS.get_cmdline_user_args():
+		if server_url != "" and arg in ["--server-host", "--server-join", "--server-watch"]:
+			var role := arg.trim_prefix("--server-")
+			var err := Net.start_server_smoke(server_url, role)
+			print("SMOKE TEST: lobby server %s as %s (%s)" % [server_url, role, error_string(err)])
+			if err != OK:
+				get_tree().quit(1)
+			return true
 		if arg == "--online-host" or arg.begins_with("--online-join="):
 			Net.smoke = true
 			var err := Net.host() if arg == "--online-host" else Net.join(arg.get_slice("=", 1))

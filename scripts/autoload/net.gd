@@ -8,6 +8,11 @@ extends Node
 ##   back to the lobby), or Leave.
 ## The peer is polled in _physics_process, before the fight scene's own physics (autoloads
 ## come first in the tree), so incoming inputs are in before each tick.
+## Internet play goes through the lobby server (LobbyClient, also owned here): rooms,
+## join requests and spectating are server messages; once the server matches two players
+## (match_session) the same NetPeer connects them, directly or through the server's relay,
+## and everything after that (character select, fight, rematch) is unchanged. Spectators
+## get the host's feed (SpectatorFeed) and watch it in the fight scene (SpectatorMatch).
 
 signal connected
 signal connect_failed(reason: String)
@@ -19,11 +24,20 @@ signal join_pending(host_name: String)
 signal lobby_changed
 signal rematch_changed
 signal left(reason: String)
+## Lobby server: connected (welcome), gone, every message (for the lobby screen).
+signal server_connected
+signal server_closed(reason: String)
+signal server_message(msg: Dictionary)
+## Spectating: a reaction from someone in the room; the feed or room ended.
+signal reaction_received(from_name: String, emote: String)
+signal spectate_closed(reason: String)
 
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const ONLINE_MENU_SCENE := "res://scenes/online_menu.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const VS_SCENE := "res://scenes/vs_screen.tscn"
+const SERVER_LOBBY_SCENE := "res://scenes/server_lobby.tscn"
+const EMOTES := ["clap", "fire", "wow", "laugh", "gg", "ouch"]
 
 # Reliable lobby message types.
 const M_PICK := 1 # u8 roster index (255 = undecided)
@@ -46,6 +60,22 @@ var smoke := false
 ## Tests: a clock (msec) given to every new peer, so they can run faster than real time.
 var peer_clock := Callable()
 
+# Lobby server.
+var lobby: LobbyClient
+## Our room: the latest room object from the server, or {}.
+var room := {}
+## The room's join code (hosts see it), or "".
+var room_code := ""
+## Our part in the room: "host", "guest", "pending" (asked to join), "spectator" or "".
+var room_role := ""
+## Watching a match: the feed of the current match (frames keep arriving while it loads).
+var spectating := false
+var feed := SpectatorFeed.Log.new()
+var spectate_delay_ms := 0
+## `--server-host` / `--server-join` / `--server-watch` smoke tests (with --server=URL).
+var server_smoke := ""
+var _pending_endpoints := {}
+
 
 func _ready() -> void:
 	# The host's RSA key takes a second or more of CPU: make it in the background at boot,
@@ -60,6 +90,8 @@ func _exit_tree() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	if lobby:
+		lobby.poll()
 	if peer:
 		peer.poll()
 
@@ -123,13 +155,21 @@ func rtt_ms() -> float:
 	return peer.rtt_ms if peer else 0.0
 
 
-## Closes the connection (telling the opponent) and forgets the lobby.
+## Closes the connection (telling the opponent) and forgets the lobby. In an internet
+## room, leaves the room too (a host leaving closes it).
 func leave() -> void:
 	if peer:
 		var old := peer
 		peer = null
 		old.close()
 	_reset_lobby()
+	if room_role == "host" or room_role == "guest":
+		leave_room()
+
+
+## Where to go after leaving a match: the internet lobby while connected to the server.
+func exit_scene() -> String:
+	return SERVER_LOBBY_SCENE if is_server_open() else MAIN_MENU_SCENE
 
 
 # --- Lobby -----------------------------------------------------------------------
@@ -207,6 +247,7 @@ func _begin_match(stage_index: int, seed: int, p1: int, p2: int, delay: int, rem
 
 func _enter_lobby() -> void:
 	_reset_lobby()
+	report_room("character_select")
 	GameState.mode = GameState.Mode.ONLINE
 	get_tree().change_scene_to_file(CHARACTER_SELECT_SCENE)
 
@@ -251,6 +292,9 @@ func _apply_lag_args(target: NetPeer) -> void:
 
 
 func _on_connected() -> void:
+	if lobby and peer.server_ip != "":
+		lobby.send("connection_report", {path = peer.connection_path(), rtt_ms = clampi(roundi(peer.rtt_ms), 0, 65535)})
+		report_room("character_select")
 	connected.emit()
 	if smoke:
 		print("SMOKE TEST: online connected to %s, security code %s" % [peer.remote_name, peer.security_code])
@@ -270,12 +314,14 @@ func _on_disconnected(reason: String) -> void:
 	peer = null
 	last_reason = reason
 	_reset_lobby()
+	if room_role == "host" or room_role == "guest":
+		leave_room() # an internet match that ended: the room goes with it
 	left.emit(reason)
 	# Outside a fight (lobby screens), go back to the online menu, which shows why.
 	# In a fight NetplayMatch shows it and offers the way out.
 	var scene := get_tree().current_scene
 	if scene == null or not scene.has_method("save_state"):
-		get_tree().change_scene_to_file(ONLINE_MENU_SCENE)
+		get_tree().change_scene_to_file(SERVER_LOBBY_SCENE if is_server_open() else ONLINE_MENU_SCENE)
 
 
 func _on_message(type: int, payload: PackedByteArray) -> void:
@@ -306,3 +352,313 @@ func _on_message(type: int, payload: PackedByteArray) -> void:
 			_check_rematch()
 		M_LOBBY:
 			_enter_lobby()
+
+
+# --- Lobby server ----------------------------------------------------------------
+
+## Connects to the lobby server at `url` (ws:// or wss://).
+func connect_server(url: String) -> Error:
+	disconnect_server()
+	lobby = LobbyClient.new()
+	lobby.connected.connect(func(_welcome: Dictionary) -> void: server_connected.emit())
+	lobby.disconnected.connect(_on_server_lost)
+	lobby.message.connect(_on_lobby_message)
+	lobby.feed_frame.connect(_on_feed_frame)
+	var err := lobby.open(url, {game_version = GameState.game_version(), content_hash = GameState.content_hash() & 0xFFFFFFFF,
+		client_id = Settings.get_client_id(), name = Settings.online_name(), relay_only = Settings.relay_only})
+	if err != OK:
+		lobby = null
+	return err
+
+
+func disconnect_server() -> void:
+	if lobby:
+		var old := lobby
+		lobby = null
+		old.close()
+	_clear_room()
+
+
+func is_server_open() -> bool:
+	return lobby != null and lobby.is_open()
+
+
+func list_rooms() -> void:
+	if is_server_open():
+		lobby.send("list_rooms", {status = "any", compatible_only = false, limit = 50})
+
+
+## Opens a room (we'll be the host, Player 1). password "" = none.
+func create_room(room_name: String, public: bool, password: String, allow_spectators: bool) -> void:
+	var fields := {name = room_name, visibility = "public" if public else "unlisted", allow_spectators = allow_spectators}
+	if password != "":
+		fields.password = password
+	lobby.send("create_room", fields)
+
+
+## Asks to join a room by id or code.
+func join_room(room_key: String, password: String = "") -> void:
+	var fields := {room = _room_key(room_key)}
+	if password != "":
+		fields.password = password
+	lobby.send("join_room", fields)
+	room_role = "pending"
+
+
+func cancel_join() -> void:
+	if is_server_open() and room_role == "pending":
+		lobby.send("cancel_join")
+	room_role = ""
+
+
+## Host: lets the player who asked in, or turns them away.
+func answer_join(request_id: String, accept: bool) -> void:
+	lobby.send("answer_join", {request_id = request_id, accept = accept})
+
+
+func leave_room() -> void:
+	if is_server_open() and room_role != "" and room_role != "pending":
+		lobby.send("stop_spectating" if room_role == "spectator" else "leave_room")
+	_clear_room()
+
+
+func spectate_room(room_key: String, password: String = "") -> void:
+	var fields := {room = _room_key(room_key)}
+	if password != "":
+		fields.password = password
+	lobby.send("spectate", fields)
+
+
+func stop_spectating() -> void:
+	leave_room()
+
+
+## Members and spectators: a quick emote everyone in the room sees.
+func react(emote: String) -> void:
+	if is_server_open() and room_role != "" and room_role != "pending" and emote in EMOTES:
+		lobby.send("react", {emote = emote})
+
+
+## Host: tells the server what the room is doing (the room list shows it).
+func report_room(phase: String, extra: Dictionary = {}) -> void:
+	if not is_server_open() or room_role != "host":
+		return
+	var fields := extra.duplicate()
+	fields.phase = phase
+	lobby.send("room_update", fields)
+
+
+## Sends a spectator-feed frame (players in an internet room publish their match).
+func publish(bytes: PackedByteArray) -> void:
+	if is_server_open() and (room_role == "host" or room_role == "guest"):
+		lobby.send_binary(bytes)
+
+
+## Whether this match is an internet room's (and so should publish its feed).
+func publishing() -> bool:
+	return is_server_open() and peer != null and peer.server_ip != ""
+
+
+## Room codes are typed in any case; room ids pass through.
+static func _room_key(text: String) -> String:
+	var key := text.strip_edges()
+	return key.to_upper() if key.length() == 6 else key
+
+
+func _clear_room() -> void:
+	room = {}
+	room_code = ""
+	room_role = ""
+	spectating = false
+	feed = SpectatorFeed.Log.new()
+	_pending_endpoints = {}
+
+
+func _on_server_lost(reason: String) -> void:
+	lobby = null
+	var was_watching := spectating
+	_clear_room()
+	if was_watching:
+		spectate_closed.emit(reason)
+	server_closed.emit(reason)
+	# A match already running keeps going: it's player to player, the server only matched us.
+
+
+func _on_lobby_message(msg: Dictionary) -> void:
+	match str(msg.type):
+		"room_created":
+			room = msg.get("room", {})
+			room_code = str(msg.get("code", ""))
+			room_role = "host"
+		"room_state":
+			if room_role != "" and room_role != "pending":
+				room = msg.get("room", {})
+		"join_declined":
+			room_role = ""
+		"match_session":
+			_start_server_peer(msg)
+		"peer_endpoints":
+			_on_peer_endpoints(msg)
+		"player_left":
+			if room_role == "host" and peer and not peer.is_connected_to_peer():
+				# The guest left before the connection was up: wait for someone else.
+				var old := peer
+				peer = null
+				old.close()
+			elif room_role == "guest" and str(msg.get("reason", "")) == "kicked":
+				_clear_room()
+		"room_closed":
+			var was_watching := spectating
+			_clear_room()
+			if was_watching:
+				spectate_closed.emit("The room closed")
+		"spectate_started":
+			room_role = "spectator"
+			spectating = true
+			spectate_delay_ms = int(msg.get("delay_ms", 0))
+			feed = SpectatorFeed.Log.new()
+		"spectate_ended":
+			_clear_room()
+			spectate_closed.emit("Too far behind the match" if msg.get("reason") == "too_slow" else "Spectating ended")
+		"reaction":
+			reaction_received.emit(NetPeer.clean_name(str(msg.get("name", ""))), str(msg.get("emote", "")))
+		"error":
+			if room_role == "pending":
+				room_role = ""
+	server_message.emit(msg)
+	if server_smoke != "":
+		_server_smoke_step(msg)
+
+
+## The server matched us: the same NetPeer handshake, over the server's rendezvous.
+func _start_server_peer(msg: Dictionary) -> void:
+	var udp: Dictionary = msg.get("udp", {})
+	var host_name := str(udp.get("host", ""))
+	var ip := host_name if host_name.is_valid_ip_address() else IP.resolve_hostname(host_name, IP.TYPE_IPV4)
+	var token := str(msg.get("session_token", "")).hex_decode()
+	var key := str(msg.get("relay_key", "")).hex_decode()
+	if ip == "" or token.size() != 16 or key.size() != 8:
+		last_reason = "The server sent a connection this game can't use"
+		connect_failed.emit(last_reason)
+		return
+	var as_host := str(msg.get("role", "")) == "host"
+	_new_peer()
+	local_index = 0 if as_host else 1
+	var err := peer.host(0) if as_host else peer.join_via_server()
+	if err != OK:
+		peer = null
+		last_reason = "Couldn't open a network port (%s)" % error_string(err)
+		connect_failed.emit(last_reason)
+		return
+	peer.use_server(ip, int(udp.get("port", 0)), token, key, as_host)
+	room_role = "host" if as_host else "guest"
+	if not _pending_endpoints.is_empty():
+		_on_peer_endpoints(_pending_endpoints)
+
+
+func _on_peer_endpoints(msg: Dictionary) -> void:
+	if peer == null or peer.server_ip == "":
+		_pending_endpoints = msg # arrived before match_session was handled
+		return
+	_pending_endpoints = {}
+	if peer.is_connected_to_peer():
+		return # a NAT rebind notice: the connection we have is fine
+	var candidates: Variant = msg.get("candidates", [])
+	peer.set_peer_candidates(candidates if candidates is Array else [], int(msg.get("punch_at", 0)) - lobby.server_now())
+
+
+## Spectating: collect the feed; a new match (MATCH_START) loads the fight to watch it.
+func _on_feed_frame(bytes: PackedByteArray) -> void:
+	if not spectating:
+		return
+	var frame := SpectatorFeed.decode(bytes)
+	if frame.is_empty():
+		return
+	match int(frame.type):
+		SpectatorFeed.F_MATCH_START:
+			var problem := watch_problem(frame)
+			if problem != "":
+				leave_room()
+				spectate_closed.emit(problem)
+				return
+			feed = SpectatorFeed.Log.new()
+			feed.add(frame)
+			GameState.mode = GameState.Mode.ONLINE
+			GameState.player_character = GameState.roster[frame.p1]
+			GameState.p2_character = GameState.roster[frame.p2]
+			GameState.stage_path = GameState.stage_paths()[frame.stage]
+			GameState.match_seed = frame.match_id
+			GameState.go_to_fight(get_tree())
+		SpectatorFeed.F_FEED_RESET:
+			feed = SpectatorFeed.Log.new()
+		_:
+			feed.add(frame)
+
+
+## Why this machine can't watch a match ("" = it can): replaying it needs the same game.
+func watch_problem(start: Dictionary) -> String:
+	if start.game_version != GameState.game_version():
+		return "That match runs version %s of the game" % start.game_version
+	if start.stage >= GameState.STAGES.size() or start.p1 >= GameState.roster.size() or start.p2 >= GameState.roster.size():
+		return "That match uses fighters or stages this version doesn't have"
+	if str(GameState.roster[start.p1].id) != start.p1_id or str(GameState.roster[start.p2].id) != start.p2_id:
+		return "That match's fighters don't match this version"
+	return ""
+
+
+# --- Lobby server smoke tests ----------------------------------------------------
+
+## `-- --smoke-test --server=URL --server-host` (open a room and play whoever joins),
+## `--server-join` (join the first open room) or `--server-watch` (watch the first match).
+func start_server_smoke(url: String, role: String) -> Error:
+	server_smoke = role
+	smoke = role != "watch"
+	Settings.client_id = Settings.new_uuid() # each process its own player (never saved)
+	Settings.player_name = "Smoke %s" % role.capitalize()
+	Settings.relay_only = "--relay-only" in OS.get_cmdline_user_args()
+	server_connected.connect(func() -> void:
+		print("SMOKE TEST: server connected (region %s)" % lobby.welcome.get("region", "?"))
+		if role == "host":
+			create_room("Smoke %d" % (randi() % 1000), true, "", true)
+		else:
+			list_rooms(), CONNECT_ONE_SHOT)
+	server_closed.connect(func(reason: String) -> void:
+		print("SMOKE TEST: server connection closed (%s)" % reason))
+	spectate_closed.connect(func(reason: String) -> void:
+		print("SMOKE TEST: spectating ended (%s)" % reason)
+		get_tree().quit())
+	return connect_server(url)
+
+
+func _server_smoke_step(msg: Dictionary) -> void:
+	match str(msg.type):
+		"rooms":
+			if room_role != "":
+				return
+			for r: Dictionary in msg.get("rooms", []):
+				if not r.get("compatible", false):
+					continue
+				if server_smoke == "join" and r.get("status") == "open":
+					print("SMOKE TEST: server joining room %s" % r.get("name"))
+					join_room(str(r.id))
+					return
+				if server_smoke == "watch" and r.get("status") == "in_match" and r.get("allow_spectators", false):
+					print("SMOKE TEST: server watching room %s" % r.get("name"))
+					spectate_room(str(r.id))
+					return
+			get_tree().create_timer(0.5).timeout.connect(list_rooms)
+		"room_created":
+			print("SMOKE TEST: server room %s created" % msg.get("code"))
+		"join_request":
+			print("SMOKE TEST: server join request from %s" % msg.get("name"))
+			answer_join(str(msg.request_id), true)
+		"match_session":
+			print("SMOKE TEST: server matched as %s with %s" % [msg.get("role"), msg.get("peer", {}).get("name")])
+		"peer_endpoints":
+			print("SMOKE TEST: server peer endpoints, %d candidate(s)" % msg.get("candidates", []).size())
+		"spectate_started":
+			print("SMOKE TEST: server spectating (delay %d ms, live %s)" % [msg.get("delay_ms", 0), msg.get("match_live", false)])
+		"error":
+			print("SMOKE TEST: server error %s (%s)" % [msg.get("code"), msg.get("message")])
+			if server_smoke == "watch" or server_smoke == "join":
+				get_tree().create_timer(0.5).timeout.connect(list_rooms)

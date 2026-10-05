@@ -93,7 +93,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			Net.pick(-1) # change your mind
 		else:
 			Net.leave()
-			get_tree().change_scene_to_file(ONLINE_MENU_SCENE)
+			get_tree().change_scene_to_file(Net.SERVER_LOBBY_SCENE if Net.is_server_open() else ONLINE_MENU_SCENE)
 	elif event.is_action_pressed("ui_cancel"):
 		if _picking_dummy:
 			Audio.sfx(&"ui_back", -4.0)

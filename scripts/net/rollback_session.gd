@@ -121,6 +121,12 @@ func confirmed_frame() -> int:
 	return mini(_remote_confirmed, frame - 1)
 
 
+## A player's screen-relative input for a confirmed tick (the spectator feed publishes
+## these). Recent ticks only: older ones are trimmed after HISTORY ticks.
+func confirmed_input(player: int, tick: int) -> int:
+	return _inputs[player].get(tick, NEUTRAL)
+
+
 ## How many ticks the newest simulated tick is ahead of the last confirmed one.
 func prediction_depth() -> int:
 	return frame - 1 - confirmed_frame()

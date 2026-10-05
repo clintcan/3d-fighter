@@ -33,6 +33,15 @@ extends RefCounted
 ##   - send_input(): unreliable RollbackSession packets.
 ##   - LAN discovery: a host answers DISCOVER from private addresses only (LanBrowser).
 ##   - Lag simulator: lag_ms / jitter_ms / loss on outgoing traffic, for testing.
+## Internet play through the lobby server (use_server(), after the server matched the two
+## players): this socket sends BIND (session token) to the server's UDP port until BOUND,
+## then as a keepalive. With the peer's addresses (peer_endpoints) the host punches holes
+## (T_PUNCH) and the guest sends its HELLO to every candidate, locking on to the first that
+## answers; after PUNCH_TIMEOUT_MS without an answer it goes through the relay instead:
+## every datagram wrapped as RELAY [key][datagram] to the server, which forwards it as
+## RELAYED [datagram]. The relay is just another address (RELAY_IP) to the handshake, so
+## encryption and the security code work the same on both paths. The server already asked
+## the host, so the host lets in the expected addresses (and only those) without asking.
 
 signal connected
 signal connect_failed(reason: String)
@@ -83,6 +92,22 @@ const T_RELIABLE := 40
 const T_ACK := 41
 const T_DISCOVER := 50
 const T_ANNOUNCE := 51
+const T_PUNCH := 52 # opens the NAT toward a peer; ignored on arrival
+# Lobby server datagrams (rendezvous and relay; see the server's AGENTS.md section 7).
+const S_BIND := 0xF0
+const S_BOUND := 0xF1
+const S_RELAY := 0xF2
+const S_RELAYED := 0xF3
+const S_PONG := 0xF5
+## The address of a peer reached through the server's relay.
+const RELAY_IP := "relay"
+const BIND_INTERVAL_MS := 250
+const BIND_KEEPALIVE_MS := 15000
+const PUNCH_INTERVAL_MS := 100
+const PUNCH_TIMEOUT_MS := 3000 # no direct answer by then: use the relay
+const ENDPOINTS_TIMEOUT_MS := 15000 # the server never sent the peer's addresses
+const MAX_RELAY_PAYLOAD := 1200
+const MAX_BIND_CANDIDATES := 4
 
 enum Status { IDLE, HOSTING, JOINING, SECURING, CONNECTED, CLOSED }
 
@@ -116,6 +141,12 @@ var loss := 0.0
 var clock := Callable()
 ## Random per host session, so LanBrowser can merge replies that arrive by two routes.
 var session_id := 0
+## Lobby server mode (use_server()): the server's UDP address, "" otherwise.
+var server_ip := ""
+var server_port := 0
+## The server has seen this socket (BOUND); public_endpoint is the address it saw.
+var bound := false
+var public_endpoint := ""
 
 var _socket := PacketPeerUDP.new()
 var _rng := RandomNumberGenerator.new()
@@ -157,6 +188,15 @@ var _declined := {} # ip -> msec until which its HELLOs are ignored
 var _reply_window := -1000
 var _unverified_replies := 0
 var _verified_replies := 0
+# Lobby server mode.
+var _server_token := PackedByteArray() # 16 bytes, proves this socket to the server
+var _relay_key := PackedByteArray() # 8 bytes, our key for RELAY
+var _bind_role := 0 # 0 host, 1 guest
+var _last_bind := -BIND_KEEPALIVE_MS
+var _server_since := 0
+var _candidates: Array[Dictionary] = [] # the peer's addresses: [{ip, port}]
+var _punch_at := -1 # msec: when to start punching (host) / sending HELLOs (guest)
+var _expected := {} # host: ip -> true for the matched peer's addresses (and RELAY_IP)
 
 
 func _init(version: String = "", data_hash: int = 0, name: String = "Player") -> void:
@@ -223,6 +263,63 @@ func join(ip: String, port: int = DEFAULT_PORT) -> Error:
 	return OK
 
 
+## Guest through the lobby server: binds a socket (it hears the server and the host) and
+## waits for the host's addresses (set_peer_candidates()). use_server() must follow.
+func join_via_server() -> Error:
+	close_socket()
+	var err := _socket.bind(0, "*")
+	if err != OK:
+		return err
+	is_host = false
+	remote_ip = "" # unknown until a candidate answers (or the relay is used)
+	remote_port = 0
+	status = Status.JOINING
+	_nonce = _random_u64()
+	_cookie = 0
+	awaiting_accept = false
+	_last_answer = _now()
+	_last_hello = -HELLO_INTERVAL_MS
+	return OK
+
+
+## Lobby server mode, after host() / join_via_server(): the server's UDP address and this
+## player's credentials from its match_session. poll() BINDs from now on.
+func use_server(ip: String, port: int, token: PackedByteArray, relay_key: PackedByteArray, as_host: bool) -> void:
+	server_ip = ip
+	server_port = port
+	_server_token = token
+	_relay_key = relay_key
+	_bind_role = 0 if as_host else 1
+	bound = false
+	public_endpoint = ""
+	_last_bind = -BIND_KEEPALIVE_MS
+	_server_since = _now()
+	_expected = {RELAY_IP: true} # the relay only forwards from the player we were matched with
+
+
+## The peer's addresses from the server (peer_endpoints) and when to start using them:
+## the host punches toward them, the guest sends its HELLO to each. Empty = relay only.
+func set_peer_candidates(candidates: Array, start_in_ms: int) -> void:
+	_candidates.clear()
+	for c: Variant in candidates:
+		if not c is Dictionary or _candidates.size() >= 8:
+			continue
+		var ip := str(c.get("ip", ""))
+		var port := int(c.get("port", 0))
+		if ip.is_valid_ip_address() and ip.count(".") == 3 and port > 0 and port < 65536:
+			_candidates.append({ip = ip, port = port})
+			if is_host:
+				_expected[ip] = true
+	_punch_at = _now() + clampi(start_in_ms, 0, 2000)
+
+
+## How an internet connection runs: "direct" or "relay" ("" on a LAN).
+func connection_path() -> String:
+	if server_ip == "":
+		return ""
+	return "relay" if remote_ip == RELAY_IP else "direct"
+
+
 func local_port() -> int:
 	return _socket.get_local_port()
 
@@ -277,6 +374,12 @@ func close_socket() -> void:
 	_recv_highest = -1
 	_recv_window = 0
 	security_code = ""
+	server_ip = ""
+	server_port = 0
+	bound = false
+	_candidates.clear()
+	_punch_at = -1
+	_expected = {}
 
 
 func send_input(bytes: PackedByteArray) -> void:
@@ -307,15 +410,24 @@ func poll() -> void:
 		_receive(bytes, ip, port, now)
 		if status == Status.CLOSED:
 			return
+	if server_ip != "" and now - _last_bind >= (BIND_KEEPALIVE_MS if bound else BIND_INTERVAL_MS):
+		_last_bind = now
+		_send_to(server_ip, server_port, _bind_datagram())
 	match status:
 		Status.HOSTING:
 			if not pending.is_empty() and now - int(pending.seen) > CANDIDATE_TIMEOUT_MS:
 				var gave_up: String = pending.name
 				pending = {}
 				join_cancelled.emit(gave_up)
+			if _punch_at >= 0 and now >= _punch_at and now - _punch_at < PUNCH_TIMEOUT_MS and now - _last_hello >= PUNCH_INTERVAL_MS:
+				_last_hello = now
+				for c: Dictionary in _candidates:
+					_send_to(c.ip, c.port, PackedByteArray([T_PUNCH]))
 		Status.JOINING:
-			if now - _last_answer > JOIN_TIMEOUT_MS:
-				_fail("No answer from %s:%d" % [remote_ip, remote_port])
+			if server_ip != "" and remote_ip == "":
+				_find_path(now)
+			elif now - _last_answer > JOIN_TIMEOUT_MS:
+				_fail("No answer from the host through the server" if remote_ip == RELAY_IP else "No answer from %s:%d" % [remote_ip, remote_port])
 			elif now - _last_hello >= HELLO_INTERVAL_MS:
 				_last_hello = now
 				_send_now(_hello())
@@ -356,11 +468,23 @@ func poll() -> void:
 
 func _receive(bytes: PackedByteArray, ip: String, port: int, now: int) -> void:
 	var type := bytes[0]
+	if server_ip != "" and type >= S_BIND and ip == server_ip and port == server_port:
+		_on_server_datagram(bytes, now)
+		return
 	if type == T_DISCOVER:
 		# LAN only: never answer the internet (an ANNOUNCE is bigger than the query).
-		if is_host and status != Status.IDLE and status != Status.CLOSED and is_private_address(ip):
+		if is_host and server_ip == "" and status != Status.IDLE and status != Status.CLOSED and is_private_address(ip):
 			_announce_to(bytes, ip, port)
 		return
+	if type == T_PUNCH:
+		return
+	if not is_host and not _socket.is_socket_connected():
+		# A server-mode guest's socket hears everyone: only the host's address counts.
+		if remote_ip == "":
+			if not _is_candidate(ip, port):
+				return
+		elif ip != remote_ip or port != remote_port:
+			return
 	if is_host:
 		if type == T_HELLO:
 			_on_hello(bytes, ip, port, now)
@@ -368,7 +492,7 @@ func _receive(bytes: PackedByteArray, ip: String, port: int, now: int) -> void:
 		if (status != Status.SECURING and status != Status.CONNECTED) or ip != remote_ip or port != remote_port:
 			return
 	elif status == Status.JOINING:
-		_on_handshake_reply(bytes, now)
+		_on_handshake_reply(bytes, now, ip, port)
 		return
 	if status != Status.SECURING and status != Status.CONNECTED:
 		return
@@ -427,6 +551,8 @@ func _receive(bytes: PackedByteArray, ip: String, port: int, now: int) -> void:
 
 ## Host: HELLO → CHALLENGE, or (with a valid cookie) the real answer.
 func _on_hello(bytes: PackedByteArray, ip: String, port: int, now: int) -> void:
+	if server_ip != "" and not _expected.has(ip):
+		return # an internet game: only the player the server matched us with
 	var hello := _parse_hello(bytes)
 	if hello.is_empty():
 		return
@@ -456,7 +582,7 @@ func _on_hello(bytes: PackedByteArray, ip: String, port: int, now: int) -> void:
 	if problem != "":
 		_reply_to(ip, port, _reject(hello.nonce, problem), true)
 		return
-	if auto_accept:
+	if auto_accept or server_ip != "": # the server already asked the host
 		remote_ip = ip
 		remote_port = port
 		remote_name = hello.name
@@ -475,9 +601,12 @@ func _on_hello(bytes: PackedByteArray, ip: String, port: int, now: int) -> void:
 
 
 ## Guest: CHALLENGE / PENDING / WELCOME / REJECT, each only with our nonce.
-func _on_handshake_reply(bytes: PackedByteArray, now: int) -> void:
+func _on_handshake_reply(bytes: PackedByteArray, now: int, ip: String, port: int) -> void:
 	if bytes.size() < 9 or bytes.decode_u64(1) != _nonce:
 		return
+	if remote_ip == "": # server mode: the first candidate to answer is the way through
+		remote_ip = ip
+		remote_port = port
 	match bytes[0]:
 		T_CHALLENGE:
 			if bytes.size() < 17:
@@ -572,7 +701,6 @@ func _start_securing() -> void:
 	_token = _random_u64()
 	_commitment = PackedByteArray()
 	_key_cipher = PackedByteArray()
-	_socket.set_dest_address(remote_ip, remote_port)
 	if host_key_ready():
 		_prepare_welcome()
 		_send_now(_welcome())
@@ -729,7 +857,99 @@ func _flush_delayed(now: int) -> void:
 
 
 func _send_now(bytes: PackedByteArray) -> void:
+	_send_to(remote_ip, remote_port, bytes)
+
+
+## Sends one datagram: through the server's relay for RELAY_IP, else straight there.
+func _send_to(ip: String, port: int, bytes: PackedByteArray) -> void:
+	if ip == RELAY_IP:
+		if server_ip == "" or bytes.size() > MAX_RELAY_PAYLOAD:
+			return
+		var wrapped := PackedByteArray([S_RELAY])
+		wrapped.append_array(_relay_key)
+		wrapped.append_array(bytes)
+		bytes = wrapped
+		ip = server_ip
+		port = server_port
+	if _socket.is_socket_connected():
+		_socket.put_packet(bytes) # a LAN guest's socket only talks to the host
+		return
+	if ip == "":
+		return
+	_socket.set_dest_address(ip, port)
 	_socket.put_packet(bytes)
+
+
+## Guest in server mode, before any candidate answered: HELLOs to every candidate after
+## the agreed start; none answering in PUNCH_TIMEOUT_MS (or none at all) = the relay.
+func _find_path(now: int) -> void:
+	if _punch_at < 0:
+		if now - _server_since > ENDPOINTS_TIMEOUT_MS:
+			_fail("The server couldn't connect you to the host")
+		return
+	if now < _punch_at:
+		return
+	if _candidates.is_empty() or now - _punch_at >= PUNCH_TIMEOUT_MS:
+		remote_ip = RELAY_IP
+		remote_port = 0
+		_cookie = 0
+		_last_answer = now
+		_last_hello = -HELLO_INTERVAL_MS
+		return
+	if now - _last_hello >= PUNCH_INTERVAL_MS:
+		_last_hello = now
+		var hello := _hello()
+		for c: Dictionary in _candidates:
+			_send_to(c.ip, c.port, hello)
+
+
+func _is_candidate(ip: String, port: int) -> bool:
+	for c: Dictionary in _candidates:
+		if c.ip == ip and c.port == port:
+			return true
+	return false
+
+
+## BOUND (the address the server saw) and RELAYED (a datagram from the peer).
+func _on_server_datagram(bytes: PackedByteArray, now: int) -> void:
+	match bytes[0]:
+		S_BOUND:
+			if bytes.size() == 7:
+				bound = true
+				public_endpoint = "%d.%d.%d.%d:%d" % [bytes[1], bytes[2], bytes[3], bytes[4], bytes.decode_u16(5)]
+		S_RELAYED:
+			if bytes.size() >= 2 and bytes[1] < S_BIND:
+				_receive(bytes.slice(1), RELAY_IP, 0, now)
+
+
+## [BIND][session token 16][role][n][n × (ipv4, u16 port)]: this socket's LAN addresses,
+## which the server passes on when both players are behind the same public address.
+func _bind_datagram() -> PackedByteArray:
+	var out := PackedByteArray([S_BIND])
+	out.append_array(_server_token)
+	out.append(_bind_role)
+	var locals := local_candidates(local_port())
+	out.append(locals.size())
+	for c: Dictionary in locals:
+		for part in (c.ip as String).split("."):
+			out.append(int(part))
+		var port_bytes := PackedByteArray()
+		port_bytes.resize(2)
+		port_bytes.encode_u16(0, c.port)
+		out.append_array(port_bytes)
+	return out
+
+
+## This machine's private IPv4 addresses with `port` (at most MAX_BIND_CANDIDATES).
+static func local_candidates(port: int) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for address in IP.get_local_addresses():
+		if address.count(".") == 3 and is_private_address(address) and not address.begins_with("127.") \
+				and not address.begins_with("169.254."):
+			out.append({ip = address, port = port})
+			if out.size() >= MAX_BIND_CANDIDATES:
+				break
+	return out
 
 
 ## Host: a reply to some address other than the connected guest, under the rate limits.
@@ -747,10 +967,7 @@ func _reply_to(ip: String, port: int, bytes: PackedByteArray, verified: bool) ->
 		if _unverified_replies >= MAX_UNVERIFIED_REPLIES:
 			return
 		_unverified_replies += 1
-	_socket.set_dest_address(ip, port)
-	_socket.put_packet(bytes)
-	if status == Status.SECURING or status == Status.CONNECTED:
-		_socket.set_dest_address(remote_ip, remote_port)
+	_send_to(ip, port, bytes)
 
 
 ## Key exchange datagrams: [type][session token][body], not encrypted.

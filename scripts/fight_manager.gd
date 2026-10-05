@@ -72,8 +72,9 @@ var _arcade_won := false
 ## True while rollback netcode re-runs frames that were already shown: the simulation
 ## runs as normal, but announcements, sounds, camera moves and effects are skipped.
 var resimulating := false
-## The online match driver (ONLINE mode only).
-var netplay: NetplayMatch
+## The online match driver (ONLINE mode only): a NetplayMatch, or a SpectatorMatch when
+## watching an internet match.
+var netplay: Node
 
 @onready var camera: ActionCamera = $ActionCamera
 @onready var hud: FightHud = $HUD
@@ -133,7 +134,7 @@ func _ready() -> void:
 		training.setup(self)
 	start_match()
 	if is_online():
-		netplay = NetplayMatch.new()
+		netplay = SpectatorMatch.new() if Net.spectating else NetplayMatch.new()
 		add_child(netplay)
 		netplay.setup(self)
 	_update_debug_text()
@@ -335,7 +336,7 @@ func _start_victory(winner: Fighter) -> void:
 	camera.start_victory(winner)
 	hud.announce("")
 	hud.start_cinematic()
-	if is_online():
+	if is_online() and not Net.spectating:
 		Audio.voice("you_win" if fighters.find(winner) == Net.local_index else "you_lose")
 	elif is_versus():
 		Audio.voice_sequence(["player_%d" % (fighters.find(winner) + 1), "winner"])

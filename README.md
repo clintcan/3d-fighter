@@ -17,7 +17,7 @@ Its signature is a **dynamic action camera** that orbits and dollies in on every
   - **Jin**: Tae Kwon Do kicker who controls kick range.
 - **Outfits** that fit each style: a karate gi with headband, a Tae Kwon Do dobok, kickboxing gear, a wrestling singlet with knee pads and boots, a brawler's tank top and work pants. Mirror matches get alternate colours.
 - **5 stages**: Boxing Ring, Dojo, Rooftop, Temple, Beach. Each has its own music.
-- **Modes**: Vs CPU, Arcade (ladder, scoring, shadow boss), local 2-player Versus, **Online** (rollback netcode, LAN discovery or join by IP), and Training (frame data, input display, record/playback).
+- **Modes**: Vs CPU, Arcade (ladder, scoring, shadow boss), local 2-player Versus, **Online** (rollback netcode, LAN discovery, join by IP, or an internet lobby server with rooms and spectating), and Training (frame data, input display, record/playback).
 - **Fighting-game systems**: super meter with cinematic super freezes, counter hits, combos, juggles, throws and throw breaks, high/mid/low blocking, and Tekken-style sidesteps.
 - **Engine**: a deterministic 60 Hz simulation (verified identical on Windows and Linux) with a headless regression test suite.
 
@@ -43,6 +43,7 @@ Its signature is a **dynamic action camera** that orbits and dollies in on every
 - **Specials** use motion inputs (for example ↓↘→ + P), and a full super meter enables ↓↘→↓↘→ + P/K. Each fighter's moves are listed in the pause menu.
 - **Player 2** uses the arrow keys with numpad 4/5 (punches), 1/2 (kicks) and 6 (sidestep), or a second gamepad.
 - **Online:** one player hosts; on the same network the other picks the game from the list, or joins by address (UDP port 7777; forward it on the host's router to play over the internet). Both players need the same build. Connections are encrypted, and both screens show a 6-digit security code to compare.
+- **Internet lobby** (Online → Internet Lobby): connect to a 3D Fighter lobby server, open a room or join one from the list or by its 6-letter code, no port forwarding needed (the server punches through NATs, or relays the encrypted traffic). Rooms can allow spectators, who watch live with a short delay and can send reactions.
 - **Remapping:** every key and gamepad button can be changed per player in **Options → Controls**, which shows a controller diagram. The triggers can be bound too.
 
 ## Run from source

@@ -5,6 +5,7 @@ extends Control
 
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
+const SERVER_LOBBY_SCENE := "res://scenes/server_lobby.tscn"
 const WALLPAPER := "res://assets/ui/wallpaper.png"
 const GOLD := Color(1.0, 0.82, 0.3)
 const DIM := Color(0.72, 0.75, 0.82)
@@ -14,6 +15,7 @@ const NOTHING_FOUND_MS := 4000 # searching this long with no result shows the hi
 var _name_edit: LineEdit
 var _address_edit: LineEdit
 var _host_button: Button
+var _lobby_button: Button
 var _join_button: Button
 var _back_button: Button
 var _status: Label
@@ -218,6 +220,7 @@ func _save_name() -> void:
 func _set_busy(busy: bool) -> void:
 	_busy = busy
 	_host_button.disabled = busy
+	_lobby_button.disabled = busy
 	_join_button.disabled = busy
 	_address_edit.editable = not busy
 	_name_edit.editable = not busy
@@ -273,9 +276,17 @@ func _build() -> void:
 	_name_edit.max_length = 24
 	name_row.add_child(_name_edit)
 
+	var host_row := _row(column)
+	host_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_host_button = _button("Host Game")
 	_host_button.pressed.connect(_host)
-	column.add_child(_host_button)
+	host_row.add_child(_host_button)
+	_lobby_button = _button("Internet Lobby")
+	_lobby_button.tooltip_text = "Rooms on a lobby server: no port forwarding, and you can watch matches"
+	_lobby_button.pressed.connect(func() -> void:
+		_save_name()
+		get_tree().change_scene_to_file(SERVER_LOBBY_SCENE))
+	host_row.add_child(_lobby_button)
 
 	column.add_child(_label("GAMES ON YOUR NETWORK", 22, GOLD))
 	var lan_box := PanelContainer.new()

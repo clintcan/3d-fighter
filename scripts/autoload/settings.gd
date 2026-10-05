@@ -14,6 +14,12 @@ var swap_pads := false
 ## Online: the name shown to opponents, and the last address joined.
 var player_name := ""
 var last_join_address := ""
+## Internet lobby: the server's address (ws:// or wss://), whether to always play through
+## its relay (the opponent never sees your IP address), and this installation's random id
+## (the server uses it for bans and "same player again" hints, never shown to others).
+var server_url := ""
+var relay_only := false
+var client_id := ""
 
 
 func _ready() -> void:
@@ -34,6 +40,9 @@ func load_settings() -> void:
 	swap_pads = cfg.get_value("input", "swap_pads", swap_pads)
 	player_name = cfg.get_value("online", "player_name", player_name)
 	last_join_address = cfg.get_value("online", "last_join_address", last_join_address)
+	server_url = cfg.get_value("online", "server_url", server_url)
+	relay_only = cfg.get_value("online", "relay_only", relay_only)
+	client_id = cfg.get_value("online", "client_id", client_id)
 	InputSetup.load_bindings(cfg)
 
 
@@ -48,6 +57,9 @@ func save_settings() -> void:
 	cfg.set_value("input", "swap_pads", swap_pads)
 	cfg.set_value("online", "player_name", player_name)
 	cfg.set_value("online", "last_join_address", last_join_address)
+	cfg.set_value("online", "server_url", server_url)
+	cfg.set_value("online", "relay_only", relay_only)
+	cfg.set_value("online", "client_id", client_id)
 	InputSetup.save_bindings(cfg)
 	cfg.save(PATH)
 
@@ -58,6 +70,23 @@ func online_name() -> String:
 		return player_name.strip_edges().left(24)
 	var user := OS.get_environment("USERNAME") if OS.has_environment("USERNAME") else OS.get_environment("USER")
 	return user.left(24) if user != "" else "Player"
+
+
+## This installation's lobby id (a random UUID, made and saved on first use).
+func get_client_id() -> String:
+	if client_id == "":
+		client_id = new_uuid()
+		save_settings()
+	return client_id
+
+
+## A random (version 4) UUID.
+static func new_uuid() -> String:
+	var b := Crypto.new().generate_random_bytes(16)
+	b[6] = (b[6] & 0x0F) | 0x40
+	b[8] = (b[8] & 0x3F) | 0x80
+	var h := b.hex_encode()
+	return "%s-%s-%s-%s-%s" % [h.substr(0, 8), h.substr(8, 4), h.substr(12, 4), h.substr(16, 4), h.substr(20, 12)]
 
 
 func apply() -> void:

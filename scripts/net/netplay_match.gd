@@ -4,10 +4,13 @@ extends Node
 ## this machine's Player 1 controls and the Net connection, and shows the connection
 ## (ping, rollback, quality bars). Esc asks before leaving (an online match can't pause).
 ## Handles the opponent leaving, the connection dropping, and desyncs.
+## In an internet room it also publishes the match to spectators (SpectatorFeed.Publisher:
+## setup, confirmed inputs, checksums, result) and keeps the room's listing up to date.
 
 const QUALITY_COLORS := [Color(0.9, 0.25, 0.2), Color(0.95, 0.55, 0.2), Color(0.95, 0.8, 0.25), Color(0.6, 0.85, 0.3), Color(0.3, 0.85, 0.4)]
 const STALL_NOTICE_TICKS := 30 # waiting this long for the opponent shows a notice
 const SMOKE_CHECK_TICK := 1200
+const ROOM_REPORT_TICKS := 30 # how often the room's round / wins are checked
 
 var manager: Node # FightManager
 var session: RollbackSession
@@ -21,6 +24,8 @@ var _rng := RandomNumberGenerator.new() # smoke test inputs only
 var _smoke_input := InputBuffer.pack(InputBuffer.NEUTRAL, 0)
 var _smoke_hold := 0
 var _smoke_done := false
+var _publisher: SpectatorFeed.Publisher
+var _reported := [] # round and wins last sent to the server
 
 
 func setup(fight_manager: Node) -> void:
@@ -40,6 +45,8 @@ func setup(fight_manager: Node) -> void:
 	hud.p1_name.text = "%s  ·  %s" % [manager.fighters[0].data.display_name, names[0]]
 	hud.p2_name.text = "%s  ·  %s" % [names[1], manager.fighters[1].data.display_name]
 	hud.configure_result("Rematch", "Character Select", "Leave")
+	if Net.publishing():
+		_start_publishing(names)
 
 
 func _exit_tree() -> void:
@@ -60,6 +67,8 @@ func _physics_process(_delta: float) -> void:
 	var input := _local_input()
 	var advanced := session.advance(input)
 	Net.peer.send_input(session.make_packet())
+	if _publisher:
+		_publish()
 	_stalled_for = 0 if advanced else _stalled_for + 1
 	if Engine.get_physics_frames() % 10 == 0 or not advanced:
 		_update_status()
@@ -97,8 +106,10 @@ func request_rematch() -> void:
 
 func leave() -> void:
 	ended = true
+	_finish_feed(SpectatorFeed.Result.ABORTED)
+	var exit := Net.exit_scene()
 	Net.leave()
-	manager._go_to(Net.MAIN_MENU_SCENE)
+	manager._go_to(exit)
 
 
 # --- Events ----------------------------------------------------------------------
@@ -107,6 +118,7 @@ func _on_left(reason: String) -> void:
 	if ended:
 		return
 	ended = true
+	_finish_feed(SpectatorFeed.Result.ABORTED)
 	_leave_prompt.visible = false
 	_status.text = ""
 	manager.hud.announce("DISCONNECTED", reason.to_upper(), true)
@@ -119,6 +131,7 @@ func _on_left(reason: String) -> void:
 func _on_desynced(frame: int, local_checksum: int, remote_checksum: int) -> void:
 	push_error("Netplay desync at tick %d (local %08x, remote %08x)" % [frame, local_checksum, remote_checksum])
 	ended = true
+	_finish_feed(SpectatorFeed.Result.ABORTED)
 	manager.hud.announce("DESYNC", "THE MATCH WAS STOPPED", true)
 	manager.hud.configure_result("", "", "Leave")
 	manager.hud.show_result()
@@ -132,6 +145,44 @@ func _on_rematch_changed() -> void:
 		manager.hud.configure_result("Waiting for opponent...", "Character Select", "Leave")
 	elif Net.rematch_remote and not Net.rematch_local:
 		manager.hud.configure_result("Rematch (opponent is ready)", "Character Select", "Leave")
+
+
+# --- Spectator feed (internet rooms) -----------------------------------------------
+
+func _start_publishing(names: Array) -> void:
+	_publisher = SpectatorFeed.Publisher.new(session, Net.publish)
+	var p1: CharacterData = manager.fighters[0].data
+	var p2: CharacterData = manager.fighters[1].data
+	var stage_id := GameState.stage_path.get_file().get_basename()
+	_publisher.start(maxi(GameState.stage_paths().find(GameState.stage_path), 0), GameState.roster.find(p1), GameState.roster.find(p2),
+		PackedStringArray([GameState.game_version(), stage_id, p1.id, p2.id, names[0], names[1]]))
+	_reported = [1, [0, 0]]
+	Net.report_room("in_match", {fighters = [str(p1.id), str(p2.id)], stage = stage_id, round = 1, wins = [0, 0]})
+
+
+## Confirmed inputs to the server; the result once the match is over and confirmed (no
+## prediction left, so a rollback can't change it any more); the round now and then.
+func _publish() -> void:
+	_publisher.update(Time.get_ticks_msec())
+	if session.prediction_depth() > 0:
+		return
+	if manager.phase == manager.Phase.MATCH_OVER and not _publisher.ended:
+		var wins: Array = manager.round_wins
+		var result := SpectatorFeed.Result.DRAW
+		if manager.match_winner:
+			result = SpectatorFeed.Result.P1_WON if manager.match_winner == manager.fighters[0] else SpectatorFeed.Result.P2_WON
+		_publisher.finish(result, wins[0], wins[1], Time.get_ticks_msec())
+		Net.report_room("results", {round = manager.round_number, wins = [wins[0], wins[1]]})
+	elif session.frame % ROOM_REPORT_TICKS == 0 and manager.phase != manager.Phase.MATCH_OVER:
+		var now := [manager.round_number, [manager.round_wins[0], manager.round_wins[1]]]
+		if now != _reported:
+			_reported = now
+			Net.report_room("in_match", {round = now[0], wins = now[1]})
+
+
+func _finish_feed(result: int) -> void:
+	if _publisher and not _publisher.ended:
+		_publisher.finish(result, manager.round_wins[0], manager.round_wins[1], Time.get_ticks_msec())
 
 
 # --- Connection display ----------------------------------------------------------
@@ -225,7 +276,8 @@ func _smoke_check() -> void:
 	_smoke_done = true
 	print("SMOKE TEST: online checksum at tick %d = %08x (rollbacks %d, %d ticks re-run, stalls %d)" % [
 		SMOKE_CHECK_TICK, session.checksums[SMOKE_CHECK_TICK], session.rollbacks, session.rollback_ticks, session.stalls])
-	# Keep sending for a moment so the opponent can confirm its own checksum too.
-	get_tree().create_timer(1.5).timeout.connect(func() -> void:
+	# Keep sending for a moment so the opponent can confirm its own checksum too (and, in
+	# an internet room, so spectators get past this tick despite the feed's delay).
+	get_tree().create_timer(8.0 if _publisher else 1.5).timeout.connect(func() -> void:
 		Net.leave()
 		get_tree().quit())
