@@ -342,6 +342,7 @@ func _initialize() -> void:
 	await valka_tests()
 	await temple_tests()
 	await jin_tests()
+	await mira_tests()
 	await beach_tests()
 	await scores_credits_tests()
 	await controls_tests()
@@ -1244,7 +1245,7 @@ func controls_tests() -> void:
 func jin_tests() -> void:
 	var gs = root.get_node("GameState")
 	var jin: CharacterData = gs.roster.filter(func(c): return c.id == &"jin").front()
-	check("Jin: in the roster as the fifth fighter", jin != null and gs.roster.size() == 5 and gs.roster[4] == jin)
+	check("Jin: in the roster as the fifth fighter", jin != null and gs.roster.size() >= 5 and gs.roster[4] == jin)
 	gs.mode = gs.Mode.VS_CPU
 	gs.player_character = jin; gs.p2_character = gs.roster[0]
 	gs.stage_path = gs.DEFAULT_STAGE
@@ -1288,6 +1289,133 @@ func jin_tests() -> void:
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 
 
+## Mira (Brawler): Lakas Stance builds Focus (no hitbox, capped at 3), Focus powers
+## Bagyo Rush and picks the super's finisher, knockdowns take it away, it survives a
+## rollback snapshot, the dive kick changes the jump arc, and her detailed textures.
+func mira_tests() -> void:
+	var gs = root.get_node("GameState")
+	var mira: CharacterData = gs.roster.filter(func(c): return c.id == &"mira").front()
+	check("Mira: in the roster as the sixth fighter", mira != null and gs.roster.size() == 6 and gs.roster[5] == mira)
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = mira; gs.p2_character = gs.roster[0]
+	gs.stage_path = gs.DEFAULT_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	var cpu := AIController.new()
+	cpu.attach(p1)
+	check("Mira: Brawler CPU personality", cpu.personality_name() == "Brawler")
+	check("Mira: the CPU never picks Lakas Stance as an attack",
+		cpu._special_with(func(mv: MoveData) -> bool: return mv.motion() == "214") == null and cpu._stance(p1) != null)
+
+	# Lakas Stance: one level each, capped at 3, and it never hits.
+	reset(DummyController.Mode.STAND); approach(0.9); step(16)
+	var hp := p2.health
+	for i in 4:
+		motion("214", InputBuffer.LP)
+		step(40)
+	check("Mira: Lakas Stance raises Focus to 3 and no further", p1.focus == Fighter.MAX_FOCUS, "focus %d" % p1.focus)
+	check("Mira: Lakas Stance has no hitbox", p2.health == hp, "hp %d -> %d" % [hp, p2.health])
+
+	# Bagyo Rush: 3 hits at Focus 0; at Focus 3, 6 hits and much more damage.
+	var rush := [[0, 0, 0], [0, 0, 0]] # [focus, hits, damage]
+	for k in 2:
+		reset(DummyController.Mode.STAND); approach(1.0); step(16)
+		p1._set_focus(3 * k)
+		hp = p2.health
+		var most := 0
+		motion("236", InputBuffer.LP)
+		for t in 90:
+			step()
+			most = maxi(most, p2.combo_hits)
+		rush[k] = [3 * k, most, hp - p2.health]
+	check("Mira: Bagyo Rush hits 3 times, 6 at full Focus", rush[0][1] == 3 and rush[1][1] == 6, "%s" % [rush])
+	check("Mira: full Focus more than doubles Bagyo Rush's damage", rush[1][2] > rush[0][2] * 2, "%s" % [rush])
+
+	# A knockdown takes her Focus away.
+	reset(DummyController.Mode.STAND); step(4)
+	p1._set_focus(2)
+	p1.receive_hit(p2, p2._move_for_input("2HK"))
+	wait_until(func() -> bool: return p1.state == Fighter.State.KNOCKDOWN, 60)
+	check("Mira: a knockdown resets Focus", p1.state == Fighter.State.KNOCKDOWN and p1.focus == 0, "%s, focus %d" % [state_name(p1), p1.focus])
+
+	# Focus is simulation state: it comes back with a rollback snapshot.
+	reset(DummyController.Mode.STAND); step(4)
+	p1._set_focus(2)
+	var snapshot: Dictionary = p1.save_state()
+	p1._set_focus(0)
+	p1.load_state(snapshot)
+	check("Mira: Focus is part of the rollback snapshot", p1.focus == 2)
+
+	# The super uses Focus up; at full Focus it ends in the stronger finisher.
+	for full in [false, true]:
+		reset(DummyController.Mode.STAND); approach(1.0); step(16)
+		p1.add_meter(Fighter.MAX_METER)
+		p1._set_focus(Fighter.MAX_FOCUS if full else 0)
+		motion("236236", InputBuffer.LP)
+		var used := p1.focus == 0
+		var finisher := ""
+		for t in 160:
+			step()
+			if p1.current_move and p1.current_move.input.begins_with("~"):
+				finisher = p1.current_move.input
+				break
+		var expected := "~hagupit_max" if full else "~hagupit_finish"
+		check("Mira: the super%s ends in %s" % [" at full Focus" if full else "", expected], used and finisher == expected,
+			"focus used %s, finisher '%s'" % [used, finisher])
+		step(120)
+
+	# Lawin Drop: down + kick in the air dives down and forward.
+	reset(DummyController.Mode.STAND); step(4)
+	ctl.dir = 8; step(1); ctl.dir = 5; step(12)
+	var height := p1.position.y
+	press(InputBuffer.LK, 2); ctl.dir = 5
+	var dove := false
+	for t in 12:
+		step()
+		if p1.current_move and p1.current_move.input == "j.2K" and p1.velocity.y < -5.0 and p1.velocity.dot(p1.forward) > 3.0:
+			dove = true
+	check("Mira: Lawin Drop dives down and forward from a jump", height > 0.3 and dove, "height %.2f" % height)
+	step(60)
+	check("Mira: the move list shows the dive kick with an arrow", FightHud.notation("j.2K") == "j.↓ K", FightHud.notation("j.2K"))
+
+	# Detailed textures: hem shading and stitch lines in the outfit, a second UV set for the
+	# skin detail, and the materials that use them (other fighters keep the plain ones).
+	var outfit := mira.outfit_mesh as ArrayMesh
+	var darkest := 1.0
+	var brightest := 0.0
+	for surface in outfit.get_surface_count():
+		var colors = outfit.surface_get_arrays(surface)[Mesh.ARRAY_COLOR]
+		if colors == null:
+			darkest = -1.0
+			break
+		for c: Color in colors:
+			darkest = minf(darkest, c.r)
+			brightest = maxf(brightest, c.r)
+	check("Mira: the outfit has hem shading and stitch lines", mira.detailed_textures and darkest > 0.5 and darkest < 0.7 and brightest > 0.99,
+		"%.2f .. %.2f" % [darkest, brightest])
+	check("Mira: her body carries a second UV set", (mira.outfit_body_mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_TEX_UV2] != null)
+	var looks := {}
+	for character: CharacterData in [mira, gs.roster[0]]:
+		var model := FighterModel.new()
+		root.add_child(model)
+		model.build(character)
+		var cloth := (model.skeleton.get_node("Outfit") as MeshInstance3D).get_surface_override_material(0) as StandardMaterial3D
+		var skin: StandardMaterial3D
+		for mi: MeshInstance3D in model.skeleton.find_children("*", "MeshInstance3D", true, false):
+			if mi.mesh == character.outfit_body_mesh:
+				skin = mi.get_surface_override_material(0)
+		looks[character.id] = [cloth.albedo_texture != null and cloth.vertex_color_use_as_albedo,
+			skin.detail_enabled and skin.detail_uv_layer == BaseMaterial3D.DETAIL_UV_2 and skin.detail_normal != null]
+		model.queue_free()
+	check("Mira: detailed cloth (weave, hem shading) and skin detail", looks[&"mira"] == [true, true], "%s" % [looks])
+	check("Other fighters keep the plain materials", looks[&"kenji"] == [false, false], "%s" % [looks])
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+
+
 ## Generated clothing (tools/build_outfits.gd): every fighter is dressed, the outfit is
 ## a valid skinned mesh on the body's skin, the covered skin is removed, and mirror
 ## matches get the alternate colours.
@@ -1302,9 +1430,10 @@ func outfit_tests() -> void:
 		var names := []
 		for surface in outfit.get_surface_count():
 			names.append(outfit.surface_get_name(surface))
+		var slots := character.outfit_colors.size()
 		check("%s outfit surfaces are colour slots with colours and fabrics" % id,
-			names.all(func(n): return n in ["main", "trim", "accent"]) and character.outfit_colors.size() == 3
-			and character.alt_outfit_colors.size() == 3 and character.outfit_fabrics.size() == 3
+			names.all(func(n): return n in ["main", "trim", "accent", "extra"]) and slots >= names.size()
+			and character.alt_outfit_colors.size() == slots and character.outfit_fabrics.size() == slots
 			and character.alt_outfit_colors != character.outfit_colors, "%s" % [names])
 		var base_triangles := 0
 		var base_scene := character.model_scene.instantiate()

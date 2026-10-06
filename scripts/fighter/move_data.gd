@@ -72,6 +72,23 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 @export var grab_range: float = 1.0
 ## Projectiles pass through the fighter during this move's startup and active frames.
 @export var projectile_immune: bool = false
+## Air move: on its first active frame the attacker dives along (forward, down) m/s
+## (dive kicks). The move lasts until landing.
+@export var dive: Vector2 = Vector2.ZERO
+
+@export_group("Focus")
+## Focus levels (Fighter.focus, 0..MAX_FOCUS) gained on the first active frame (stances).
+@export var focus_gain: int = 0
+## Per focus level: extra hits (fitted into the same active frames), extra damage
+## (fraction of the move's damage), extra rise (m/s).
+@export var focus_hits: int = 0
+@export var focus_damage: float = 0.0
+@export var focus_rise: float = 0.0
+## Starting the move uses up the fighter's focus (its level still powers this move and
+## its follow-up).
+@export var focus_consume: bool = false
+## Follow-up used instead of `followup` when the move started at full focus.
+@export var focus_followup: String = ""
 
 @export_group("Hitbox")
 ## Sphere hitbox. Offset is in the fighter's local space (-Z = toward opponent), or

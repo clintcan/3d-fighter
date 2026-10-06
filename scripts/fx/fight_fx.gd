@@ -14,6 +14,7 @@ const HIT_COLOR := Color(1.0, 0.75, 0.35)
 const COUNTER_COLOR := Color(1.0, 0.35, 0.15)
 const BLOCK_COLOR := Color(0.45, 0.75, 1.0)
 const SUPER_COLOR := Color(1.0, 0.82, 0.3)
+const FOCUS_COLOR := Color(1.0, 0.55, 0.15) # a focus power-up (Mira's Lakas Stance)
 const TRAIL_COLOR := Color(0.8, 0.9, 1.0)
 const DEBRIS_COLOR := Color(0.55, 0.45, 0.35)
 
@@ -96,7 +97,8 @@ func _on_attack_started(move: MoveData, fighter: Fighter) -> void:
 		Audio.shout(fighter.data.id, "special")
 
 
-## First active frame: launch flash, rising burst, or ground-pound shockwave.
+## First active frame: launch flash, rising burst, ground-pound shockwave, or a focus
+## power-up (a ring at the feet and rising sparks).
 func _on_move_active(fighter: Fighter, move: MoveData) -> void:
 	if move.projectile_speed > 0.0:
 		spark(fighter.global_transform * Projectile.SPAWN_OFFSET, move.projectile_color, 1.0)
@@ -110,6 +112,11 @@ func _on_move_active(fighter: Fighter, move: MoveData) -> void:
 		_debris(point)
 		Audio.sfx(&"fall", 2.0, 0.7)
 		manager.camera.shake(0.35)
+	if move.impact_fx == &"focus":
+		var feet := fighter.global_position + Vector3.UP * 0.03
+		_ring(feet, FOCUS_COLOR, 2.2, true)
+		spark(fighter.global_position + Vector3.UP * 1.0, FOCUS_COLOR, 1.5)
+		Audio.sfx(&"super", -8.0, 1.35)
 
 
 ## Trails and strike sparks follow fighters while a qualifying move is active.

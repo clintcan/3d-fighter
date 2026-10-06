@@ -304,15 +304,22 @@ func _build_meters() -> void:
 func _bind_meter(fighter: Fighter, side: int) -> void:
 	var bar := _meters[side]
 	bar.max_value = Fighter.MAX_METER
+	# Fighters with a power-up stance (Mira) also show their focus level as pips.
+	var has_focus := fighter.data.moves.any(func(move: MoveData) -> bool: return move.focus_gain > 0)
 	var update := func(current: int, maximum: int) -> void:
 		bar.max_value = maximum
 		bar.value = current
 		var full := current >= maximum
 		(bar.get_theme_stylebox("fill") as StyleBoxFlat).bg_color = METER_FULL_COLOR if full else METER_COLOR
-		_meter_labels[side].text = "SUPER  ★ READY" if full else "SUPER"
+		var text := "SUPER  ★ READY" if full else "SUPER"
+		if has_focus:
+			text += "    FOCUS " + "◆".repeat(fighter.focus) + "◇".repeat(Fighter.MAX_FOCUS - fighter.focus)
+		_meter_labels[side].text = text
 		_meter_labels[side].modulate = METER_FULL_COLOR if full else Color.WHITE
 	update.call(fighter.meter, Fighter.MAX_METER)
 	fighter.meter_changed.connect(update)
+	if has_focus:
+		fighter.focus_changed.connect(func(_level: int) -> void: update.call(fighter.meter, Fighter.MAX_METER))
 
 
 func _process(_delta: float) -> void:
@@ -471,6 +478,8 @@ func _move_list_text(character: CharacterData) -> String:
 
 ## "236P" -> "↓↘→ P" (numpad motion as arrows, facing right).
 static func notation(input: String) -> String:
+	if input.begins_with("j.") and input.length() > 3 and input[2].is_valid_int():
+		return "j." + notation(input.substr(2)) # air moves with a direction: "j.↓ K"
 	var arrows := ""
 	var i := 0
 	while i < input.length() and input[i].is_valid_int():

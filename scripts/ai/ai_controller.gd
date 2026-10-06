@@ -10,6 +10,9 @@ extends FighterController
 ## the difficulty: a preferred fighting range it steers toward, skill bonuses, weights on
 ## its options, how often it keeps pressure on a blocking opponent, and how far it
 ## reaches to punish a whiff.
+## A power-up stance (a special with focus_gain, Mira's Lakas Stance) is never picked as
+## an attack: the CPU uses it on purpose, at range and while the opponent is knocked
+## down, weighted by the personality's `stance`.
 
 enum Difficulty { EASY, NORMAL, HARD }
 
@@ -74,6 +77,13 @@ const PERSONALITIES := {
 		rising_anti_air = 0.85, pressure = 0.3, far_punish = 0.6,
 		weights = {poke = 2.4, rush = 1.4, retreat = 1.3, approach = 1.0, dash = 0.6, jump = 0.4,
 			throw = 0.7, string = 0.7, sidestep = 0.8},
+	},
+	&"mira": {
+		name = "Brawler", blurb = "powers up when you give her room, then rushes you down", preferred_range = 1.0,
+		aggression = 0.15, block = 0.0, punish = 0.05, anti_air = 0.1,
+		rising_anti_air = 0.7, pressure = 0.5, far_punish = 0.4,
+		weights = {stance = 2.0, rush = 1.6, string = 1.6, dash = 1.4, jump = 1.0, approach = 1.5,
+			poke = 1.0, wait = 0.4, retreat = 0.4},
 	},
 	&"brutus": {
 		name = "Punisher", blurb = "waits patiently, then punishes every mistake", preferred_range = 1.6,
@@ -395,8 +405,13 @@ func _punish(fighter: Fighter, dist: float, target_crouching: bool) -> void:
 func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 	match seen.state:
 		Fighter.State.KNOCKDOWN, Fighter.State.GETUP:
-			# Close in for wake-up pressure, but don't walk into them.
-			if dist > WAKEUP_SPACING:
+			# Power up while they're down (from a safe distance), or close in for wake-up
+			# pressure without walking into them.
+			var down_stance := _stance(fighter)
+			if down_stance and seen.state == Fighter.State.KNOCKDOWN and dist > CLOSE_RANGE \
+					and _rng.randf() < 0.35 * _w("stance"):
+				_queue_special(down_stance)
+			elif dist > WAKEUP_SPACING:
 				_plan.append([6, 0, 6])
 			return
 		Fighter.State.ATTACK:
@@ -414,9 +429,11 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 	var ground_special := _special_with(func(m: MoveData) -> bool: return m.motion() == "214")
 	var grab := _special_with(func(m: MoveData) -> bool: return m.command_grab and not m.super_move)
 	var can_fireball := projectile_move != null and fighter.projectile == null
+	var stance := _stance(fighter)
 	if dist > FAR_RANGE:
 		options = [
 			[2.5 * _w("fireball") if can_fireball else 0.0, func() -> void: _queue_special(projectile_move)],
+			[1.5 * _w("stance") if stance else 0.0, func() -> void: _queue_special(stance)],
 			[1.0 * aggression * _w("rush") if rush and dist <= reach(rush) else 0.0, func() -> void: _queue_special(rush)],
 			[4.0 * _w("approach"), func() -> void: _plan.append([6, 0, _rng.randi_range(12, 28)])],
 			[2.0 * aggression * _w("dash"), func() -> void: _queue_dash()],
@@ -505,7 +522,17 @@ func _queue_special(move: MoveData, recover := true) -> void:
 ## First special (motion input) of this character matching `test`, or null.
 func _special_with(test: Callable) -> MoveData:
 	for move: MoveData in _moves.values():
-		if move.is_special() and test.call(move):
+		if move.is_special() and move.focus_gain == 0 and test.call(move):
+			return move
+	return null
+
+
+## The fighter's power-up stance while it can still gain focus, or null.
+func _stance(fighter: Fighter) -> MoveData:
+	if fighter.focus >= Fighter.MAX_FOCUS:
+		return null
+	for move: MoveData in _moves.values():
+		if move.focus_gain > 0:
 			return move
 	return null
 

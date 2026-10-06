@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_2kgto"]
+
+[resource]
+script = ExtResource("1_2kgto")
+name = "Sipa Flip"
+input = "6HK"
+animation = &"fight/flip_kick"
+animation_impact = 0.12
+animation_end = 0.66
+startup = 11
+active = 4
+recovery = 24
+damage = 85
+hitstun = 0
+blockstun = 16
+hitstop = 10
+knockback = Vector2(0.6, 6.8)
+launches = true
+hitbox_radius = 0.32
+hitbox_offset = Vector3(0.02, 1.45, -0.5)
+camera_intensity = 0.3

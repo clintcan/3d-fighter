@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_u2rcm"]
+
+[resource]
+script = ExtResource("1_u2rcm")
+name = "Flying Kick"
+input = "j.HK"
+animation = &"fight/jump_kick"
+animation_impact = 0.12
+animation_end = 0.45
+startup = 8
+active = 6
+damage = 81
+hit_level = 3
+hitstun = 21
+blockstun = 15
+hitstop = 9
+knockback = Vector2(2.2, 0)
+hitbox_radius = 0.22
+hitbox_offset = Vector3(0.11, 0.45, -0.88)
+camera_intensity = 0.15

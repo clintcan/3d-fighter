@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_uh7iw"]
+
+[resource]
+script = ExtResource("1_uh7iw")
+name = "Crouching Jab"
+input = "2LP"
+animation = &"fight/crouch_jab"
+animation_impact = 0.12
+active = 2
+recovery = 9
+damage = 24
+hitstun = 13
+blockstun = 9
+hitstop = 5
+knockback = Vector2(1, 0)
+hitbox_offset = Vector3(-0.1, 0.84, -0.55)
+cancel_into = Array[String](["2LP", "2LK"])

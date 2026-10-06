@@ -24,6 +24,25 @@ const FABRICS := {
 		"res://assets/characters/outfits/textures/denim_fabric_06_rough_1k.jpg", 5.0, 1.0, 0.12],
 	&"leather": ["res://assets/stages/ring/textures/fabric_leather_02_nor_gl_1k.jpg", "", 3.0, 0.55, 0.35],
 }
+## Detailed fabrics (CharacterData.detailed_textures): 2K normal and roughness maps plus
+## a greyscale weave map that textures the colour (averaging 0.9), same tiling and
+## material values as above. Fabrics without an entry use FABRICS.
+const DETAILED_FABRICS := {
+	&"cotton": ["res://assets/characters/outfits/textures/detail/cotton_jersey_nor_gl_2k.jpg",
+		"res://assets/characters/outfits/textures/detail/cotton_jersey_rough_2k.jpg",
+		"res://assets/characters/outfits/textures/detail/cotton_jersey_weave_2k.jpg", 6.0, 1.0, 0.12],
+	&"stretch": ["res://assets/characters/outfits/textures/detail/bi_stretch_nor_gl_2k.jpg",
+		"res://assets/characters/outfits/textures/detail/bi_stretch_rough_2k.jpg",
+		"res://assets/characters/outfits/textures/detail/bi_stretch_weave_2k.jpg", 8.0, 1.0, 0.12],
+	&"leather": ["res://assets/characters/outfits/textures/detail/fabric_leather_02_nor_gl_2k.jpg", "",
+		"res://assets/characters/outfits/textures/detail/fabric_leather_02_weave_2k.jpg", 3.0, 0.55, 0.35],
+}
+## Skin pore detail (detailed characters): a tiling normal map over the body's second UV
+## set, mixed in at SKIN_DETAIL_AMOUNT so it adds fine grain without flattening the
+## body's own normal map. Visible in close-ups, invisible at fight distance.
+const SKIN_DETAIL_NORMAL := "res://assets/characters/detail/skin_pores_nor.png"
+const SKIN_DETAIL_SCALE := 28.0
+const SKIN_DETAIL_AMOUNT := 0.3
 ## Brightest fabric albedo: real white cloth reflects about 80%; brighter blooms under the
 ## stage lights.
 const MAX_FABRIC_ALBEDO := 0.72
@@ -58,7 +77,7 @@ func build(data: CharacterData, alt: bool = false) -> void:
 	for hair_scene in data.hair_scenes:
 		_attach_skinned(hair_scene)
 	var albedo := data.alt_body_albedo if alt and data.alt_body_albedo else data.body_albedo
-	_customize_materials(albedo, data.alt_hair_color if alt else data.hair_color)
+	_customize_materials(albedo, data.alt_hair_color if alt else data.hair_color, data.detailed_textures)
 	if data.outfit_mesh:
 		_dress(data, alt)
 
@@ -145,11 +164,15 @@ func _dress(data: CharacterData, alt: bool) -> void:
 	outfit.skeleton = outfit.get_path_to(skeleton)
 	var colors := data.alt_outfit_colors if alt and not data.alt_outfit_colors.is_empty() else data.outfit_colors
 	for surface in data.outfit_mesh.get_surface_count():
-		var slot := ["main", "trim", "accent"].find(data.outfit_mesh.surface_get_name(surface))
+		var slot := ["main", "trim", "accent", "extra"].find(data.outfit_mesh.surface_get_name(surface))
 		if slot < 0:
 			slot = surface
 		var fabric_name: StringName = data.outfit_fabrics[slot] if slot < data.outfit_fabrics.size() else &"cotton"
 		var fabric: Array = FABRICS.get(fabric_name, FABRICS[&"cotton"])
+		var detailed: bool = data.detailed_textures and DETAILED_FABRICS.has(fabric_name)
+		if detailed: # same layout as FABRICS, the weave map in the middle
+			var d: Array = DETAILED_FABRICS[fabric_name]
+			fabric = [d[0], d[1], d[3], d[4], d[5]]
 		var color: Color = colors[slot] if slot < colors.size() else Color.WHITE
 		var brightest := maxf(color.r, maxf(color.g, color.b))
 		if brightest > MAX_FABRIC_ALBEDO:
@@ -165,7 +188,24 @@ func _dress(data: CharacterData, alt: bool) -> void:
 		cloth.metallic_specular = fabric[4]
 		cloth.uv1_scale = Vector3.ONE * fabric[2]
 		cloth.cull_mode = BaseMaterial3D.CULL_DISABLED # the inside shows at hems and sleeves
+		if detailed:
+			cloth.albedo_texture = load(DETAILED_FABRICS[fabric_name][2])
+		if data.detailed_textures:
+			cloth.vertex_color_use_as_albedo = true # hem shading and stitch lines
 		outfit.set_surface_override_material(surface, cloth)
+
+
+## The detail albedo is white (multiplying changes nothing); its alpha sets how much of
+## the pore normal map is mixed in.
+func _add_skin_detail(skin: StandardMaterial3D) -> void:
+	var mix := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+	mix.fill(Color(1, 1, 1, SKIN_DETAIL_AMOUNT))
+	skin.detail_enabled = true
+	skin.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL
+	skin.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
+	skin.detail_albedo = ImageTexture.create_from_image(mix)
+	skin.detail_normal = load(SKIN_DETAIL_NORMAL)
+	skin.uv2_scale = Vector3.ONE * SKIN_DETAIL_SCALE
 
 
 func _attach_skinned(scene: PackedScene) -> void:
@@ -181,7 +221,8 @@ func _attach_skinned(scene: PackedScene) -> void:
 
 
 ## Swaps the body's skin texture and tints hair, working on per-instance material copies.
-func _customize_materials(body_albedo: Texture2D, hair_color: Color) -> void:
+## `detailed` adds the skin pore detail (the dressed body carries the second UV set).
+func _customize_materials(body_albedo: Texture2D, hair_color: Color, detailed: bool) -> void:
 	for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
 		for surface in mesh.get_surface_override_material_count():
 			var material := mesh.mesh.surface_get_material(surface) as StandardMaterial3D
@@ -190,6 +231,8 @@ func _customize_materials(body_albedo: Texture2D, hair_color: Color) -> void:
 			if material.resource_name.begins_with("MI_Superhero") and body_albedo:
 				var skin := material.duplicate() as StandardMaterial3D
 				skin.albedo_texture = body_albedo
+				if detailed:
+					_add_skin_detail(skin)
 				mesh.set_surface_override_material(surface, skin)
 			elif material.resource_name.begins_with("MI_Hair"):
 				var hair := material.duplicate() as StandardMaterial3D

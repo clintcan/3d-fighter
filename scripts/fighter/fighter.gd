@@ -14,6 +14,7 @@ signal attack_started(move: MoveData)
 signal landed_hard(fighter: Fighter)
 signal throw_impact(defender: Fighter)
 signal meter_changed(current: int, maximum: int)
+signal focus_changed(level: int)
 ## A super started: FightManager freezes the fight for the super flash.
 signal super_started(fighter: Fighter, move: MoveData)
 ## Cosmetic: the current move's first active frame (impact effects).
@@ -85,6 +86,8 @@ const METER_PER_DAMAGE_HIT := 1.0 # attacker, per point of the move's damage
 const METER_PER_DAMAGE_BLOCKED := 0.5 # attacker, when blocked
 const METER_PER_DAMAGE_TAKEN := 0.6 # defender
 const METER_PER_SPECIAL := 20 # starting a special
+## Focus (Mira's stance): levels powering up moves with focus_* data. Lost on knockdown.
+const MAX_FOCUS := 3
 ## Motion input windows (ticks) and how recently the final direction must have been held.
 const MOTION_WINDOW := 14
 const SUPER_MOTION_WINDOW := 26
@@ -113,7 +116,8 @@ const SIM_FIELDS := [&"input_locked", &"view_right", &"view_depth", &"state", &"
 	&"crouching", &"health", &"forward", &"velocity", &"hitstop", &"stun", &"combo_hits",
 	&"juggle_hits", &"air_attack_used", &"throw_grab_frame", &"grab_move", &"throw_techable",
 	&"current_move", &"move_has_hit", &"hits_landed", &"next_hit_frame", &"meter", &"frozen",
-	&"_landing_frames", &"sidestep_dir", &"victory", &"last_hit_level", &"immortal"]
+	&"_landing_frames", &"sidestep_dir", &"victory", &"last_hit_level", &"immortal", &"focus",
+	&"move_focus"]
 ## (victory_clip is cosmetic: each machine picks its own victory animation.)
 
 var data: CharacterData
@@ -151,6 +155,8 @@ var move_has_hit := false
 var hits_landed := 0
 var next_hit_frame := 0
 var meter := 0
+var focus := 0
+var move_focus := 0 # focus level the current move started with
 ## This fighter's projectile in flight (one at a time), ticked by FightManager.
 var projectile: Projectile
 ## Set by FightManager during the super freeze (holds animation).
@@ -245,6 +251,8 @@ func reset_to(spawn_position: Vector3) -> void:
 	last_hit_level = MoveData.HitLevel.MID
 	victory = false
 	victory_clip = &""
+	move_focus = 0
+	_set_focus(0)
 	_set_combo(0)
 	_set_state(State.IDLE)
 	health_changed.emit(health, data.max_health)
@@ -265,6 +273,7 @@ func save_state() -> Dictionary:
 func load_state(state: Dictionary) -> void:
 	var old_health := health
 	var old_meter := meter
+	var old_focus := focus
 	var old_combo := combo_hits
 	for field in SIM_FIELDS:
 		set(field, state[field])
@@ -290,6 +299,8 @@ func load_state(state: Dictionary) -> void:
 		health_changed.emit(health, data.max_health)
 	if meter != old_meter:
 		meter_changed.emit(meter, MAX_METER)
+	if focus != old_focus:
+		focus_changed.emit(focus)
 	if combo_hits != old_combo:
 		combo_changed.emit(combo_hits)
 
@@ -433,24 +444,29 @@ func _tick_attack() -> void:
 	var airborne := position.y > 0.0
 	var frame := state_frame
 	var active := frame > move.startup and frame <= move.startup + move.active
-	if active and move.travel > 0.0 and hits_landed < move.hits:
+	if active and move.travel > 0.0 and hits_landed < move_hits():
 		velocity = Vector3(0.0, velocity.y, 0.0) + forward * move.travel
 	elif not airborne:
 		velocity = _with_friction(velocity)
 	if frame == move.startup + 1:
 		move_active.emit(self, move)
 		if move.rise > 0.0:
-			velocity.y = move.rise
+			velocity.y = move.rise + move.focus_rise * move_focus
+		if move.dive != Vector2.ZERO and airborne:
+			velocity = forward * move.dive.x + Vector3.DOWN * move.dive.y
+		if move.focus_gain > 0:
+			_set_focus(mini(MAX_FOCUS, focus + move.focus_gain))
 		if move.projectile_speed > 0.0:
 			_fire_projectile(move)
 	if move_has_hit and frame > move.startup and _try_attack(true):
 		return
 	# A connected move with a follow-up chains into it right after its active frames;
 	# a whiff plays out its full recovery.
-	if move.followup != "" and move_has_hit and frame >= move.startup + move.active:
-		var next := _move_for_input(move.followup)
+	var followup := move.focus_followup if move.focus_followup != "" and move_focus >= MAX_FOCUS else move.followup
+	if followup != "" and move_has_hit and frame >= move.startup + move.active:
+		var next := _move_for_input(followup)
 		if next:
-			_start_move(next, false)
+			_start_move(next, false, move_focus)
 			return
 	if frame >= move.total_frames():
 		if airborne:
@@ -536,8 +552,12 @@ func _special_buttons(suffix: String) -> Array:
 	return [button] if button != null else []
 
 
-func _start_move(move: MoveData, airborne: bool) -> void:
+## `carried_focus`: a follow-up keeps the focus level its first move started with.
+func _start_move(move: MoveData, airborne: bool, carried_focus := -1) -> void:
 	current_move = move
+	move_focus = focus if carried_focus < 0 else carried_focus
+	if move.focus_consume:
+		_set_focus(0)
 	move_has_hit = false
 	hits_landed = 0
 	next_hit_frame = 0
@@ -559,6 +579,31 @@ func _fire_projectile(move: MoveData) -> void:
 	add_sibling(projectile)
 
 
+func _set_focus(level: int) -> void:
+	if level != focus:
+		focus = level
+		focus_changed.emit(focus)
+
+
+## Hits of the current move, with its focus bonus.
+func move_hits() -> int:
+	return current_move.hits + current_move.focus_hits * move_focus
+
+
+## Ticks between the current move's hits: focus bonus hits are fitted into the same
+## active frames.
+func _hit_interval() -> int:
+	var hits := move_hits()
+	if hits == current_move.hits:
+		return current_move.hit_interval
+	return maxi(2, (current_move.active - 1) / (hits - 1))
+
+
+## Damage multiplier of `move` from this fighter's focus when the move started.
+func focus_damage_scale(move: MoveData) -> float:
+	return 1.0 + move.focus_damage * move_focus
+
+
 func add_meter(amount: int) -> void:
 	var value := clampi(meter + amount, 0, MAX_METER)
 	if value != meter:
@@ -572,7 +617,13 @@ func add_meter(amount: int) -> void:
 func _find_move(button: int, dir: int, airborne: bool) -> MoveData:
 	var button_name: String = InputBuffer.BUTTON_NAMES[button]
 	if airborne:
-		return _move_for_input("j." + button_name)
+		# Down + button in the air: "j.2LK", or "j.2K" for either kick (dive kicks).
+		var dive_move: MoveData = null
+		if dir <= 3:
+			dive_move = _move_for_input("j.2" + button_name)
+			if dive_move == null:
+				dive_move = _move_for_input("j.2" + button_name.right(1))
+		return dive_move if dive_move else _move_for_input("j." + button_name)
 	var prefix := ""
 	if dir <= 3:
 		prefix = "2"
@@ -620,7 +671,8 @@ func _on_landed() -> void:
 	match state:
 		State.JUMP, State.ATTACK:
 			velocity = Vector3.ZERO
-			if current_move and current_move.rise > 0.0:
+			# Rising moves keep their landing lag; a dive kick only when it missed.
+			if current_move and (current_move.rise > 0.0 or (current_move.dive != Vector2.ZERO and not move_has_hit)):
 				_landing_frames = LANDING_FRAMES + current_move.landing_recovery
 			current_move = null
 			_set_state(State.LANDING)
@@ -644,15 +696,17 @@ func _set_state(new_state: State, crouch: bool = false) -> void:
 	state = new_state
 	state_frame = 0
 	crouching = crouch
+	if new_state == State.KNOCKDOWN or new_state == State.KO:
+		_set_focus(0)
 
 
 # --- Combat ----------------------------------------------------------------------
 
 ## Active hitbox this tick as {center: Vector3, radius: float}, or {} if none.
 func get_active_hitbox() -> Dictionary:
-	if state != State.ATTACK or current_move.projectile_speed > 0.0 or current_move.command_grab:
+	if state != State.ATTACK or current_move.projectile_speed > 0.0 or current_move.command_grab 			or current_move.hitbox_radius <= 0.0:
 		return {}
-	if hits_landed >= current_move.hits or state_frame < next_hit_frame:
+	if hits_landed >= move_hits() or state_frame < next_hit_frame:
 		return {}
 	var frame := state_frame
 	if frame <= current_move.startup or frame > current_move.startup + current_move.active:
@@ -710,7 +764,7 @@ func receive_hit(attacker: Fighter, move: MoveData, push_dir := Vector3.ZERO, fi
 	var scale := maxf(MIN_COMBO_SCALE, 1.0 - COMBO_SCALING_STEP * combo_hits)
 	if counter:
 		scale *= COUNTER_DAMAGE_SCALE
-	_take_damage(roundi(move.damage * scale))
+	_take_damage(roundi(move.damage * scale * attacker.focus_damage_scale(move)))
 	_set_combo(combo_hits + 1)
 	_flash_color = Color(1.0, 0.85, 0.3) if counter else Color.WHITE
 	last_hit_level = move.hit_level
@@ -750,13 +804,13 @@ func on_hit_confirmed() -> void:
 		return
 	move_has_hit = true
 	hits_landed += 1
-	next_hit_frame = state_frame + current_move.hit_interval
+	next_hit_frame = state_frame + _hit_interval()
 	hitstop = current_move.hitstop
 
 
 ## True if the next hit of the current move is its last (multi-hit moves).
 func is_final_hit() -> bool:
-	return current_move == null or hits_landed + 1 >= current_move.hits
+	return current_move == null or hits_landed + 1 >= move_hits()
 
 
 ## Match win: play `clip` from the start (cosmetic; the fighter stays in its idle state).
@@ -776,7 +830,7 @@ func is_threatening(target: Fighter) -> bool:
 func threat_move(target: Fighter) -> MoveData:
 	if projectile and projectile.is_threatening(target):
 		return projectile.move
-	if state != State.ATTACK or current_move == null or current_move.projectile_speed > 0.0:
+	if state != State.ATTACK or current_move == null or current_move.projectile_speed > 0.0 			or current_move.hitbox_radius <= 0.0:
 		return null
 	if state_frame > current_move.startup + current_move.active:
 		return null

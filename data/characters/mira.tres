@@ -1,0 +1,65 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/characters/mira/T_Mira_Body.png" id="1_rjvbr"]
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Bob.tscn" id="2_k2xky"]
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Eyebrows_Female.gltf" id="3_7772s"]
+[ext_resource type="PackedScene" path="res://assets/characters/base/Superhero_Female_FullBody.gltf" id="4_8p5wk"]
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="5_q2gt6"]
+[ext_resource type="Resource" path="res://data/moves/mira/jab.tres" id="6_1tu07"]
+[ext_resource type="Resource" path="res://data/moves/mira/straight.tres" id="7_loy4a"]
+[ext_resource type="Resource" path="res://data/moves/mira/mid_kick.tres" id="8_ouhtg"]
+[ext_resource type="Resource" path="res://data/moves/mira/roundhouse.tres" id="9_ndjb8"]
+[ext_resource type="Resource" path="res://data/moves/mira/crouch_jab.tres" id="10_udvkr"]
+[ext_resource type="Resource" path="res://data/moves/mira/low_kick.tres" id="11_4rdf6"]
+[ext_resource type="Resource" path="res://data/moves/mira/uppercut.tres" id="12_3c2yt"]
+[ext_resource type="Resource" path="res://data/moves/mira/sweep.tres" id="13_2bgpu"]
+[ext_resource type="Resource" path="res://data/moves/mira/jump_jab.tres" id="14_8x6jb"]
+[ext_resource type="Resource" path="res://data/moves/mira/jump_hammer.tres" id="15_agt2q"]
+[ext_resource type="Resource" path="res://data/moves/mira/jump_kick.tres" id="16_obv6a"]
+[ext_resource type="Resource" path="res://data/moves/mira/flying_kick.tres" id="17_0qilu"]
+[ext_resource type="Resource" path="res://data/moves/mira/tapik.tres" id="18_fxtyi"]
+[ext_resource type="Resource" path="res://data/moves/mira/sipa_flip.tres" id="19_m72t6"]
+[ext_resource type="Resource" path="res://data/moves/mira/lawin_drop.tres" id="20_yn843"]
+[ext_resource type="Resource" path="res://data/moves/mira/bagyo_rush.tres" id="21_beb16"]
+[ext_resource type="Resource" path="res://data/moves/mira/lawin_rise.tres" id="22_svvia"]
+[ext_resource type="Resource" path="res://data/moves/mira/lakas_stance.tres" id="23_hrygk"]
+[ext_resource type="Resource" path="res://data/moves/mira/huling_hagupit.tres" id="24_41and"]
+[ext_resource type="Resource" path="res://data/moves/mira/hagupit_finish.tres" id="25_l05d0"]
+[ext_resource type="Resource" path="res://data/moves/mira/hagupit_max.tres" id="26_f0pbg"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/mira_body.res" id="27_7772s"]
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="27_sdsm8"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/mira_outfit.res" id="28_8p5wk"]
+[ext_resource type="Texture2D" path="res://assets/ui/portraits/mira.png" id="29_8p5wk"]
+
+[resource]
+script = ExtResource("27_sdsm8")
+id = &"mira"
+display_name = "Mira"
+archetype = "Brawler"
+description = "Manila street brawler. Strings punches into flip kicks, and powers up with Lakas Stance until her rushes hit like a typhoon."
+select_order = 5
+portrait = ExtResource("29_8p5wk")
+model_scene = ExtResource("4_8p5wk")
+hair_scenes = Array[PackedScene]([ExtResource("2_k2xky"), ExtResource("3_7772s")])
+body_albedo = ExtResource("1_rjvbr")
+hair_color = Color(0.13, 0.08, 0.05, 1)
+alt_body_albedo = ExtResource("1_rjvbr")
+alt_hair_color = Color(0.32, 0.1, 0.05, 1)
+outfit_mesh = ExtResource("28_8p5wk")
+outfit_body_mesh = ExtResource("27_7772s")
+outfit_colors = PackedColorArray(0.13, 0.13, 0.14, 1, 0.86, 0.62, 0.12, 1, 0.05, 0.05, 0.06, 1, 0.82, 0.81, 0.78, 1)
+outfit_fabrics = Array[StringName]([&"cotton", &"stretch", &"stretch", &"leather"])
+alt_outfit_colors = PackedColorArray(0.8, 0.8, 0.78, 1, 0.75, 0.08, 0.08, 1, 0.11, 0.11, 0.12, 1, 0.72, 0.08, 0.08, 1)
+detailed_textures = true
+victory_animations = Array[StringName]([&"fight/victory_fist_pump", &"fight/victory_point"])
+placeholder_color = Color(0.86, 0.62, 0.12, 1)
+max_health = 950
+walk_speed = 2.3
+back_walk_speed = 1.8
+dash_speed = 7.0
+jump_velocity = 6.3
+weight = 0.92
+throw_damage = 115
+power_rating = 0.55
+speed_rating = 0.75
+moves = Array[ExtResource("5_q2gt6")]([ExtResource("6_1tu07"), ExtResource("7_loy4a"), ExtResource("8_ouhtg"), ExtResource("9_ndjb8"), ExtResource("10_udvkr"), ExtResource("11_4rdf6"), ExtResource("12_3c2yt"), ExtResource("13_2bgpu"), ExtResource("14_8x6jb"), ExtResource("15_agt2q"), ExtResource("16_obv6a"), ExtResource("17_0qilu"), ExtResource("18_fxtyi"), ExtResource("19_m72t6"), ExtResource("20_yn843"), ExtResource("21_beb16"), ExtResource("22_svvia"), ExtResource("23_hrygk"), ExtResource("24_41and"), ExtResource("25_l05d0"), ExtResource("26_f0pbg")])

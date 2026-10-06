@@ -1,6 +1,7 @@
 extends SceneTree
 ## Generates each fighter's clothing from their base body mesh and saves it into the
 ## character data. Run: godot_console --headless --path . -s res://tools/build_outfits.gd
+## (append `-- <id> ...` to rebuild only those fighters)
 ##
 ## A garment is the part of the body surface inside a region, pushed out along the normals
 ## by the garment's thickness. Regions are signed-distance functions of the T-pose
@@ -16,15 +17,28 @@ extends SceneTree
 ## inset), so nothing pokes through and no gap opens at the hems.
 ## Outfit references: karate gi (cross-over jacket with a V opening, belt, headband),
 ## Tae Kwon Do dobok (closed V-neck pullover, black collar for black belts), kickboxing
-## gear, pro-wrestling singlet with knee pads and boots, brawler tank top and work pants.
+## gear, pro-wrestling singlet with knee pads and boots, brawler tank top and work pants,
+## street gear (sleeveless zip-up, track pants with side stripes, fingerless gloves,
+## sneakers).
+## Detailed outfits (`detailed = true`) also carry vertex colours: the cloth darkens a
+## little toward every hem and opening, and a stitch line runs along each hem (the
+## polygons are cut along it, so it stays a crisp line). Their body gets a second UV set
+## for the skin pore detail map (FighterModel).
 
 const OUT_DIR := "res://assets/characters/outfits/"
 const CHARACTER_DIR := "res://data/characters/"
 const HIDE_INSET := 0.015 # body skin this far inside a garment's edge is removed
 const NECK_RADIUS := 0.072 # the neck hole of tops and jackets
 const ARM_LIMIT := 0.35 # |x| beyond this (T-pose) is arm, never legs or torso
+## Detailed outfits: the stitch line runs between these distances inside a hem, and the
+## cloth shades from HEM_SHADE at the edge to full brightness HEM_SHADE_DEPTH inside.
+const STITCH_NEAR := 0.007
+const STITCH_FAR := 0.0095
+const STITCH_SHADE := 0.62
+const HEM_SHADE := 0.8
+const HEM_SHADE_DEPTH := 0.035
 
-enum Slot { MAIN, TRIM, ACCENT }
+enum Slot { MAIN, TRIM, ACCENT, EXTRA }
 
 var _body_skin: Skin
 var _pelvis_bind := 0
@@ -34,13 +48,17 @@ func _initialize() -> void:
 	await process_frame
 	var specs := _specs()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
+	var only := OS.get_cmdline_user_args() # e.g. `-- mira`: rebuild just these fighters
 	for id: String in specs:
+		if not only.is_empty() and id not in only:
+			continue
 		var spec: Dictionary = specs[id]
 		var data := load(CHARACTER_DIR + id + ".tres") as CharacterData
 		if data == null:
 			push_error("No character data for %s" % id)
 			continue
 		var result := _build(data.model_scene, spec)
+		data.detailed_textures = spec.get("detailed", false)
 		var outfit_path := OUT_DIR + id + "_outfit.res"
 		var body_path := OUT_DIR + id + "_body.res"
 		ResourceSaver.save(result.outfit, outfit_path)
@@ -148,6 +166,32 @@ func _specs() -> Dictionary:
 			alt_colors = [Color(0.52, 0.52, 0.54), Color(0.22, 0.32, 0.52), Color(0.27, 0.16, 0.08)],
 			fabrics = [&"cotton", &"denim", &"leather"],
 		},
+		"mira": {
+			detailed = true,
+			pieces = func(L: Dictionary) -> Array:
+				var hem: float = L.waist - 0.07
+				return [
+					# Sleeveless zip-up to the waist, closed at the neck, with a contrast zip
+					# down the front and a contrast band at the hem.
+					{slot = Slot.MAIN, offset = 0.014, trim_slot = Slot.TRIM,
+						region = func(p, n): return _sleeveless(p, L, hem, L.shoulder * 0.9),
+						trim = func(p, n): return maxf(_zip(p, n, 0.007), (hem + 0.022) - p.y)},
+					# Track pants with contrast stripes down the outside of each leg.
+					{slot = Slot.ACCENT, offset = 0.010, trim_slot = Slot.TRIM,
+						region = func(p, n): return _legs(p, L.ankle + 0.06, L.waist + 0.005),
+						trim = func(p, n): return signf(p.x) * n.x - 0.93},
+					# Fingerless gloves: wrist to knuckles.
+					{slot = Slot.ACCENT, offset = 0.004, region = func(p, n):
+						return minf(minf(p.y - (L.arm_y - 0.12), absf(p.x) - (L.wrist - 0.06)), (L.wrist + 0.085) - absf(p.x))},
+					# Leather sneakers over the ankle with a contrast sole, soles flat on the floor.
+					{slot = Slot.EXTRA, offset = 0.018, flat_soles = true, trim_slot = Slot.TRIM,
+						region = func(p, n): return _legs(p, -1.0, L.ankle + 0.07),
+						trim = func(p, n): return 0.03 - p.y},
+				],
+			colors = [Color(0.13, 0.13, 0.14), Color(0.86, 0.62, 0.12), Color(0.05, 0.05, 0.06), Color(0.82, 0.81, 0.78)],
+			alt_colors = [Color(0.8, 0.8, 0.78), Color(0.75, 0.08, 0.08), Color(0.11, 0.11, 0.12), Color(0.72, 0.08, 0.08)],
+			fabrics = [&"cotton", &"stretch", &"stretch", &"leather"],
+		},
 	}
 
 
@@ -186,6 +230,13 @@ func _v_cut(p: Vector3, n: Vector3, L: Dictionary, bottom: float, width: float) 
 	return minf(half_width - absf(p.x), p.y - bottom)
 
 
+## A zip down the front centre (positive on it), `half_width` either side.
+func _zip(p: Vector3, n: Vector3, half_width: float) -> float:
+	if p.z <= 0.0 or n.z < 0.3:
+		return -1.0
+	return half_width - absf(p.x)
+
+
 ## A rounded neckline front and back (positive inside it): `depth` below the neck,
 ## `half_width` wide.
 func _scoop(p: Vector3, L: Dictionary, depth: float, half_width: float) -> float:
@@ -214,9 +265,11 @@ func _build(model_scene: PackedScene, spec: Dictionary) -> Dictionary:
 	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
 	var pieces: Array = spec.pieces.call(L)
 
+	var detailed: bool = spec.get("detailed", false)
 	var tools: Array[SurfaceTool] = []
-	var used: Array[bool] = [false, false, false]
-	for i in 3:
+	var used: Array[bool] = []
+	for i in Slot.size():
+		used.append(false)
 		var st := SurfaceTool.new()
 		st.set_skin_weight_count(SurfaceTool.SKIN_4_WEIGHTS)
 		st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -250,19 +303,26 @@ func _build(model_scene: PackedScene, spec: Dictionary) -> Dictionary:
 				parts = [[_clip(polygon, trim, false), piece.trim_slot],
 					[_clip(polygon, func(p, n): return -trim.call(p, n), false), piece.slot]]
 			for part: Array in parts:
-				var poly: Array = part[0]
 				var slot: int = part[1]
-				for i in range(1, poly.size() - 1):
-					for vertex: Dictionary in [poly[0], poly[i], poly[i + 1]]:
-						_emit(tools[slot], vertex, piece)
-					used[slot] = true
-					triangles += 1
+				var bands := [[part[0], false]]
+				if detailed:
+					bands = _stitch_bands(part[0], region)
+				for band: Array in bands:
+					var poly: Array = band[0]
+					for i in range(1, poly.size() - 1):
+						for vertex: Dictionary in [poly[0], poly[i], poly[i + 1]]:
+							var shade := 1.0
+							if detailed:
+								shade = STITCH_SHADE if band[1] else _hem_shade(region.call(vertex.p, vertex.n))
+							_emit(tools[slot], vertex, piece, Color(shade, shade, shade) if detailed else Color.TRANSPARENT)
+						used[slot] = true
+						triangles += 1
 	if spec.has("belt_knot"):
 		triangles += _add_belt_knot(tools[spec.belt_knot.slot], spec.belt_knot, L, verts)
 		used[spec.belt_knot.slot] = true
 
 	var outfit := ArrayMesh.new()
-	for slot in 3:
+	for slot in Slot.size():
 		if not used[slot]:
 			continue
 		tools[slot].index()
@@ -281,6 +341,8 @@ func _build(model_scene: PackedScene, spec: Dictionary) -> Dictionary:
 	# re-add, and standard materials never read them.
 	for channel in [Mesh.ARRAY_CUSTOM0, Mesh.ARRAY_CUSTOM1, Mesh.ARRAY_CUSTOM2, Mesh.ARRAY_CUSTOM3]:
 		body_arrays[channel] = null
+	if detailed:
+		body_arrays[Mesh.ARRAY_TEX_UV2] = uvs # the skin pore detail map tiles over this
 	var body := ArrayMesh.new()
 	body.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, body_arrays)
 	body.surface_set_material(0, body_instance.mesh.surface_get_material(0).duplicate())
@@ -309,6 +371,21 @@ func _clip(polygon: Array, field: Callable, all_inside: bool = false) -> Array:
 	return out
 
 
+## Detailed outfits: a garment polygon cut into the part outside the stitch line (toward
+## the hem), the stitch line itself and the rest: [[polygon, is_stitch], ...].
+func _stitch_bands(polygon: Array, region: Callable) -> Array:
+	var outer := _clip(polygon, func(p, n): return STITCH_NEAR - region.call(p, n))
+	var stitch := _clip(_clip(polygon, func(p, n): return region.call(p, n) - STITCH_NEAR),
+		func(p, n): return STITCH_FAR - region.call(p, n))
+	var inner := _clip(polygon, func(p, n): return region.call(p, n) - STITCH_FAR)
+	return [[outer, false], [stitch, true], [inner, false]]
+
+
+## Cloth brightness at `distance` inside a hem (detailed outfits).
+func _hem_shade(distance: float) -> float:
+	return lerpf(HEM_SHADE, 1.0, clampf(distance / HEM_SHADE_DEPTH, 0.0, 1.0))
+
+
 func _blend(a: Dictionary, b: Dictionary, t: float) -> Dictionary:
 	var influence := {}
 	for k in 4:
@@ -331,10 +408,13 @@ func _blend(a: Dictionary, b: Dictionary, t: float) -> Dictionary:
 		bones = bone_ids, weights = bone_weights}
 
 
-func _emit(st: SurfaceTool, vertex: Dictionary, piece: Dictionary) -> void:
+## `shade` (detailed outfits): the vertex colour; transparent = none.
+func _emit(st: SurfaceTool, vertex: Dictionary, piece: Dictionary, shade := Color.TRANSPARENT) -> void:
 	var offset: float = piece.offset.call(vertex.n) if piece.offset is Callable else piece.offset
 	if piece.get("flat_soles", false) and vertex.n.y < -0.6:
 		offset = 0.002 # don't push boot soles into the floor
+	if shade.a > 0.0:
+		st.set_color(shade)
 	st.set_normal(vertex.n)
 	st.set_uv(vertex.uv)
 	st.set_bones(vertex.bones)

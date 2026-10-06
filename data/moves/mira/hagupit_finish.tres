@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_o3q3r"]
+
+[resource]
+script = ExtResource("1_o3q3r")
+name = "Huling Hagupit"
+input = "~hagupit_finish"
+animation = &"fight/palm_blast"
+animation_end = 0.65
+startup = 4
+active = 4
+recovery = 24
+damage = 130
+hitstun = 0
+blockstun = 20
+hitstop = 14
+knockback = Vector2(4, 2.5)
+knockdown = true
+chip_damage = 12
+hitbox_radius = 0.4
+hitbox_offset = Vector3(0, 1.1, -0.55)
+camera_intensity = 0.6

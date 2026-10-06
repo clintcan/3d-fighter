@@ -27,6 +27,12 @@ const ROUTINES := {
 	&"jin": [["idle", 1.0], ["move", "6LK"], ["idle", 0.6], ["move", "236K"], ["idle", 0.7],
 		["move", "6HK"], ["idle", 0.6], ["move", "623K"], ["idle", 0.8],
 		["clip", &"fight/victory_point", 2.4], ["idle", 1.0]],
+	# Brawler: a backfist string into the flip kick, three power-ups, then the rush and
+	# the super at full focus.
+	&"mira": [["idle", 0.6, &"fight/guard", 1.6], ["move", "6LP"], ["move", "6LP"], ["move", "6LP"], ["move", "6HK"],
+		["idle", 0.6], ["move", "214P"], ["move", "214P"], ["move", "214P"], ["idle", 0.4],
+		["move", "236P"], ["idle", 0.5], ["move", "236236P"], ["idle", 0.6],
+		["clip", &"fight/victory_fist_pump", 2.6], ["idle", 0.8, &"fight/guard", 1.6]],
 	# Punisher: waits with folded arms, then slams, charges, smashes, flexes.
 	&"brutus": [["idle", 2.2, &"ual2/Idle_FoldArms", 1.0], ["move", "214P"], ["idle", 1.6],
 		["move", "236P"], ["idle", 1.4], ["move", "6HP"], ["idle", 1.0],
@@ -51,6 +57,7 @@ var _index := 0
 var _time := 0.0
 var _frame := 0.0
 var _impact_done := false
+var _focus := 0 # focus level in the routine (power-up stances), for the super's finisher
 var _offset := Vector3.ZERO # model offset in the pivot's space (rise, travel)
 var _y_velocity := 0.0
 
@@ -68,6 +75,7 @@ func _init(fighter_model: FighterModel, character: CharacterData, turntable: Nod
 func restart() -> void:
 	_steps = (ROUTINES.get(data.id, [["idle", 999.0]]) as Array).duplicate(true)
 	_index = 0
+	_focus = 0
 	_begin_step()
 	_offset = Vector3.ZERO
 	_y_velocity = 0.0
@@ -120,10 +128,16 @@ func _process_move(move: MoveData, delta: float) -> void:
 			_fire_orb(move)
 		if move.impact_fx == &"shockwave":
 			_shockwave()
+		if move.focus_gain > 0:
+			_focus = mini(_focus + move.focus_gain, Fighter.MAX_FOCUS)
+			_focus_ring()
 	if _frame >= move.total_frames() and _offset.y <= 0.0:
-		var follow := _moves.get(move.followup) as MoveData if move.followup != "" else null
+		var followup := move.focus_followup if move.focus_followup != "" and _focus >= Fighter.MAX_FOCUS else move.followup
+		if move.focus_consume:
+			_focus = 0
+		var follow := _moves.get(followup) as MoveData if followup != "" else null
 		if follow:
-			_steps[_index] = ["move", move.followup] # supers chain into their finisher
+			_steps[_index] = ["move", followup] # supers chain into their finisher
 			_begin_step()
 		else:
 			_next()
@@ -183,6 +197,29 @@ func _fire_orb(move: MoveData) -> void:
 	tween.tween_property(mat, "albedo_color:a", 0.0, 0.25).set_delay(0.45)
 	tween.tween_property(light, "light_energy", 0.0, 0.25).set_delay(0.45)
 	tween.chain().tween_callback(orb.queue_free)
+
+
+## Focus power-up: an orange ring spreading at the fighter's feet.
+func _focus_ring() -> void:
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.42
+	torus.outer_radius = 0.5
+	torus.rings = 32
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.albedo_color = Color(1.0, 0.55, 0.15, 0.9)
+	torus.material = mat
+	ring.mesh = torus
+	fx_parent.add_child(ring)
+	ring.global_position = model.global_position + Vector3.UP * 0.04
+	ring.scale = Vector3(0.3, 0.05, 0.3)
+	var tween := ring.create_tween().set_parallel()
+	tween.tween_property(ring, "scale", Vector3(2.2, 0.15, 2.2), 0.45).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(mat, "albedo_color:a", 0.0, 0.45).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(ring.queue_free)
 
 
 func _shockwave() -> void:

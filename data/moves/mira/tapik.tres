@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_fw4id"]
+
+[resource]
+script = ExtResource("1_fw4id")
+name = "Tapik"
+input = "6LP"
+animation = &"fight/backfist"
+animation_impact = 0.12
+animation_end = 0.32
+startup = 6
+active = 2
+damage = 35
+hit_level = 0
+blockstun = 11
+hitstop = 5
+knockback = Vector2(1.3, 0)
+hitbox_radius = 0.17
+hitbox_offset = Vector3(-0.08, 1.36, -0.6)
+cancel_into = Array[String](["6LP", "HP", "6HK"])

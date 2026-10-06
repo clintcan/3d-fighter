@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_sola3"]
+
+[resource]
+script = ExtResource("1_sola3")
+name = "Lakas Stance"
+input = "214P"
+animation = &"fight/focus_stance"
+animation_impact = 0.25
+animation_end = 0.6
+startup = 18
+active = 1
+recovery = 14
+damage = 0
+hitstun = 0
+blockstun = 0
+hitstop = 0
+knockback = Vector2(0, 0)
+impact_fx = &"focus"
+focus_gain = 1
+hitbox_radius = 0.0
+hitbox_offset = Vector3(0, 1, 0)

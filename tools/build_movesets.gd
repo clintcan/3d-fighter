@@ -15,7 +15,8 @@ const H := MoveData.HitLevel
 ## extras: cancel_into, camera_intensity, launches, knockdown, lunge, and for specials:
 ##         chip_damage, hits, hit_interval, travel, rise, landing_recovery, invuln_frames,
 ##         low_profile, super_move, followup, projectile_speed, projectile_lifetime,
-##         projectile_color (see MoveData)
+##         projectile_color, dive, focus_gain, focus_hits, focus_damage, focus_rise,
+##         focus_consume, focus_followup (see MoveData)
 const BASE := {
 	"jab": ["Jab", "LP", &"ual1/Punch_Jab", 0.20, 0.62, 4, 2, 8, 30, H.HIGH, 14, 10, 5, Vector2(1.2, 0), Vector3(0, 1.40, -0.78), 0.15, {cancel_into = ["LP", "HP", "2LP"]}],
 	"straight": ["Straight", "HP", &"ual1/Punch_Cross", 0.28, 0.85, 9, 3, 18, 80, H.HIGH, 20, 14, 8, Vector2(2.5, 0), Vector3(0.1, 1.36, -0.70), 0.18, {camera_intensity = 0.1}],
@@ -163,6 +164,49 @@ const CHARACTERS := {
 				{knockdown = true, chip_damage = 12, camera_intensity = 0.6}],
 		},
 	},
+	"mira": {
+		startup = 0, damage = 0.95, knockback = 1.0, hitstop = 0,
+		create = {display_name = "Mira", archetype = "Brawler", select_order = 5,
+			description = "Manila street brawler. Strings punches into flip kicks, and powers up with Lakas Stance until her rushes hit like a typhoon.",
+			model_scene = "res://assets/characters/base/Superhero_Female_FullBody.gltf",
+			hair_scenes = ["res://assets/characters/hair/Hair_Bob.tscn", "res://assets/characters/hair/Eyebrows_Female.gltf"], # from tools/build_hair.gd
+			body_albedo = "res://assets/characters/mira/T_Mira_Body.png", # the female base tinted warm medium-brown
+			model_scale = 1.0, hair_color = Color(0.13, 0.08, 0.05), placeholder_color = Color(0.86, 0.62, 0.12)},
+		stats = {max_health = 950, walk_speed = 2.3, back_walk_speed = 1.8, dash_speed = 7.0,
+			jump_velocity = 6.3, weight = 0.92, throw_damage = 115, power_rating = 0.55, speed_rating = 0.75,
+			victory_animations = [&"fight/victory_fist_pump", &"fight/victory_point"],
+			alt_body_albedo = "res://assets/characters/mira/T_Mira_Body.png", alt_hair_color = Color(0.32, 0.1, 0.05)},
+		signatures = {
+			# Backfist that chains into itself, the straight or the flip kick.
+			"tapik": ["Tapik", "6LP", &"fight/backfist", 0.12, 0.32, 6, 2, 10, 35, H.HIGH, 15, 11, 5, Vector2(1.3, 0), Vector3(-0.08, 1.36, -0.6), 0.17,
+				{cancel_into = ["6LP", "HP", "6HK"]}],
+			# Somersault kick: launches, but very punishable on block.
+			"sipa_flip": ["Sipa Flip", "6HK", &"fight/flip_kick", 0.12, 0.66, 11, 4, 24, 85, H.MID, 0, 16, 10, Vector2(0.6, 6.8), Vector3(0.02, 1.45, -0.5), 0.32,
+				{launches = true, camera_intensity = 0.3}],
+			# Dive kick: changes the jump arc; extra landing lag when it misses.
+			"lawin_drop": ["Lawin Drop", "j.2K", &"fight/dive_kick", 0.08, 0.6, 5, 30, 4, 60, H.OVERHEAD, 17, 12, 7, Vector2(1.5, 0), Vector3(0.1, 0.25, -0.6), 0.24,
+				{dive = Vector2(4.5, 7.0), landing_recovery = 10, camera_intensity = 0.1}],
+		},
+		specials = {
+			# Travelling punch flurry: Focus adds a hit and 15% damage per level.
+			"bagyo_rush": ["Bagyo Rush", "236P", &"fight/punch_flurry", 0.10, 0.70, 10, 18, 22, 32, H.MID, 20, 15, 5, Vector2(3.0, 0), Vector3(0, 1.22, -0.6), 0.32,
+				{hits = 3, hit_interval = 6, travel = 3.5, chip_damage = 5, focus_hits = 1, focus_damage = 0.15, camera_intensity = 0.15}],
+			# Invincible rising flip kick: Focus adds height and 15% damage per level.
+			"lawin_rise": ["Lawin Rise", "623K", &"fight/flip_kick", 0.12, 0.66, 4, 10, 16, 90, H.MID, 0, 16, 9, Vector2(1.0, 7.0), Vector3(0.02, 1.5, -0.45), 0.38,
+				{launches = true, rise = 6.5, travel = 1.0, invuln_frames = 6, landing_recovery = 14, chip_damage = 10, focus_damage = 0.15, focus_rise = 0.6, camera_intensity = 0.3}],
+			# Power-up stance: no hitbox, one Focus level on its first active frame.
+			"lakas_stance": ["Lakas Stance", "214P", &"fight/focus_stance", 0.25, 0.6, 18, 1, 14, 0, H.MID, 0, 0, 0, Vector2.ZERO, Vector3(0, 1.0, 0), 0.0,
+				{focus_gain = 1, impact_fx = &"focus"}],
+			"huling_hagupit": ["Huling Hagupit", "236236P", &"fight/punch_flurry", 0.10, 0.70, 6, 34, 22, 26, H.MID, 22, 16, 4, Vector2(0.6, 0), Vector3(0, 1.22, -0.6), 0.32,
+				{super_move = true, hits = 8, hit_interval = 4, travel = 2.0, invuln_frames = 12, chip_damage = 5,
+					followup = "~hagupit_finish", focus_followup = "~hagupit_max", focus_consume = true, camera_intensity = 0.15}],
+			"hagupit_finish": ["Huling Hagupit", "~hagupit_finish", &"fight/palm_blast", 0.20, 0.65, 4, 4, 24, 130, H.MID, 0, 20, 14, Vector2(4.0, 2.5), Vector3(0, 1.1, -0.55), 0.4,
+				{knockdown = true, chip_damage = 12, camera_intensity = 0.6}],
+			# The finisher at full Focus: a shockwave strike.
+			"hagupit_max": ["Huling Hagupit", "~hagupit_max", &"fight/palm_blast", 0.20, 0.65, 4, 4, 24, 170, H.MID, 0, 20, 16, Vector2(5.0, 3.0), Vector3(0, 1.1, -0.55), 0.45,
+				{knockdown = true, chip_damage = 16, camera_intensity = 0.8, impact_fx = &"shockwave"}],
+		},
+	},
 }
 
 
@@ -253,7 +297,8 @@ func _make(row: Array) -> MoveData:
 	m.lunge = extras.get("lunge", 0.0)
 	for key in ["chip_damage", "hits", "hit_interval", "travel", "rise", "landing_recovery", "invuln_frames",
 			"low_profile", "super_move", "followup", "projectile_speed", "projectile_lifetime", "projectile_color", "impact_fx",
-			"command_grab", "grab_range", "projectile_immune"]:
+			"command_grab", "grab_range", "projectile_immune", "dive", "focus_gain", "focus_hits", "focus_damage",
+			"focus_rise", "focus_consume", "focus_followup"]:
 		if extras.has(key):
 			m.set(key, extras[key])
 	return m

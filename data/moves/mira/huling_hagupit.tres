@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_aiq3o"]
+
+[resource]
+script = ExtResource("1_aiq3o")
+name = "Huling Hagupit"
+input = "236236P"
+animation = &"fight/punch_flurry"
+animation_impact = 0.1
+animation_end = 0.7
+startup = 6
+active = 34
+recovery = 22
+damage = 26
+hitstun = 22
+blockstun = 16
+hitstop = 4
+knockback = Vector2(0.6, 0)
+chip_damage = 5
+hits = 8
+travel = 2.0
+invuln_frames = 12
+super_move = true
+followup = "~hagupit_finish"
+focus_consume = true
+focus_followup = "~hagupit_max"
+hitbox_radius = 0.32
+hitbox_offset = Vector3(0, 1.22, -0.6)
+camera_intensity = 0.15

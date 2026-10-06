@@ -77,6 +77,10 @@ func _initialize() -> void:
 	lib.add_animation("hurricane_kicks", build_hurricane_kicks())
 	lib.add_animation("lariat", build_lariat())
 	lib.add_animation("knee_lift", build_knee_lift())
+	lib.add_animation("backfist", build_backfist())
+	lib.add_animation("flip_kick", build_flip_kick())
+	lib.add_animation("dive_kick", build_dive_kick())
+	lib.add_animation("focus_stance", build_focus_stance())
 	lib.add_animation("slide_kick",build_in_place_ranges([[ual2.get_animation("Slide_Start"), 0.2, 0.83], [ual2.get_animation("Slide_Exit"), 0.0, 0.3]], crouch, 0.25))
 	lib.add_animation("shoulder_charge", build_in_place_ranges([[ual2.get_animation("Shield_Dash"), 0.0, 0.5]], guard, 0.3))
 	var err := ResourceSaver.save(lib, OUTPUT)
@@ -1042,6 +1046,125 @@ func build_knee_lift() -> Animation:
 
 	return make_animation([[0.0, guard], [0.08, clinch], [0.16, strike], [0.26, strike],
 		[0.36, recoil], [0.46, clinch], [0.62, guard]], false)
+
+
+## Backfist (Mira's Tapik): the lead elbow lifts across the chest with the fist by the
+## rear shoulder, then the forearm whips out so the back of the fist snaps into the
+## opponent's temple as the lead hip drives in; it comes back along the same arc.
+## Impact 0.12 s.
+func build_backfist() -> Animation:
+	var s := rear_sign()
+	var lead_foot := global_origin(guard, "foot_" + lead)
+	var rear_foot := global_origin(guard, "foot_" + rear)
+	var chamber := duplicate_pose(guard)
+	hip_turn(chamber, 15.0)
+	plant_both(chamber, lead_foot, rear_foot)
+	var rear_shoulder := global_origin(chamber, "upperarm_" + rear)
+	reach_arm(chamber, lead, rear_shoulder + Vector3(-s * 0.05, -0.08, 0.2))
+	shoulder_roll(chamber, lead, 8.0)
+
+	var strike := duplicate_pose(guard)
+	move_bone(strike, "pelvis", Vector3(0, -0.02, 0.06))
+	hip_turn(strike, -25.0)
+	lean(strike, -4.0, 0.0)
+	plant_both(strike, lead_foot, rear_foot)
+	var lead_shoulder := global_origin(strike, "upperarm_" + lead)
+	var fist := Vector3(lead_shoulder.x * 0.6, lead_shoulder.y + 0.05, lead_shoulder.z + 0.62)
+	# Elbow up and out to the side: the forearm swings horizontally into the target.
+	solve_ik(strike, "upperarm_" + lead, "lowerarm_" + lead, "hand_" + lead, fist, Vector3(-s, 0.4, 0.0))
+	shoulder_roll(strike, lead, 12.0)
+
+	return make_animation([[0.0, guard], [0.06, chamber], [0.12, strike], [0.17, strike], [0.32, guard]], false)
+
+
+## Somersault flip kick (Mira's Sipa Flip and Lawin Rise): a quick dip, then the rear leg
+## whips straight up past the opponent's chin as the body throws itself into a backflip,
+## knees tucked through the turn, landing in a crouch. Impact 0.12 s (foot in front of
+## the face). The flip turns in steps under 180 degrees so the keys interpolate the right
+## way round.
+func build_flip_kick() -> Animation:
+	var s := rear_sign()
+	var dip := duplicate_pose(crouch)
+	move_bone(dip, "pelvis", Vector3(0, -0.05, 0))
+	plant_both(dip, global_origin(crouch, "foot_" + lead), global_origin(crouch, "foot_" + rear))
+
+	var kicks := []
+	for k in [[-40.0, 0.12], [-75.0, 0.22]]:
+		var kick := duplicate_pose(guard)
+		move_bone(kick, "pelvis", Vector3(0, k[1], 0))
+		rotate_bone(kick, "pelvis", Vector3.RIGHT, k[0])
+		var hip := global_origin(kick, "thigh_" + rear)
+		solve_ik(kick, "thigh_" + rear, "calf_" + rear, "foot_" + rear,
+			Vector3(hip.x * 0.3, hip.y + 0.72, hip.z + 0.5), Vector3(0, 0, 1))
+		point_foot(kick, rear, Vector3(0, 1, 0.4))
+		rotate_bone(kick, "thigh_" + lead, Vector3.RIGHT, -45.0)
+		rotate_bone(kick, "calf_" + lead, Vector3.RIGHT, 80.0)
+		swing_rear_arm(kick, 0.9)
+		kicks.append(kick)
+
+	var tucks := []
+	for t in [[-150.0, 0.38], [-240.0, 0.40], [-310.0, 0.24]]:
+		var tuck := duplicate_pose(guard)
+		move_bone(tuck, "pelvis", Vector3(0, t[1], 0))
+		rotate_bone(tuck, "pelvis", Vector3.RIGHT, t[0])
+		for side in ["l", "r"]:
+			rotate_bone(tuck, "thigh_" + side, Vector3.RIGHT, -95.0 if t[0] > -300.0 else -40.0)
+			rotate_bone(tuck, "calf_" + side, Vector3.RIGHT, 115.0 if t[0] > -300.0 else 60.0)
+		tucks.append(tuck)
+
+	var land := duplicate_pose(crouch)
+	move_bone(land, "pelvis", Vector3(0, -0.04, 0))
+
+	return make_animation([[0.0, guard], [0.05, dip], [0.12, kicks[0]], [0.18, kicks[1]],
+		[0.26, tucks[0]], [0.34, tucks[1]], [0.42, tucks[2]], [0.50, land], [0.66, guard]], false)
+
+
+## Dive kick (Mira's Lawin Drop): from the jump the rear leg spears down and forward at
+## 45 degrees, foot pointed, the lead knee tucked and the torso leaning back, arms out for
+## balance; held all the way down. Impact 0.08 s.
+func build_dive_kick() -> Animation:
+	var s := rear_sign()
+	var air := merge(sample(ual1.get_animation("Jump_Start"), 0.5), guard, arm_bones())
+	var kick := duplicate_pose(air)
+	hip_turn(kick, 30.0)
+	lean(kick, 24.0, 4.0)
+	var hip := global_origin(kick, "thigh_" + rear)
+	solve_ik(kick, "thigh_" + rear, "calf_" + rear, "foot_" + rear,
+		hip + Vector3(-s * 0.05, -0.68, 0.58), Vector3(0, 1, 0.3))
+	point_foot(kick, rear, Vector3(0, -0.6, 1))
+	var lead_hip := global_origin(kick, "thigh_" + lead)
+	solve_ik(kick, "thigh_" + lead, "calf_" + lead, "foot_" + lead,
+		lead_hip + Vector3(-s * 0.1, -0.22, -0.06), Vector3(0, 0.2, 1))
+	swing_rear_arm(kick, 0.6)
+	# The extra key keeps the cubic curve from bulging away from the held pose.
+	return make_animation([[0.0, air], [0.08, kick], [0.11, kick], [0.6, kick]], false)
+
+
+## Focus stance (Mira's Lakas Stance): the feet slide wide into a low horse stance, the
+## fists cross in front of the chest, then pull back to the hips with the chest out and
+## the chin up as she draws in power; holds, then back to guard. Power peaks at 0.25 s.
+func build_focus_stance() -> Animation:
+	var s := rear_sign()
+	var wide_lead := global_origin(guard, "foot_" + lead) + Vector3(-s * 0.12, 0, 0.04)
+	var wide_rear := global_origin(guard, "foot_" + rear) + Vector3(s * 0.12, 0, -0.04)
+	var cross := duplicate_pose(guard)
+	move_bone(cross, "pelvis", Vector3(0, -0.1, 0))
+	plant_both(cross, wide_lead, wide_rear)
+	var chest := global_origin(cross, "spine_03")
+	reach_arm(cross, "l", chest + Vector3(-0.06, 0.02, 0.32))
+	reach_arm(cross, "r", chest + Vector3(0.06, 0.06, 0.30)) # crossed at the wrists
+
+	var power := duplicate_pose(guard)
+	move_bone(power, "pelvis", Vector3(0, -0.16, 0))
+	lean(power, 10.0, 0.0)
+	plant_both(power, wide_lead, wide_rear)
+	for side in ["l", "r"]:
+		var hip := global_origin(power, "thigh_" + side)
+		var x := 0.12 if side == "l" else -0.12
+		reach_arm(power, side, hip + Vector3(x, 0.12, -0.08)) # fists at the hips, elbows back
+	rotate_bone(power, "neck_01", Vector3.RIGHT, -12.0) # chin up
+
+	return make_animation([[0.0, guard], [0.10, cross], [0.25, power], [0.45, power], [0.60, guard]], false)
 
 
 ## Resamples `source` keeping its `keep_bones`, with the rest of the body from the guard.

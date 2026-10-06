@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_hc23p"]
+
+[resource]
+script = ExtResource("1_hc23p")
+name = "Lawin Drop"
+input = "j.2K"
+animation = &"fight/dive_kick"
+animation_impact = 0.08
+animation_end = 0.6
+active = 30
+recovery = 4
+damage = 60
+hit_level = 3
+hitstun = 17
+blockstun = 12
+hitstop = 7
+landing_recovery = 10
+dive = Vector2(4.5, 7)
+hitbox_radius = 0.24
+hitbox_offset = Vector3(0.1, 0.25, -0.6)
+camera_intensity = 0.1

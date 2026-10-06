@@ -3,6 +3,7 @@ extends SceneTree
 ## assigns it to CharacterData.portrait.
 ##
 ## Run WINDOWED (needs the renderer): godot --path . -s res://tools/render_portraits.gd
+## Append `-- <id> ...` to render only those characters.
 
 const OUT_DIR := "res://assets/ui/portraits/"
 const SIZE := Vector2i(512, 512)
@@ -12,8 +13,10 @@ func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	await process_frame
 	var roster: Array = root.get_node("GameState").roster
+	var only := OS.get_cmdline_user_args()
 	for character: CharacterData in roster:
-		await _render(character)
+		if only.is_empty() or String(character.id) in only:
+			await _render(character)
 	print("portraits done")
 	quit()
 
