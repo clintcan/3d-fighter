@@ -1200,6 +1200,17 @@ func market_tests() -> void:
 	check("Market: grill light flickers and the neon is wired", grill != null and grill._lights.size() == 2
 		and neon != null and neon._labels.size() == 1 and neon._hums.size() == 1)
 	check("Market: in the stage list as the Night Market", gs.stage_name(gs.MARKET_STAGE) == "Night Market")
+	var jeeps := [m.stage.get_node_or_null("Jeepney0"), m.stage.get_node_or_null("Jeepney1")]
+	var painted := jeeps.all(func(j) -> bool:
+		if not j is MeshInstance3D or (j as MeshInstance3D).mesh.resource_path != "res://assets/stages/market/jeepney.res":
+			return false
+		for i in (j as MeshInstance3D).mesh.get_surface_count():
+			if (j as MeshInstance3D).get_surface_override_material(i) == null:
+				return false
+		return true)
+	check("Market: two modelled jeepneys, every surface painted", painted)
+	check("Market: the jeepneys are painted differently", painted
+		and (jeeps[0] as MeshInstance3D).get_surface_override_material(1) != (jeeps[1] as MeshInstance3D).get_surface_override_material(1))
 	gs.stage_path = gs.DEFAULT_STAGE
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 

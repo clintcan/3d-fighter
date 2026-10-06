@@ -5,7 +5,7 @@ extends SceneTree
 ## shophouses (shutters, lit shopfronts, balconies, aircon units, hand-painted signs).
 ## Wooden electric poles carry a tangle of wires, and banderitas (fiesta bunting) and
 ## string lights cross overhead. A jeepney is parked at the back right, another down the
-## street on the left, and locals watch from both ends.
+## street on the left (modelled by tools/build_jeepney.gd), and locals watch from both ends.
 ## Re-run after changing anything below.
 ##
 ## Run: godot_console --headless --path . -s res://tools/build_market_stage.gd
@@ -25,6 +25,7 @@ const CROWD_SCRIPT := "res://scripts/stages/crowd.gd"
 const AMBIENCE_SCRIPT := "res://scripts/stages/neon_ambience.gd"
 const FLICKER_SCRIPT := "res://scripts/stages/fire_flicker.gd"
 const AO_PATH := "res://assets/stages/market/street_ao.res"
+const JEEPNEY := "res://assets/stages/market/jeepney.res" # tools/build_jeepney.gd
 
 const CURB_Z := -6.4 # street edge (sidewalk starts here)
 const FRONT_Z := -9.6 # shophouse fronts
@@ -369,53 +370,39 @@ func _build_stalls() -> void:
 
 # --- Jeepneys --------------------------------------------------------------------
 
-## A jeepney: a long chrome-and-paint body with an open rear, a short bonnet with a chrome
-## grille, side windows, a roof with rails and a lit route sign, fiesta stripes, chrome
-## fenders and four wheels. Local frame: front toward +X.
+## A jeepney (the mesh from tools/build_jeepney.gd), painted through its named surfaces,
+## with its route lit on the roof board and a name painted on each side. Front toward
+## local +X.
 func _build_jeepney(xform: Transform3D, route: String, index: int) -> void:
-	var body: Material = _material([Color(0.85, 0.86, 0.88), Color(0.9, 0.18, 0.15)][index], 0.75 if index == 0 else 0.1, 0.25)
-	var cabin: Material = _material([Color(0.1, 0.25, 0.7), Color(0.95, 0.85, 0.2)][index], 0.1, 0.4)
-	var b := func(material: Material, size: Vector3, pos: Vector3, rot := Basis()) -> void:
-		_batch(material, size, xform * Transform3D(rot, pos))
-	b.call(body, Vector3(4.2, 0.85, 1.8), Vector3(-0.3, 0.95, 0))
-	b.call(cabin, Vector3(3.6, 0.85, 1.8), Vector3(-0.6, 1.8, 0))
-	b.call(mat_glass, Vector3(3.2, 0.42, 1.84), Vector3(-0.7, 1.88, 0)) # side window band
-	for k in 6: # window pillars
-		b.call(cabin, Vector3(0.08, 0.44, 1.86), Vector3(-2.2 + k * 0.62, 1.88, 0))
-	b.call(body, Vector3(1.2, 0.6, 1.62), Vector3(2.4, 1.05, 0)) # bonnet
-	b.call(mat_glass, Vector3(0.06, 0.6, 1.6), Vector3(1.22, 1.85, 0), Basis(Vector3.BACK, deg_to_rad(18.0))) # windscreen
-	b.call(mat_chrome, Vector3(0.08, 0.55, 1.3), Vector3(3.02, 1.05, 0)) # grille
-	for z in [-0.6, 0.6]:
-		b.call(mat_headlight, Vector3(0.06, 0.18, 0.22), Vector3(3.04, 1.18, z))
-	b.call(mat_chrome, Vector3(4.1, 0.08, 2.0), Vector3(-0.55, 2.27, 0)) # roof
-	for z in [-0.92, 0.92]:
-		b.call(mat_chrome, Vector3(3.9, 0.05, 0.05), Vector3(-0.55, 2.4, z)) # roof rails
-		for s in 3: # fiesta stripes along the side
-			var stripe: Material = _tarps[(s + index) % 4]
-			b.call(stripe, Vector3(4.15, 0.07, 0.02), Vector3(-0.3, 0.75 + s * 0.12, z * 0.98 + signf(z) * 0.02))
-	b.call(mat_dark, Vector3(0.05, 1.55, 1.5), Vector3(-2.45, 1.4, 0)) # open rear, dark inside
-	b.call(mat_chrome, Vector3(0.35, 0.06, 1.2), Vector3(-2.55, 0.55, 0)) # rear step
-	b.call(mat_dark, Vector3(1.0, 0.32, 0.06), Vector3(1.2, 2.55, 0)) # route sign board
-	for w in [Vector2(2.1, 0.86), Vector2(2.1, -0.86), Vector2(-1.6, 0.86), Vector2(-1.6, -0.86)]:
-		var wheel := CylinderMesh.new()
-		wheel.top_radius = 0.38
-		wheel.bottom_radius = 0.38
-		wheel.height = 0.26
-		wheel.radial_segments = 16
-		_append(mat_tire, wheel, xform * Transform3D(Basis(Vector3.RIGHT, PI / 2.0), Vector3(w.x, 0.38, w.y)))
-		var hub := CylinderMesh.new()
-		hub.top_radius = 0.17
-		hub.bottom_radius = 0.17
-		hub.height = 0.28
-		hub.radial_segments = 12
-		_append(mat_chrome, hub, xform * Transform3D(Basis(Vector3.RIGHT, PI / 2.0), Vector3(w.x, 0.38, w.y)))
-		b.call(mat_chrome, Vector3(0.95, 0.06, 0.32), Vector3(w.x, 0.82, w.y)) # fender
+	var schemes := [
+		{body = _material(Color(0.82, 0.84, 0.87), 0.85, 0.22), paint = _material(Color(0.1, 0.25, 0.7), 0.1, 0.35),
+			accent = _material(Color(0.9, 0.15, 0.12), 0.0, 0.5), accent2 = _material(Color(0.95, 0.75, 0.1), 0.0, 0.5), name = "MIRA'S PRIDE"},
+		{body = _material(Color(0.85, 0.16, 0.13), 0.2, 0.3), paint = _material(Color(0.95, 0.82, 0.18), 0.1, 0.35),
+			accent = _material(Color(0.12, 0.3, 0.75), 0.0, 0.5), accent2 = _material(Color(0.95, 0.95, 0.92), 0.0, 0.5), name = "GOD BLESS OUR TRIP"},
+	]
+	var scheme: Dictionary = schemes[index]
+	var shared := {chrome = mat_chrome, glass = mat_glass, interior = mat_dark, seat = _material(Color(0.6, 0.08, 0.08), 0.0, 0.4),
+		tire = mat_tire, light = mat_headlight, taillight = _emissive(Color(1.0, 0.1, 0.05), 2.0)}
+	var jeep := MeshInstance3D.new()
+	jeep.mesh = load(JEEPNEY)
+	jeep.transform = xform
+	_add(stage, jeep, "Jeepney%d" % index)
+	for s in jeep.mesh.get_surface_count():
+		var surface: String = jeep.mesh.surface_get_name(s)
+		jeep.set_surface_override_material(s, scheme.get(surface, shared.get(surface)))
 	var label := _label(route, 80, Color(1.0, 0.92, 0.5))
-	label.transform = xform * Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3(1.24, 2.55, 0))
+	label.transform = xform * Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3(1.09, 2.43, 0))
 	label.pixel_size = 0.0022
 	label.modulate = Color(2.2, 2.0, 1.0)
 	label.shaded = false
 	_add(stage, label, "JeepneyRoute%d" % index)
+	for side in [-1.0, 1.0]: # its name in looping script along the stainless side
+		var name_label := _label(scheme.name, 96, Color(0.95, 0.2, 0.15) if index == 0 else Color(1.0, 0.95, 0.4))
+		name_label.transform = xform * Transform3D(Basis(Vector3.UP, 0.0 if side > 0 else PI), Vector3(-0.8, 1.28, side * 0.945))
+		name_label.pixel_size = 0.0026
+		name_label.outline_size = 10
+		name_label.outline_modulate = Color(0.05, 0.05, 0.1)
+		_add(stage, name_label, "JeepneyName%d%s" % [index, "R" if side > 0 else "L"])
 
 
 # --- Poles, wires, banderitas ------------------------------------------------------
