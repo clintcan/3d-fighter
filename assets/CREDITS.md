@@ -56,6 +56,14 @@ Third-party assets are CC0, except the Permanent Marker font that `tools/build_l
 | Boss_Koto (temple music; loudness-matched) | `assets/audio/music/fight_temple_boss_koto.ogg` | G_P | https://opengameart.org/content/bosskoto | CC0 1.0 |
 | Midnight Drive (rooftop music; loudness-matched) | `assets/audio/music/fight_rooftop_midnight_drive.ogg` | congusbongus | https://opengameart.org/content/midnight-drive | CC0 1.0 |
 | Funky House (beach music; loudness-matched) | `assets/audio/music/fight_beach_funky_house.ogg` | Of Far Different Nature | https://opengameart.org/content/funky-house | CC0 1.0 |
+| Jazzy Battle Theme (night market music; loudness-matched) | `assets/audio/music/fight_market_jazzy_battle.ogg` | MintoDog | https://opengameart.org/content/jazzy-battle-theme | CC0 1.0 |
+| Qwantani Dusk 2 (Pure Sky) HDRI (2k; night market sky) | `assets/stages/market/qwantani_dusk_2_puresky_2k.hdr` | Greg Zaal, Jarod Guest / Poly Haven | https://polyhaven.com/a/qwantani_dusk_2_puresky | CC0 1.0 |
+| Asphalt 02 texture (market street) | `assets/stages/market/textures/asphalt_02_*` | Rob Tuytel / Poly Haven | https://polyhaven.com/a/asphalt_02 | CC0 1.0 |
+| Brick Pavement texture (market sidewalk) | `assets/stages/market/textures/brick_pavement_*` | Charlotte Baglioni / Poly Haven | https://polyhaven.com/a/brick_pavement | CC0 1.0 |
+| Painted Plaster Wall texture (shophouses) | `assets/stages/market/textures/painted_plaster_wall_*` | Amal Kumar / Poly Haven | https://polyhaven.com/a/painted_plaster_wall | CC0 1.0 |
+| Rusty Corrugated Iron texture (shophouse roofs) | `assets/stages/market/textures/rusty_corrugated_iron_*` | Charlotte Baglioni / Poly Haven | https://polyhaven.com/a/rusty_corrugated_iron | CC0 1.0 |
+| Wood Planks texture (stalls, electric poles) | `assets/stages/market/textures/wood_planks_*` | Amal Kumar / Poly Haven | https://polyhaven.com/a/wood_planks | CC0 1.0 |
+| Painted Metal Shutter texture (shop shutters) | `assets/stages/market/textures/painted_metal_shutter_*` | Dario Barresi, Rico Cilliers, Charlotte Baglioni / Poly Haven | https://polyhaven.com/a/painted_metal_shutter | CC0 1.0 |
 | Male Grunt/Yelling sounds (Kenji, Brutus and Jin shouts; trimmed, normalized, Brutus pitched down) | `assets/audio/voice/fighters/kenji_*`, `brutus_*`, `jin_*` | HaelDB | https://opengameart.org/content/male-gruntyelling-sounds | CC0 1.0 (dual-licensed CC0 / OGA-BY 3.0; used under CC0) |
 | Female Hurt Grunts & Groans (Rhea shouts; Valka's are other takes pitched to 0.86, Mira's pitched to 1.07) | `assets/audio/voice/fighters/rhea_*`, `valka_*`, `mira_*` | AuraVoice (Nocturnal_Vanguard) | https://opengameart.org/content/female-hurt-grunts-groans | CC0 1.0 |
 | Swing whooshes | `assets/audio/sfx/swing_*.wav` | Synthesized for this project (filtered noise) | — | CC BY 4.0 (project original) |

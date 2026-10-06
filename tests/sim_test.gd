@@ -344,6 +344,7 @@ func _initialize() -> void:
 	await jin_tests()
 	await mira_tests()
 	await beach_tests()
+	await market_tests()
 	await scores_credits_tests()
 	await controls_tests()
 	await outfit_tests()
@@ -810,7 +811,8 @@ func stage_tests() -> void:
 	var polish := {gs.DEFAULT_STAGE: [["CanvasShadows", "ArenaShadows"], ["Dust", "CameraFlashes"]],
 		gs.DOJO_STAGE: [["FloorShadows"], ["Dust", "CandleFlicker", "IncenseSmoke"]],
 		gs.TEMPLE_STAGE: [["GravelShadows"], ["LanternFlicker"]],
-		gs.BEACH_STAGE: [["SandShadows"], ["SeaSpray", "TorchFire0", "TorchEmbers0"]]}
+		gs.BEACH_STAGE: [["SandShadows"], ["SeaSpray", "TorchFire0", "TorchEmbers0"]],
+		gs.MARKET_STAGE: [["StreetShadows"], ["GrillSmoke0", "GrillSparks0", "GrillFlicker", "Ambience"]]}
 	var missing := []
 	for path: String in polish:
 		var scene := (load(path) as PackedScene).instantiate()
@@ -872,9 +874,10 @@ func stage_tests() -> void:
 
 	# Arcade stages: alternate arenas, boss in the dojo.
 	var run := ArcadeRun.create(gs.roster[0], gs.roster, 1, 9, gs.arcade_arenas(), gs.DOJO_STAGE)
-	check("Arcade: ring, rooftop, temple, beach, then the boss in the dojo", run.stages[0].stage_path == gs.DEFAULT_STAGE
+	check("Arcade: ring, rooftop, temple, beach, market, then the boss in the dojo", run.stages[0].stage_path == gs.DEFAULT_STAGE
 		and run.stages[1].stage_path == gs.ROOFTOP_STAGE and run.stages[2].stage_path == gs.TEMPLE_STAGE
-		and run.stages[3].stage_path == gs.BEACH_STAGE and run.stages[-1].stage_path == gs.DOJO_STAGE)
+		and run.stages[3].stage_path == gs.BEACH_STAGE and run.stages[4].stage_path == gs.MARKET_STAGE
+		and run.stages[-1].stage_path == gs.DOJO_STAGE)
 	# The rooftop: loads, fights, and its sky shader compiles.
 	gs.stage_path = gs.ROOFTOP_STAGE
 	change_scene_to_file("res://scenes/fight.tscn")
@@ -910,7 +913,7 @@ func polish_tests() -> void:
 	gs.mode = gs.Mode.VS_CPU
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 	# Each stage brings its own music.
-	for entry in [[gs.DOJO_STAGE, &"dojo"], [gs.ROOFTOP_STAGE, &"rooftop"], [gs.TEMPLE_STAGE, &"temple"], [gs.BEACH_STAGE, &"beach"], [gs.DEFAULT_STAGE, &"fight"]]:
+	for entry in [[gs.DOJO_STAGE, &"dojo"], [gs.ROOFTOP_STAGE, &"rooftop"], [gs.TEMPLE_STAGE, &"temple"], [gs.BEACH_STAGE, &"beach"], [gs.MARKET_STAGE, &"market"], [gs.DEFAULT_STAGE, &"fight"]]:
 		gs.stage_path = entry[0]
 		change_scene_to_file("res://scenes/fight.tscn")
 		await process_frame; await process_frame
@@ -1172,6 +1175,33 @@ func beach_tests() -> void:
 	check("Beach: loads with the standard bounds and combat works", m.stage.name == "Beach" and m.stage.bounds_half_extent == 3.6
 		and p2.health == hp - dmg(p1, "LP"), "hp %d -> %d" % [hp, p2.health])
 	gs.stage_path = gs.DEFAULT_STAGE
+
+
+## The night market: loads with the standard bounds, combat works, its grill light
+## flickers and the neon is wired up.
+func market_tests() -> void:
+	var gs = root.get_node("GameState")
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = gs.roster[5]; gs.p2_character = gs.roster[0]
+	gs.stage_path = gs.MARKET_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	reset(DummyController.Mode.STAND); approach(1.1)
+	var hp := p2.health
+	press(InputBuffer.LP); step(6)
+	check("Market: loads with the standard bounds and combat works", m.stage.name == "Market" and m.stage.bounds_half_extent == 3.6
+		and p2.health == hp - dmg(p1, "LP"), "hp %d -> %d" % [hp, p2.health])
+	var grill := m.stage.get_node_or_null("GrillFlicker") as FireFlicker
+	var neon := m.stage.get_node_or_null("Ambience") as NeonAmbience
+	check("Market: grill light flickers and the neon is wired", grill != null and grill._lights.size() == 2
+		and neon != null and neon._labels.size() == 1 and neon._hums.size() == 1)
+	check("Market: in the stage list as the Night Market", gs.stage_name(gs.MARKET_STAGE) == "Night Market")
+	gs.stage_path = gs.DEFAULT_STAGE
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 
 
 func temple_tests() -> void:

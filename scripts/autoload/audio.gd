@@ -28,6 +28,7 @@ const MUSIC := {
 	&"rooftop": "fight_rooftop_midnight_drive",
 	&"temple": "fight_temple_boss_koto",
 	&"beach": "fight_beach_funky_house",
+	&"market": "fight_market_jazzy_battle",
 }
 const SFX_VOICES := 16
 const MUSIC_FADE := 1.2
