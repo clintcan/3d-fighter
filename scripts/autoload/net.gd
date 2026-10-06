@@ -550,7 +550,8 @@ func _start_server_peer(msg: Dictionary) -> void:
 	var ip := host_name if host_name.is_valid_ip_address() else IP.resolve_hostname(host_name, IP.TYPE_IPV4)
 	var token := str(msg.get("session_token", "")).hex_decode()
 	var key := str(msg.get("relay_key", "")).hex_decode()
-	if ip == "" or token.size() != 16 or key.size() != 8:
+	var pair_secret := str(msg.get("pair_secret", "")).hex_decode() # empty from older servers
+	if ip == "" or token.size() != 16 or key.size() != 8 or pair_secret.size() not in [0, 16]:
 		last_reason = "The server sent a connection this game can't use"
 		connect_failed.emit(last_reason)
 		return
@@ -563,7 +564,7 @@ func _start_server_peer(msg: Dictionary) -> void:
 		last_reason = "Couldn't open a network port (%s)" % error_string(err)
 		connect_failed.emit(last_reason)
 		return
-	peer.use_server(ip, int(udp.get("port", 0)), token, key, as_host)
+	peer.use_server(ip, int(udp.get("port", 0)), token, key, as_host, pair_secret)
 	room_role = "host" if as_host else "guest"
 	if not _pending_endpoints.is_empty():
 		_on_peer_endpoints(_pending_endpoints)

@@ -2313,8 +2313,9 @@ func _forwarded_pair(pass_from_host: int) -> Dictionary:
 	fake.pair(tokens[0], keys[0], tokens[1], keys[1])
 	host.host(0)
 	guest.join_via_server()
-	host.use_server("127.0.0.1", fake.port(), tokens[0], keys[0], true)
-	guest.use_server("127.0.0.1", fake.port(), tokens[1], keys[1], false)
+	var secret := Crypto.new().generate_random_bytes(16)
+	host.use_server("127.0.0.1", fake.port(), tokens[0], keys[0], true, secret)
+	guest.use_server("127.0.0.1", fake.port(), tokens[1], keys[1], false, secret)
 	var fwd := FakeForward.new(host.local_port())
 	fwd.pass_from_host = pass_from_host
 	for i in 10:
@@ -2327,7 +2328,9 @@ func _forwarded_pair(pass_from_host: int) -> Dictionary:
 ## Two NetPeers matched through a FakeRendezvous; `candidates` decides the path:
 ## "relay" (none: the relay only), "direct" (each other's real address) or "dead" (an
 ## address nobody answers: the guest must give up on it and fall back to the relay).
-func _server_pair(candidates: String) -> Dictionary:
+## `guest_secret`: the guest's pair_secret is the host's ("same"), another one ("wrong"),
+## missing ("none"), or neither has one ("legacy": a server that doesn't send it).
+func _server_pair(candidates: String, guest_secret := "same") -> Dictionary:
 	var fake := FakeRendezvous.new()
 	var host := _net_peer("1.0", 42, "NetHost")
 	var guest := _net_peer("1.0", 42, "NetGuest")
@@ -2338,8 +2341,10 @@ func _server_pair(candidates: String) -> Dictionary:
 	fake.pair(tokens[0], keys[0], tokens[1], keys[1])
 	host.host(0)
 	guest.join_via_server()
-	host.use_server("127.0.0.1", fake.port(), tokens[0], keys[0], true)
-	guest.use_server("127.0.0.1", fake.port(), tokens[1], keys[1], false)
+	var secret := PackedByteArray() if guest_secret == "legacy" else Crypto.new().generate_random_bytes(16)
+	var theirs: PackedByteArray = {same = secret, wrong = Crypto.new().generate_random_bytes(16)}.get(guest_secret, PackedByteArray())
+	host.use_server("127.0.0.1", fake.port(), tokens[0], keys[0], true, secret)
+	guest.use_server("127.0.0.1", fake.port(), tokens[1], keys[1], false, theirs)
 	for i in 10:
 		_pump([host, guest, fake], 1)
 	var bound := host.bound and guest.bound
@@ -2610,6 +2615,66 @@ func server_tests() -> void:
 		and dead.rounds * 16 >= NetPeer.PUNCH_TIMEOUT_MS, "%s via %s after %d rounds" % [dead.guest.status, dead.guest.connection_path(), dead.rounds])
 	dead.host.close()
 	dead.guest.close()
+
+	# pair_secret: only the player the server gave it to gets in, even from the right address.
+	for kind in ["wrong", "none"]:
+		var outsider := _server_pair("direct", kind)
+		check("a HELLO with a %s pair_secret proof is ignored (direct and relay)" % kind,
+			not outsider.host.is_connected_to_peer() and not outsider.guest.is_connected_to_peer()
+			and outsider.host.status == NetPeer.Status.HOSTING and outsider.host.remote_ip == "",
+			"%s / %s, host talking to '%s'" % [outsider.host.status, outsider.guest.status, outsider.host.remote_ip])
+		outsider.host.close()
+		outsider.guest.close()
+	var legacy := _server_pair("direct", "legacy")
+	check("a server without pair_secret still connects the players", legacy.host.is_connected_to_peer()
+		and legacy.guest.is_connected_to_peer() and legacy.host.security_code == legacy.guest.security_code)
+	legacy.host.close()
+	legacy.guest.close()
+	# A proof seen on the wire can't be reused from another address (it's tied to the cookie):
+	# otherwise the "same guest on another path" restart would hand the exchange to a stranger.
+	var paired := _net_peer("1.0", 42, "PairHost")
+	paired.auto_accept = false
+	paired.host(0)
+	paired.use_server("127.0.0.1", 9, Crypto.new().generate_random_bytes(16), Crypto.new().generate_random_bytes(8), true,
+		Crypto.new().generate_random_bytes(16))
+	paired.set_peer_candidates([{ip = "127.0.0.1", port = 9}], 0)
+	var matched := PacketPeerUDP.new()
+	var thief := PacketPeerUDP.new()
+	var nonce := 0x51C0FFEE
+	var cookie_of := func(sock: PacketPeerUDP) -> int:
+		sock.put_packet(_hello_bytes("1.0", 42, "X", nonce, 0))
+		for i in 6:
+			OS.delay_usec(300)
+			paired.poll()
+		while sock.get_available_packet_count() > 0:
+			var reply := sock.get_packet()
+			if reply.size() == 17 and reply[0] == NetPeer.T_CHALLENGE:
+				return reply.decode_u64(9)
+		return 0
+	var send_hello := func(sock: PacketPeerUDP, cookie: int, proof: PackedByteArray) -> void:
+		var hello := _hello_bytes("1.0", 42, "X", nonce, cookie)
+		hello.append_array(proof)
+		sock.put_packet(hello)
+		for i in 6:
+			OS.delay_usec(300)
+			paired.poll()
+	for sock: PacketPeerUDP in [matched, thief]:
+		sock.bind(0, "127.0.0.1")
+		sock.set_dest_address("127.0.0.1", paired.local_port())
+	var matched_cookie: int = cookie_of.call(matched)
+	var matched_proof: PackedByteArray = paired._pair_proof(nonce, matched_cookie)
+	send_hello.call(matched, matched_cookie, matched_proof)
+	var with_matched := paired.status == NetPeer.Status.SECURING and paired.remote_port == matched.get_local_port()
+	var thief_cookie: int = cookie_of.call(thief)
+	send_hello.call(thief, thief_cookie, matched_proof)
+	var kept := paired.remote_port == matched.get_local_port()
+	send_hello.call(thief, thief_cookie, paired._pair_proof(nonce, thief_cookie))
+	var moved := paired.remote_port == thief.get_local_port() # control: a valid proof does move it
+	check("a replayed pair_secret proof can't move the key exchange to another address", with_matched and kept and moved,
+		"secured with the guest %s, kept %s, valid proof moves it %s" % [with_matched, kept, moved])
+	matched.close()
+	thief.close()
+	paired.close()
 
 	# A direct path that answers once and then stalls: the guest must not stay stuck on it.
 	var stall := _forwarded_pair(1)

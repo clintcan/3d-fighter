@@ -47,6 +47,10 @@ extends RefCounted
 ## relay (same nonce), and the host restarts the key exchange on the new path. During a
 ## match, FAILOVER_MS of silence on a direct path moves both players to the relay (the
 ## sealed datagrams don't depend on the path); packets are accepted from either path.
+## The server gives both players a pair_secret: the guest's HELLO carries PAIR_PROOF_SIZE
+## bytes of HMAC(pair_secret, nonce + cookie), and the host ignores HELLOs without a valid
+## one, so another player behind the guest's public address (same NAT) or anyone who sees
+## the HELLO can't take the guest's place. The secret is also mixed into the session keys.
 
 signal connected
 signal connect_failed(reason: String)
@@ -114,6 +118,7 @@ const PUNCH_INTERVAL_MS := 100
 const PUNCH_TIMEOUT_MS := 3000 # no direct answer by then: use the relay
 const DIRECT_DEADLINE_MS := 4000 # locked on to a direct path but not connected by then: use the relay
 const FAILOVER_MS := 2000 # a direct path silent this long during a match: switch to the relay
+const PAIR_PROOF_SIZE := 16 # bytes of the HELLO's pair_secret proof
 const ENDPOINTS_TIMEOUT_MS := 15000 # the server never sent the peer's addresses
 const MAX_RELAY_PAYLOAD := 1200
 const MAX_BIND_CANDIDATES := 4
@@ -200,6 +205,7 @@ var _verified_replies := 0
 # Lobby server mode.
 var _server_token := PackedByteArray() # 16 bytes, proves this socket to the server
 var _relay_key := PackedByteArray() # 8 bytes, our key for RELAY
+var _pair_secret := PackedByteArray() # shared with the matched peer (empty: not checked)
 var _bind_role := 0 # 0 host, 1 guest
 var _last_bind := -BIND_KEEPALIVE_MS
 var _server_since := 0
@@ -294,12 +300,15 @@ func join_via_server() -> Error:
 
 
 ## Lobby server mode, after host() / join_via_server(): the server's UDP address and this
-## player's credentials from its match_session. poll() BINDs from now on.
-func use_server(ip: String, port: int, token: PackedByteArray, relay_key: PackedByteArray, as_host: bool) -> void:
+## player's credentials from its match_session (pair_secret: shared by both players, or
+## empty from a server that doesn't send one). poll() BINDs from now on.
+func use_server(ip: String, port: int, token: PackedByteArray, relay_key: PackedByteArray, as_host: bool,
+		pair_secret := PackedByteArray()) -> void:
 	server_ip = ip
 	server_port = port
 	_server_token = token
 	_relay_key = relay_key
+	_pair_secret = pair_secret
 	_bind_role = 0 if as_host else 1
 	bound = false
 	public_endpoint = ""
@@ -392,6 +401,7 @@ func close_socket() -> void:
 	_punch_at = -1
 	_expected = {}
 	_direct_addr = []
+	_pair_secret = PackedByteArray()
 
 
 func send_input(bytes: PackedByteArray) -> void:
@@ -590,6 +600,9 @@ func _on_hello(bytes: PackedByteArray, ip: String, port: int, now: int) -> void:
 		_reply_to(ip, port, challenge, false)
 		return
 	# The address is proven from here on.
+	if server_ip != "" and not _pair_secret.is_empty() 			and (hello.proof.size() != PAIR_PROOF_SIZE
+				or not _crypto.constant_time_compare(hello.proof, _pair_proof(hello.nonce, hello.cookie))):
+		return # not the player the server matched us with, even if from their address
 	if server_ip != "" and hello.nonce == _nonce and (ip != remote_ip or port != remote_port) \
 			and (status == Status.SECURING or (status == Status.CONNECTED and _recv_highest < 0)):
 		# The matched guest gave up on the other path (it falls back to the relay when a
@@ -768,7 +781,7 @@ func _fail(reason: String) -> void:
 ## Session keys from the secret and both nonces; the security code from everything.
 func _finish_keys() -> void:
 	var salt := _host_nonce + _guest_nonce
-	var master := _crypto.hmac_digest(HashingContext.HASH_SHA256, _key_secret, "3DF-keys|".to_utf8_buffer() + salt)
+	var master := _crypto.hmac_digest(HashingContext.HASH_SHA256, _key_secret + _pair_secret, "3DF-keys|".to_utf8_buffer() + salt)
 	var to_guest := ["enc|h2g", "mac|h2g", "iv|h2g"].map(func(label: String) -> PackedByteArray:
 		return _crypto.hmac_digest(HashingContext.HASH_SHA256, master, label.to_utf8_buffer()))
 	var to_host := ["enc|g2h", "mac|g2h", "iv|g2h"].map(func(label: String) -> PackedByteArray:
@@ -1079,10 +1092,23 @@ func _hello() -> PackedByteArray:
 	out.put_utf8_string(player_name)
 	out.put_u64(_nonce)
 	out.put_u64(_cookie)
+	if not _pair_secret.is_empty():
+		out.put_data(_pair_proof(_nonce, _cookie))
 	return out.data_array
 
 
-## {protocol, version, data_hash, name, nonce, cookie}, or {} when malformed.
+## Proves the HELLO comes from the player who got the pair_secret; tied to the cookie, so
+## it's only good from the address that cookie was made for.
+func _pair_proof(nonce: int, cookie: int) -> PackedByteArray:
+	var message := "3DF-pair|".to_utf8_buffer()
+	message.resize(message.size() + 16)
+	message.encode_u64(message.size() - 16, nonce)
+	message.encode_u64(message.size() - 8, cookie)
+	return _crypto.hmac_digest(HashingContext.HASH_SHA256, _pair_secret, message).slice(0, PAIR_PROOF_SIZE)
+
+
+## {protocol, version, data_hash, name, nonce, cookie, proof}, or {} when malformed (proof:
+## the trailing pair_secret proof, empty when there isn't one).
 func _parse_hello(bytes: PackedByteArray) -> Dictionary:
 	if bytes.size() < 31:
 		return {}
@@ -1097,8 +1123,13 @@ func _parse_hello(bytes: PackedByteArray) -> Dictionary:
 	var name: Variant = read_string(buffer)
 	if name == null or buffer.get_available_bytes() < 16:
 		return {}
+	var nonce := buffer.get_u64()
+	var cookie := buffer.get_u64()
+	var proof := PackedByteArray()
+	if buffer.get_available_bytes() == PAIR_PROOF_SIZE:
+		proof = buffer.get_data(PAIR_PROOF_SIZE)[1]
 	return {protocol = protocol, version = version, data_hash = data_hash, name = clean_name(name),
-		nonce = buffer.get_u64(), cookie = buffer.get_u64()}
+		nonce = nonce, cookie = cookie, proof = proof}
 
 
 ## [WELCOME][nonce][token][name][public key PEM][commitment 32]
