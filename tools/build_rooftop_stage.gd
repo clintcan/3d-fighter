@@ -70,6 +70,7 @@ func _initialize() -> void:
 	_build_string_lights()
 	_build_rain()
 	_build_ambience()
+	_add(stage, StageFX.ambience([["res://assets/audio/ambience/rain.ogg", -9.0], ["res://assets/audio/ambience/city_traffic.ogg", -20.0]]), "Sound") # ambient loops (StageAmbience)
 	_bake_ao()
 	_flush_batches()
 	_add(stage, _marker(Vector3(-2, 0, 0)), "P1Spawn")

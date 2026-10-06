@@ -147,6 +147,12 @@ All third-party assets are CC0 (public domain), credited with thanks:
   Groans" by AuraVoice - https://opengameart.org
 - Sound effects & announcer: Kenney - Impact Sounds, Interface Sounds,
   Voiceover Pack: Fighter - https://kenney.nl
+- Ambient sound: "AMB Rain Loop 1" by kresiek-the-furry, "High traffic road
+  sounds" by ignasd, "Background voices" by pauliuw, "Crowd Shouting/Speaking
+  Ambience" by starninjas, "Applause in a large hall or church" by expl0it3r,
+  "Beach Ocean Waves" by qubodup (recorded by jasinski), "Park ambiences" by
+  thimras, "Fire Crackling" by antumdeluge, "Solo Seagull Sound Effects" by
+  rango-mango - https://opengameart.org
 
 Stages (including the jeepneys), crowds, fighter outfits, additional fight
 and special-move animations, portraits, key art and logo, and synthesized

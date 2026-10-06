@@ -67,6 +67,7 @@ func _initialize() -> void:
 	_build_petals()
 	_build_mountains()
 	_build_lantern_flicker()
+	_add(stage, StageFX.ambience([["res://assets/audio/ambience/birds.ogg", -15.0], ["res://assets/audio/ambience/wind.ogg", -21.0]]), "Sound") # ambient loops (StageAmbience)
 	_flush_batches()
 	_bake_contact_shadows()
 	_add(stage, _marker(Vector3(-2, 0, 0)), "P1Spawn")

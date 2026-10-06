@@ -808,11 +808,11 @@ func stage_tests() -> void:
 		return ResourceLoader.exists(st.path) and ResourceLoader.exists(st.thumb)))
 	# Polish: baked contact shadows (an AO overlay, or the rooftop's wet-deck shader) and
 	# each stage's ambient effects.
-	var polish := {gs.DEFAULT_STAGE: [["CanvasShadows", "ArenaShadows"], ["Dust", "CameraFlashes"]],
-		gs.DOJO_STAGE: [["FloorShadows"], ["Dust", "CandleFlicker", "IncenseSmoke"]],
-		gs.TEMPLE_STAGE: [["GravelShadows"], ["LanternFlicker"]],
-		gs.BEACH_STAGE: [["SandShadows"], ["SeaSpray", "TorchFire0", "TorchEmbers0"]],
-		gs.MARKET_STAGE: [["StreetShadows"], ["GrillSmoke0", "GrillSparks0", "GrillFlicker", "Ambience"]]}
+	var polish := {gs.DEFAULT_STAGE: [["CanvasShadows", "ArenaShadows"], ["Dust", "CameraFlashes", "Sound"]],
+		gs.DOJO_STAGE: [["FloorShadows"], ["Dust", "CandleFlicker", "IncenseSmoke", "Sound"]],
+		gs.TEMPLE_STAGE: [["GravelShadows"], ["LanternFlicker", "Sound"]],
+		gs.BEACH_STAGE: [["SandShadows"], ["SeaSpray", "TorchFire0", "TorchEmbers0", "Sound"]],
+		gs.MARKET_STAGE: [["StreetShadows"], ["GrillSmoke0", "GrillSparks0", "GrillFlicker", "Ambience", "Sound"]]}
 	var missing := []
 	for path: String in polish:
 		var scene := (load(path) as PackedScene).instantiate()
@@ -903,7 +903,8 @@ func stage_tests() -> void:
 		"AO %s" % [ao_image.get_size() if ao_image else "missing"])
 	var ambience := m.stage.get_node_or_null("Ambience") as NeonAmbience
 	check("Rooftop: reflections, drizzle and neon ambience", m.stage.get_node_or_null("Lights/WetReflections") is ReflectionProbe
-		and m.stage.get_node_or_null("Rain") is GPUParticles3D and ambience != null and ambience._labels.size() == 1 and ambience._blinks.size() == 1)
+		and m.stage.get_node_or_null("Rain") is GPUParticles3D and ambience != null and ambience._labels.size() == 1 and ambience._blinks.size() == 1
+		and m.stage.get_node_or_null("Sound") is StageAmbience)
 	gs.stage_path = gs.DEFAULT_STAGE
 
 
@@ -1200,6 +1201,18 @@ func market_tests() -> void:
 	check("Market: grill light flickers and the neon is wired", grill != null and grill._lights.size() == 2
 		and neon != null and neon._labels.size() == 1 and neon._hums.size() == 1)
 	check("Market: in the stage list as the Night Market", gs.stage_name(gs.MARKET_STAGE) == "Night Market")
+	# Ambient sound: the loops play on the Effects bus, the crowd cheers on a K.O., and not
+	# while rollback re-simulates frames.
+	var sound := m.stage.get_node_or_null("Sound") as StageAmbience
+	check("Market: ambient loops play on the SFX bus", sound != null and sound._loop_players.size() == 3
+		and sound._loop_players.all(func(pl: AudioStreamPlayer) -> bool: return pl.playing and pl.bus == &"SFX"))
+	if sound:
+		m.resimulating = true
+		p2.knocked_out.emit(p2)
+		var quiet_in_rollback := not sound._reaction_player.playing
+		m.resimulating = false
+		p2.knocked_out.emit(p2)
+		check("Market: the crowd cheers on a K.O., but not during rollback", quiet_in_rollback and sound._reaction_player.playing)
 	var jeeps := [m.stage.get_node_or_null("Jeepney0"), m.stage.get_node_or_null("Jeepney1")]
 	var painted := jeeps.all(func(j) -> bool:
 		if not j is MeshInstance3D or (j as MeshInstance3D).mesh.resource_path != "res://assets/stages/market/jeepney.res":

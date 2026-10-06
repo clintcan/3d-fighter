@@ -65,6 +65,7 @@ func _initialize() -> void:
 	_build_rocks()
 	_build_crowd()
 	_build_spray()
+	_add(stage, StageFX.ambience([["res://assets/audio/ambience/waves.ogg", -9.0], ["res://assets/audio/ambience/wind.ogg", -25.0]], "res://assets/audio/ambience/crowd_cheer.ogg", -8.0, ["res://assets/audio/ambience/seagull_1.ogg", "res://assets/audio/ambience/seagull_2.ogg"], -15.0), "Sound") # ambient loops (StageAmbience)
 	_flush_batches()
 	_bake_contact_shadows()
 	_add(stage, _marker(Vector3(-2, 0, 0)), "P1Spawn")

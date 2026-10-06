@@ -85,6 +85,7 @@ func _initialize() -> void:
 	_build_banderitas()
 	_build_crowd()
 	_build_atmosphere()
+	_add(stage, StageFX.ambience([["res://assets/audio/ambience/market_chatter.ogg", -12.0], ["res://assets/audio/ambience/city_traffic.ogg", -25.0], ["res://assets/audio/ambience/fire_crackle.ogg", -19.0]], "res://assets/audio/ambience/crowd_cheer.ogg", -6.0), "Sound") # ambient loops (StageAmbience)
 	_flush_batches()
 	_bake_contact_shadows()
 	_add(stage, _marker(Vector3(-2, 0, 0)), "P1Spawn")

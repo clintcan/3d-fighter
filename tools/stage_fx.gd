@@ -203,3 +203,26 @@ static func _fade(color: Color, fade_in: float, fade_out: float) -> GradientText
 	var texture := GradientTexture1D.new()
 	texture.gradient = ramp
 	return texture
+
+
+## A stage's ambient sound (StageAmbience): `loops` as [[path, volume dB], ...], an
+## optional crowd reaction, and optional one-shots (`sprinkles` paths) every few seconds.
+static func ambience(loops: Array, reaction := "", reaction_volume := -6.0, sprinkles: Array = [], sprinkle_volume := -14.0) -> Node:
+	var node := Node.new()
+	node.set_script(load("res://scripts/stages/stage_ambience.gd"))
+	var streams: Array[AudioStream] = []
+	var volumes := PackedFloat32Array()
+	for loop: Array in loops:
+		streams.append(load(loop[0]))
+		volumes.append(loop[1])
+	node.set("loops", streams)
+	node.set("loop_volumes", volumes)
+	if reaction != "":
+		node.set("reaction", load(reaction))
+		node.set("reaction_volume", reaction_volume)
+	var shots: Array[AudioStream] = []
+	for path: String in sprinkles:
+		shots.append(load(path))
+	node.set("sprinkles", shots)
+	node.set("sprinkle_volume", sprinkle_volume)
+	return node

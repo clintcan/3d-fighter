@@ -26,6 +26,7 @@ const CREDITS := [
 	["Music", "\"Heavy Battle 2\", \"Space Battle\" and \"Jazzy Battle Theme\" by MintoDog, \"Determination\"\nby HydroGene, \"Midnight Drive\" by congusbongus,\n\"Boss_Koto\" by G_P, \"Funky House\" by Of Far Different Nature\n(OpenGameArt, CC0)"],
 	["Fighter voices", "\"Male Grunt/Yelling sounds\" by HaelDB, \"Female Hurt\nGrunts & Groans\" by AuraVoice (OpenGameArt, CC0)"],
 	["Sound effects & announcer", "Kenney: Impact Sounds, Interface Sounds,\nVoiceover Pack: Fighter (CC0)"],
+	["Ambient sound", "\"AMB Rain Loop 1\" by kresiek-the-furry, \"High traffic road sounds\"\nby ignasd, \"Background voices\" by pauliuw, \"Crowd Shouting/Speaking\nAmbience\" by starninjas, \"Applause in a large hall or church\" by expl0it3r,\n\"Beach Ocean Waves\" by qubodup, \"Park ambiences\" by thimras, \"Fire Crackling\"\nby antumdeluge, \"Solo Seagull Sound Effects\" by rango-mango (OpenGameArt, CC0)"],
 	["Logo lettering", "Based on the \"Permanent Marker\" font by Font Diner"],
 	["Made for this project", "Ring, arena, dojo, rooftop, temple, beach, night market and crowds, fighter outfits,\nfight and special-move animations, portraits, key art and logo, swing,\nenergy and super sounds"],
 	["License", "Code: MIT  ·  Original assets: CC BY 4.0\nThird-party assets: CC0"],

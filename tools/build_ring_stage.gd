@@ -42,6 +42,7 @@ func _initialize() -> void:
 	_build_arena()
 	_build_crowd()
 	_build_atmosphere()
+	_add(stage, StageFX.ambience([["res://assets/audio/ambience/arena_crowd.ogg", -10.0]], "res://assets/audio/ambience/crowd_cheer.ogg", -4.0), "Sound") # ambient loops (StageAmbience)
 	_bake_contact_shadows()
 	_add(stage, _marker(Vector3(-2, 0, 0)), "P1Spawn")
 	_add(stage, _marker(Vector3(2, 0, 0)), "P2Spawn")
