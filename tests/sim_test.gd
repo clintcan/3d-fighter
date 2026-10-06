@@ -856,6 +856,20 @@ func stage_tests() -> void:
 	hp = p2.health
 	press(InputBuffer.LP); step(6)
 	check("Rooftop: loads and combat works", m.stage.name == "Rooftop" and p2.health == hp - dmg(p1, "LP"), "hp %d -> %d" % [hp, p2.health])
+	# After the rain: wet deck with baked contact shadows, reflections, drizzle, neon.
+	var deck_material: ShaderMaterial = null
+	for mi: MeshInstance3D in m.stage.find_children("*", "MeshInstance3D", true, false):
+		var material := mi.mesh.surface_get_material(0) if mi.mesh else null
+		if material is ShaderMaterial and (material as ShaderMaterial).get_shader_parameter("textured"):
+			deck_material = material
+	var ao: Texture2D = deck_material.get_shader_parameter("ao_tex") if deck_material else null
+	var ao_image := ao.get_image() if ao else null
+	check("Rooftop: wet deck with baked contact shadows", ao_image != null and ao_image.get_size() == Vector2i(256, 256)
+		and ao_image.get_pixel(128, 128).r > 0.9 and ao_image.get_pixel(int((8.5 + 13.0) / 26.0 * 256), int((-7.6 + 13.0) / 26.0 * 256)).r < 0.75,
+		"AO %s" % [ao_image.get_size() if ao_image else "missing"])
+	var ambience := m.stage.get_node_or_null("Ambience") as NeonAmbience
+	check("Rooftop: reflections, drizzle and neon ambience", m.stage.get_node_or_null("Lights/WetReflections") is ReflectionProbe
+		and m.stage.get_node_or_null("Rain") is GPUParticles3D and ambience != null and ambience._labels.size() == 1 and ambience._blinks.size() == 1)
 	gs.stage_path = gs.DEFAULT_STAGE
 
 

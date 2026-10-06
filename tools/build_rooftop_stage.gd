@@ -10,12 +10,26 @@ extends SceneTree
 ## reach, so nothing needs hiding). The sky is a custom shader over a cropped band of the
 ## Shanghai Bund panorama (assets/stages/rooftop/night_skyline.gdshader).
 ## Repeated geometry is merged into one mesh per material.
+## After the rain: the deck and its painted markings use a wet shader (darker damp
+## concrete, glossy puddles with rain ripples; assets/stages/rooftop/wet_deck.gdshader), a
+## reflection probe (captured once) puts the neon and lights in the puddles, a drizzle
+## falls around the fight, the neon flickers and the beacon blinks (NeonAmbience).
+## Contact shadows are baked: every prop standing on the deck is recorded while building,
+## and _bake_ao() computes ambient occlusion over a height map of the roof
+## (assets/stages/rooftop/deck_ao.res, used by the deck shader).
 
 const OUTPUT := "res://scenes/stages/rooftop.tscn"
 const SKY_SHADER := "res://assets/stages/rooftop/night_skyline.gdshader"
 const SKYLINE := "res://assets/stages/rooftop/shanghai_bund_skyline.jpg"
 const CONCRETE := "res://assets/stages/ring/textures/concrete_floor_worn_001"
 const STAGE_SCRIPT := "res://scripts/stages/stage.gd"
+const WET_SHADER := "res://assets/stages/rooftop/wet_deck.gdshader"
+const AMBIENCE_SCRIPT := "res://scripts/stages/neon_ambience.gd"
+const AO_PATH := "res://assets/stages/rooftop/deck_ao.res"
+const AO_SIZE := 256 # texels across the roof (about 10 cm each)
+const AO_DIRECTIONS := 16
+const AO_STEPS := [0.08, 0.16, 0.28, 0.45, 0.7, 1.0, 1.4, 1.9, 2.5] # metres
+const AO_STRENGTH := 1.35
 
 const ROOF := 13.0 # half size
 const PARAPET_HEIGHT := 1.1
@@ -26,10 +40,11 @@ const FLOOD := Color(1.0, 0.92, 0.78)
 
 var stage: Node3D
 var _batches := {}
-var mat_deck: StandardMaterial3D
+var _footprints := [] # [x0, z0, x1, z1, top] of everything standing on the deck
+var mat_deck: ShaderMaterial
 var mat_wall: StandardMaterial3D
-var mat_paint_yellow: StandardMaterial3D
-var mat_paint_white: StandardMaterial3D
+var mat_paint_yellow: ShaderMaterial
+var mat_paint_white: ShaderMaterial
 var mat_metal: StandardMaterial3D
 var mat_dark_metal: StandardMaterial3D
 var mat_rail: StandardMaterial3D
@@ -38,7 +53,7 @@ var mat_bulb: StandardMaterial3D
 var mat_red_light: StandardMaterial3D
 var mat_window: StandardMaterial3D
 var mat_door: StandardMaterial3D
-var mat_seam: StandardMaterial3D
+var mat_seam: ShaderMaterial
 
 
 func _initialize() -> void:
@@ -56,6 +71,9 @@ func _initialize() -> void:
 	_build_structures()
 	_build_neon_sign()
 	_build_string_lights()
+	_build_rain()
+	_build_ambience()
+	_bake_ao()
 	_flush_batches()
 	_add(stage, _marker(Vector3(-2, 0, 0)), "P1Spawn")
 	_add(stage, _marker(Vector3(2, 0, 0)), "P2Spawn")
@@ -70,11 +88,10 @@ func _initialize() -> void:
 
 
 func _make_materials() -> void:
-	mat_deck = _textured(CONCRETE, Color(0.62, 0.62, 0.66), 0.35)
-	mat_deck.roughness = 0.75
+	mat_deck = _wet(Color(0.62, 0.62, 0.66), true, 0.75)
 	mat_wall = _textured(CONCRETE, Color(0.5, 0.5, 0.54), 0.5)
-	mat_paint_yellow = _material(Color(0.95, 0.75, 0.12), 0.0, 0.7)
-	mat_paint_white = _material(Color(0.88, 0.88, 0.86), 0.0, 0.7)
+	mat_paint_yellow = _wet(Color(0.95, 0.75, 0.12), false, 0.7)
+	mat_paint_white = _wet(Color(0.88, 0.88, 0.86), false, 0.7)
 	mat_metal = _material(Color(0.55, 0.57, 0.6), 0.7, 0.45)
 	mat_dark_metal = _material(Color(0.16, 0.17, 0.19), 0.6, 0.55)
 	mat_rail = _material(Color(0.3, 0.32, 0.35), 0.8, 0.35)
@@ -83,7 +100,7 @@ func _make_materials() -> void:
 	mat_red_light = _emissive(Color(1.0, 0.1, 0.05), 6.0)
 	mat_window = _emissive(Color(1.0, 0.85, 0.55), 1.5)
 	mat_door = _material(Color(0.22, 0.24, 0.27), 0.5, 0.5)
-	mat_seam = _material(Color(0.08, 0.08, 0.09), 0.0, 0.9)
+	mat_seam = _wet(Color(0.08, 0.08, 0.09), false, 0.9)
 
 
 # --- Environment & lighting ------------------------------------------------------
@@ -104,8 +121,12 @@ func _build_environment() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = 1.05
 	env.glow_enabled = true
-	env.glow_intensity = 0.8
-	env.glow_bloom = 0.06
+	env.glow_intensity = 0.9
+	env.glow_bloom = 0.08
+	# Grade: a touch more contrast and saturation, so the neon pops off the wet deck.
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.07
+	env.adjustment_saturation = 1.15
 	env.ssao_enabled = false # too costly on integrated GPUs (see CLAUDE.md)
 	env.volumetric_fog_enabled = true
 	env.volumetric_fog_density = 0.006
@@ -153,6 +174,18 @@ func _build_lights() -> void:
 	top.light_color = Color(0.85, 0.88, 1.0)
 	top.light_volumetric_fog_energy = 0.0
 	_add(lights, top, "TopFill")
+	# Reflections for the wet deck: the sign, hut, lights and skyline, captured once. This
+	# is most of the rain's cost (about 1 ms a frame on the integrated GPU); a thin slab
+	# over the deck was cheaper but lost the neon in the puddles.
+	var probe := ReflectionProbe.new()
+	probe.position = Vector3(0, 2.5, -1.0)
+	probe.size = Vector3(27.0, 9.0, 27.0)
+	probe.origin_offset = Vector3(0, -1.0, 0)
+	probe.box_projection = true
+	probe.update_mode = ReflectionProbe.UPDATE_ONCE
+	probe.max_distance = 60.0
+	probe.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
+	_add(lights, probe, "WetReflections")
 
 
 # --- Deck & helipad ----------------------------------------------------------------
@@ -316,9 +349,130 @@ func _build_string_lights() -> void:
 			previous = p
 
 
+# --- Rain, ambience and baked shadows ---------------------------------------------
+
+## A light drizzle over the fight area: thin streaks falling a little off vertical.
+func _build_rain() -> void:
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = Vector3(9.0, 0.5, 4.5) # stops short of the camera
+	process.direction = Vector3(0.06, -1.0, 0.0)
+	process.spread = 2.0
+	process.initial_velocity_min = 11.0
+	process.initial_velocity_max = 13.0
+	process.gravity = Vector3(0, -9.8, 0)
+	var streak := QuadMesh.new()
+	streak.size = Vector2(0.012, 0.42)
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = Color(0.78, 0.84, 1.0, 0.17)
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
+	material.billboard_keep_scale = true
+	streak.material = material
+	var rain := GPUParticles3D.new()
+	rain.amount = 450
+	rain.lifetime = 0.85
+	rain.preprocess = 1.0 # already falling when the stage appears
+	rain.process_material = process
+	rain.draw_pass_1 = streak
+	rain.position = Vector3(0, 9.0, -1.5)
+	rain.visibility_aabb = AABB(Vector3(-11, -11, -9), Vector3(22, 13, 18))
+	rain.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_add(stage, rain, "Rain")
+
+
+## Neon flicker and the blinking beacon (scripts/stages/neon_ambience.gd).
+func _build_ambience() -> void:
+	var ambience := Node.new()
+	ambience.set_script(load(AMBIENCE_SCRIPT))
+	_add(stage, ambience, "Ambience")
+	# Typed arrays: set() silently ignores an untyped Array for an Array[NodePath] property.
+	var flicker_labels: Array[NodePath] = [NodePath("../NeonFight")]
+	var flicker_lights: Array[NodePath] = [NodePath("../NeonGlow0")]
+	var hum_labels: Array[NodePath] = [NodePath("../NeonNight")]
+	var blink_lights: Array[NodePath] = [NodePath("../Beacon")]
+	ambience.set("flicker_labels", flicker_labels)
+	ambience.set("flicker_lights", flicker_lights)
+	ambience.set("hum_labels", hum_labels)
+	ambience.set("blink_lights", blink_lights)
+	ambience.set("blink_material", mat_red_light)
+
+
+## Contact shadows on the deck: a height map of everything standing on it, then for each
+## texel the highest horizon in AO_DIRECTIONS directions (horizon-based ambient
+## occlusion). Saved as a texture the deck and paint shaders read.
+func _bake_ao() -> void:
+	var cell := ROOF * 2.0 / AO_SIZE
+	var heights := PackedFloat32Array()
+	heights.resize(AO_SIZE * AO_SIZE)
+	for f: Array in _footprints:
+		var x0 := clampi(int((f[0] + ROOF) / cell), 0, AO_SIZE - 1)
+		var x1 := clampi(int((f[2] + ROOF) / cell), 0, AO_SIZE - 1)
+		var z0 := clampi(int((f[1] + ROOF) / cell), 0, AO_SIZE - 1)
+		var z1 := clampi(int((f[3] + ROOF) / cell), 0, AO_SIZE - 1)
+		for z in range(z0, z1 + 1):
+			for x in range(x0, x1 + 1):
+				heights[z * AO_SIZE + x] = maxf(heights[z * AO_SIZE + x], f[4])
+	# Four rotated copies of the direction set, picked per texel: thin poles then blur into
+	# soft blobs instead of casting spokes.
+	var rotations := []
+	for r in 4:
+		var offsets := [] # per direction: [dx, dz, distance] in texels, per step
+		for d in AO_DIRECTIONS:
+			var a := TAU * (d + r * 0.25) / AO_DIRECTIONS
+			var steps := []
+			for dist: float in AO_STEPS:
+				steps.append([roundi(cos(a) * dist / cell), roundi(sin(a) * dist / cell), dist])
+			offsets.append(steps)
+		rotations.append(offsets)
+	var ao := PackedFloat32Array()
+	ao.resize(AO_SIZE * AO_SIZE)
+	for z in AO_SIZE:
+		for x in AO_SIZE:
+			var h0 := heights[z * AO_SIZE + x]
+			var occlusion := 0.0
+			for steps: Array in rotations[(x * 3 + z * 5) % 4]:
+				var horizon := 0.0
+				for step: Array in steps:
+					var xi: int = x + step[0]
+					var zi: int = z + step[1]
+					if xi < 0 or zi < 0 or xi >= AO_SIZE or zi >= AO_SIZE:
+						continue
+					var rise := heights[zi * AO_SIZE + xi] - h0
+					if rise > 0.0:
+						horizon = maxf(horizon, rise / sqrt(rise * rise + step[2] * step[2]))
+				occlusion += horizon
+			ao[z * AO_SIZE + x] = clampf(1.0 - occlusion / AO_DIRECTIONS * AO_STRENGTH, 0.2, 1.0)
+	# Soften the 10 cm texels.
+	for pass_index in 4:
+		var blurred := ao.duplicate()
+		for z in range(1, AO_SIZE - 1):
+			for x in range(1, AO_SIZE - 1):
+				var sum := 0.0
+				for dz in [-1, 0, 1]:
+					for dx in [-1, 0, 1]:
+						sum += ao[(z + dz) * AO_SIZE + x + dx]
+				blurred[z * AO_SIZE + x] = sum / 9.0
+		ao = blurred
+	var bytes := PackedByteArray()
+	bytes.resize(AO_SIZE * AO_SIZE)
+	for i in ao.size():
+		bytes[i] = int(ao[i] * 255.0)
+	var texture := ImageTexture.create_from_image(Image.create_from_data(AO_SIZE, AO_SIZE, false, Image.FORMAT_L8, bytes))
+	ResourceSaver.save(texture, AO_PATH)
+	var saved: Texture2D = load(AO_PATH)
+	for material: ShaderMaterial in [mat_deck, mat_paint_yellow, mat_paint_white, mat_seam]:
+		material.set_shader_parameter("ao_tex", saved)
+	print("baked deck AO from %d footprints" % _footprints.size())
+
+
 # --- Helpers ---------------------------------------------------------------------
 
 func _batch(material: Material, size: Vector3, xform: Transform3D) -> void:
+	var bounds := xform * AABB(-size * 0.5, size)
+	if bounds.position.y < 0.3 and bounds.end.y > 0.06: # stands on the deck: casts contact shadow
+		_footprints.append([bounds.position.x, bounds.position.z, bounds.end.x, bounds.end.z, bounds.end.y])
 	var st: SurfaceTool = _batches.get(material)
 	if st == null:
 		st = SurfaceTool.new()
@@ -385,6 +539,21 @@ func _textured(base: String, tint: Color, tiling: float) -> StandardMaterial3D:
 	m.uv1_scale = Vector3(tiling, tiling, tiling)
 	m.uv1_triplanar = true
 	m.uv1_world_triplanar = true
+	return m
+
+
+## The wet-deck shader: concrete (textured) or a flat paint colour, sharing the puddles.
+func _wet(color: Color, textured: bool, roughness: float) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = load(WET_SHADER)
+	m.set_shader_parameter("tint", color)
+	m.set_shader_parameter("textured", textured)
+	m.set_shader_parameter("dry_roughness", roughness)
+	m.set_shader_parameter("roof_half", ROOF)
+	if textured:
+		m.set_shader_parameter("albedo_tex", load(CONCRETE + "_diff_1k.jpg"))
+		m.set_shader_parameter("normal_tex", load(CONCRETE + "_nor_gl_1k.jpg"))
+		m.set_shader_parameter("rough_tex", load(CONCRETE + "_rough_1k.jpg"))
 	return m
 
 
