@@ -34,6 +34,9 @@ const DETAILED_FABRICS := {
 	&"stretch": ["res://assets/characters/outfits/textures/detail/bi_stretch_nor_gl_2k.jpg",
 		"res://assets/characters/outfits/textures/detail/bi_stretch_rough_2k.jpg",
 		"res://assets/characters/outfits/textures/detail/bi_stretch_weave_2k.jpg", 8.0, 1.0, 0.12],
+	&"denim": ["res://assets/characters/outfits/textures/detail/denim_fabric_06_nor_gl_2k.jpg",
+		"res://assets/characters/outfits/textures/detail/denim_fabric_06_rough_2k.jpg",
+		"res://assets/characters/outfits/textures/detail/denim_fabric_06_weave_2k.jpg", 5.0, 1.0, 0.12],
 	&"leather": ["res://assets/characters/outfits/textures/detail/fabric_leather_02_nor_gl_2k.jpg", "",
 		"res://assets/characters/outfits/textures/detail/fabric_leather_02_weave_2k.jpg", 3.0, 0.55, 0.35],
 }

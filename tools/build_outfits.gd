@@ -32,6 +32,7 @@ const NECK_RADIUS := 0.072 # the neck hole of tops and jackets
 const ARM_LIMIT := 0.35 # |x| beyond this (T-pose) is arm, never legs or torso
 ## Detailed outfits: the stitch line runs between these distances inside a hem, and the
 ## cloth shades from HEM_SHADE at the edge to full brightness HEM_SHADE_DEPTH inside.
+const MIN_TRIANGLE_AREA := 1e-9 # (twice the area, m²) smaller triangles are dropped
 const STITCH_NEAR := 0.007
 const STITCH_FAR := 0.0095
 const STITCH_SHADE := 0.62
@@ -79,10 +80,13 @@ func _initialize() -> void:
 ## Per character: pieces, colours, alt colours and fabrics per slot. A piece has a slot,
 ## a thickness (`offset`), a `region` func(p: Vector3, n: Vector3) -> float (signed
 ## distance, positive inside; `offset` may also be a func(n: Vector3) -> float) and optionally a `trim` func of the same shape (positive =
-## trim slot), `hide = false` (don't remove skin under it) and `flat_soles`.
+## trim slot), `hide = false` (don't remove skin under it) and `flat_soles`. In detailed
+## outfits, `stitches = false` leaves the stitch line off thin bands (belts, headbands),
+## where cutting along both edges leaves gaps.
 func _specs() -> Dictionary:
 	return {
 		"kenji": {
+			detailed = true,
 			pieces = func(L: Dictionary) -> Array:
 				return [
 					# Gi jacket: past the hips, sleeves to mid-forearm, a deep V at the chest.
@@ -91,11 +95,11 @@ func _specs() -> Dictionary:
 					# Loose gi pants to just above the ankle.
 					{slot = Slot.MAIN, offset = 0.018, region = func(p, n): return _legs(p, L.ankle + 0.07, L.waist - 0.02)},
 					# Black belt.
-					{slot = Slot.TRIM, offset = 0.036, hide = false, region = func(p, n): return _legs(p, L.hip + 0.04, L.hip + 0.085)},
+					{slot = Slot.TRIM, offset = 0.036, hide = false, stitches = false, region = func(p, n): return _legs(p, L.hip + 0.04, L.hip + 0.085)},
 					# Red headband: snug on the forehead, standing off over the hair at the sides
 					# and back.
 					{slot = Slot.ACCENT, offset = func(n: Vector3) -> float: return lerpf(0.02, 0.009, clampf(n.z * 1.6 - 0.4, 0.0, 1.0)),
-						hide = false, region = func(p, n):
+						hide = false, stitches = false, region = func(p, n):
 						return minf(minf(p.y - (L.head_top - 0.078), (L.head_top - 0.05) - p.y), 0.15 - absf(p.x))},
 				],
 			belt_knot = {slot = Slot.TRIM, y = 0.0625, offset = 0.036},
@@ -104,6 +108,7 @@ func _specs() -> Dictionary:
 			fabrics = [&"cotton", &"cotton", &"cotton"],
 		},
 		"jin": {
+			detailed = true,
 			pieces = func(L: Dictionary) -> Array:
 				var v_bottom: float = L.chest
 				return [
@@ -112,7 +117,7 @@ func _specs() -> Dictionary:
 						trim = func(p, n): return _v_cut(p, n, L, v_bottom - 0.035, 0.08) + 0.03,
 						region = func(p, n): return minf(_top(p, L, L.hip - 0.05, L.wrist - 0.05), -_v_cut(p, n, L, v_bottom, 0.08))},
 					{slot = Slot.MAIN, offset = 0.016, region = func(p, n): return _legs(p, L.ankle + 0.05, L.waist - 0.02)},
-					{slot = Slot.TRIM, offset = 0.032, hide = false, region = func(p, n): return _legs(p, L.hip + 0.04, L.hip + 0.085)},
+					{slot = Slot.TRIM, offset = 0.032, hide = false, stitches = false, region = func(p, n): return _legs(p, L.hip + 0.04, L.hip + 0.085)},
 				],
 			belt_knot = {slot = Slot.TRIM, y = 0.0625, offset = 0.032},
 			colors = [Color(0.8, 0.8, 0.8), Color(0.06, 0.06, 0.07), Color(0.0, 0.0, 0.0)],
@@ -120,6 +125,7 @@ func _specs() -> Dictionary:
 			fabrics = [&"cotton", &"cotton", &"cotton"],
 		},
 		"rhea": {
+			detailed = true,
 			pieces = func(L: Dictionary) -> Array:
 				return [
 					# Sports crop top: under the bust to the shoulders, scooped neck, sleeveless.
@@ -136,6 +142,7 @@ func _specs() -> Dictionary:
 			fabrics = [&"stretch", &"stretch", &"cotton"],
 		},
 		"valka": {
+			detailed = true,
 			pieces = func(L: Dictionary) -> Array:
 				var singlet := func(p, n):
 					return minf(_sleeveless(p, L, L.knee + 0.24, L.shoulder * 0.95), -_scoop(p, L, 0.11, 0.06))
@@ -153,6 +160,7 @@ func _specs() -> Dictionary:
 			fabrics = [&"stretch", &"stretch", &"leather"],
 		},
 		"brutus": {
+			detailed = true,
 			pieces = func(L: Dictionary) -> Array:
 				return [
 					# Tank top, tucked into the pants.
@@ -305,11 +313,16 @@ func _build(model_scene: PackedScene, spec: Dictionary) -> Dictionary:
 			for part: Array in parts:
 				var slot: int = part[1]
 				var bands := [[part[0], false]]
-				if detailed:
+				if detailed and piece.get("stitches", true):
 					bands = _stitch_bands(part[0], region)
 				for band: Array in bands:
 					var poly: Array = band[0]
 					for i in range(1, poly.size() - 1):
+						# Cuts through a vertex leave zero-area slivers; their tangents
+						# come out invalid and render as holes.
+						var area: float = (poly[i].p - poly[0].p).cross(poly[i + 1].p - poly[0].p).length()
+						if area < MIN_TRIANGLE_AREA:
+							continue
 						for vertex: Dictionary in [poly[0], poly[i], poly[i + 1]]:
 							var shade := 1.0
 							if detailed:
@@ -318,7 +331,7 @@ func _build(model_scene: PackedScene, spec: Dictionary) -> Dictionary:
 						used[slot] = true
 						triangles += 1
 	if spec.has("belt_knot"):
-		triangles += _add_belt_knot(tools[spec.belt_knot.slot], spec.belt_knot, L, verts)
+		triangles += _add_belt_knot(tools[spec.belt_knot.slot], spec.belt_knot, L, verts, detailed)
 		used[spec.belt_knot.slot] = true
 
 	var outfit := ArrayMesh.new()
@@ -423,7 +436,7 @@ func _emit(st: SurfaceTool, vertex: Dictionary, piece: Dictionary, shade := Colo
 
 
 ## Belt knot at the front centre plus two hanging tails, all bound to the pelvis.
-func _add_belt_knot(st: SurfaceTool, knot: Dictionary, L: Dictionary, verts: PackedVector3Array) -> int:
+func _add_belt_knot(st: SurfaceTool, knot: Dictionary, L: Dictionary, verts: PackedVector3Array, detailed: bool) -> int:
 	var y: float = L.hip + knot.y
 	var front := -INF
 	for v in verts:
@@ -450,6 +463,8 @@ func _add_belt_knot(st: SurfaceTool, knot: Dictionary, L: Dictionary, verts: Pac
 			var w := normal.cross(u)
 			var quad := [-u - w, u - w, u + w, -u + w]
 			for i in [0, 1, 2, 0, 2, 3]:
+				if detailed:
+					st.set_color(Color.WHITE) # no hem shading on the knot
 				st.set_normal(basis * normal)
 				st.set_uv(Vector2(0.5, 0.5))
 				st.set_bones(PackedInt32Array([_pelvis_bind, 0, 0, 0]))

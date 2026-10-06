@@ -1291,7 +1291,8 @@ func jin_tests() -> void:
 
 ## Mira (Brawler): Lakas Stance builds Focus (no hitbox, capped at 3), Focus powers
 ## Bagyo Rush and picks the super's finisher, knockdowns take it away, it survives a
-## rollback snapshot, the dive kick changes the jump arc, and her detailed textures.
+## rollback snapshot, the dive kick changes the jump arc, and the detailed textures
+## (hers first, now every fighter's).
 func mira_tests() -> void:
 	var gs = root.get_node("GameState")
 	var mira: CharacterData = gs.roster.filter(func(c): return c.id == &"mira").front()
@@ -1412,7 +1413,8 @@ func mira_tests() -> void:
 			skin.detail_enabled and skin.detail_uv_layer == BaseMaterial3D.DETAIL_UV_2 and skin.detail_normal != null]
 		model.queue_free()
 	check("Mira: detailed cloth (weave, hem shading) and skin detail", looks[&"mira"] == [true, true], "%s" % [looks])
-	check("Other fighters keep the plain materials", looks[&"kenji"] == [false, false], "%s" % [looks])
+	check("Kenji gets the detailed materials too", looks[&"kenji"] == [true, true], "%s" % [looks])
+	check("Every fighter has detailed textures", gs.roster.all(func(c: CharacterData) -> bool: return c.detailed_textures))
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 
 

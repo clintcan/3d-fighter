@@ -46,6 +46,7 @@ outfit_body_mesh = ExtResource("24_26eyd")
 outfit_colors = PackedColorArray(0.8, 0.79, 0.76, 1, 0.07, 0.07, 0.08, 1, 0.78, 0.07, 0.07, 1)
 outfit_fabrics = Array[StringName]([&"cotton", &"cotton", &"cotton"])
 alt_outfit_colors = PackedColorArray(0.15, 0.16, 0.2, 1, 0.42, 0.24, 0.1, 1, 0.8, 0.8, 0.78, 1)
+detailed_textures = true
 victory_animations = Array[StringName]([&"fight/victory_bow", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.2, 0.45, 0.9, 1)
 power_rating = 0.55

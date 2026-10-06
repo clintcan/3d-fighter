@@ -47,6 +47,7 @@ outfit_body_mesh = ExtResource("24_utyi1")
 outfit_colors = PackedColorArray(0.34, 0.37, 0.2, 1, 0.15, 0.18, 0.26, 1, 0.08, 0.06, 0.05, 1)
 outfit_fabrics = Array[StringName]([&"cotton", &"denim", &"leather"])
 alt_outfit_colors = PackedColorArray(0.52, 0.52, 0.54, 1, 0.22, 0.32, 0.52, 1, 0.27, 0.16, 0.08, 1)
+detailed_textures = true
 victory_animations = Array[StringName]([&"fight/victory_flex", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.95, 0.6, 0.15, 1)
 max_health = 1100
