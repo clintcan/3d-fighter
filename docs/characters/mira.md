@@ -1,6 +1,6 @@
 # Mira Santos: The Brawler
 
-Design for the sixth fighter. Status: in progress (not released).
+The sixth fighter, added after v0.5.1.
 
 A Manila street fighter who mixes boxing with Sikaran, the Filipino kicking art. She wins
 with fast punch strings, a flip kick and a dive kick, and she gets stronger the longer
@@ -8,7 +8,9 @@ the opponent lets her power up.
 
 ## Look
 
-- Female base body, warm medium-brown skin, short side-parted dark brown hair.
+- Female base body, warm medium-brown skin (`assets/characters/mira/T_Mira_Body.png`).
+- Dark brown A-line bob, chin length at the front (`Hair_Bob`, cut from `Hair_Long` by
+  `tools/build_hair.gd`).
 - Charcoal sleeveless zip-up with a mustard zip and hem band.
 - Black track pants with mustard stripes down the outside of each leg.
 - Black fingerless gloves and white leather sneakers.
@@ -49,6 +51,13 @@ Her signature mechanic, shown as three pips next to her SUPER meter.
 - Focus is simulation state (`Fighter.focus`, in `SIM_FIELDS`), so rollback and replays
   stay exact.
 
+## Presentation
+
+- Victory: fist pump or the point.
+- Voice: the "Female Hurt Grunts & Groans" recording (AuraVoice), other takes pitched to 1.07.
+- Character select routine: Tapik ×3 → Sipa Flip → Lakas Stance ×3 → Bagyo Rush → the
+  super at full Focus → fist pump.
+
 ## CPU style: Brawler
 
 Keeps about 1 m from the opponent, uses Lakas Stance at range and while the opponent is
@@ -56,8 +65,8 @@ knocked down, and spends level 3 on the super.
 
 ## Detailed textures
 
-Mira is the first fighter with the higher-detail materials (`CharacterData.detailed_textures`).
-If they work out, the other fighters get them too.
+Mira was the first fighter with the higher-detail materials (`CharacterData.detailed_textures`);
+every fighter has them now.
 
 - The fabric weave textures the cloth colour, not just its surface.
 - 2K fabric normal and roughness maps (CC0, Poly Haven), VRAM-compressed with mipmaps.
