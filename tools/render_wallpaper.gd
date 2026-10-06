@@ -1,5 +1,5 @@
 extends SceneTree
-## Renders the key-art wallpaper: the five fighters posed mid-move on the rooftop stage
+## Renders the key-art wallpaper: the six fighters posed mid-move on the rooftop stage
 ## with the skyline behind them. Saves res://assets/ui/wallpaper.png (no text; used by the
 ## loading screen and main menu) and res://assets/ui/splash.png (with the title; used as
 ## the boot splash), plus the itch.io cover (dist/itch/01_cover_630x500.png, a taller
@@ -14,9 +14,10 @@ const COVER := "res://dist/itch/01_cover_630x500.png"
 const POSES := [
 	[0, &"fight/palm_blast", 0.22, Vector3(-2.45, 0, 0.3), PI + 0.8], # Kenji: Ki Blast at Rhea
 	[1, &"fight/high_kick", 0.27, Vector3(-0.9, 0, -0.55), PI - 1.0], # Rhea: head kick at Kenji
-	[3, &"fight/lariat", 0.40, Vector3(1.4, 0, -0.2), PI + 0.3], # Valka: Spinning Lariat, arms out
-	[2, &"fight/victory_flex", 2.0, Vector3(2.65, 0, 0.5), PI + 0.45], # Brutus: double-biceps flex
-	[4, &"fight/axe_kick", 0.22, Vector3(0.3, 0, -1.4), PI - 1.15], # Jin: axe kick raised high
+	[3, &"fight/lariat", 0.40, Vector3(1.75, 0, -0.25), PI + 0.3], # Valka: Spinning Lariat, arms out
+	[2, &"fight/victory_flex", 2.0, Vector3(3.0, 0, 0.5), PI + 0.45], # Brutus: double-biceps flex
+	[4, &"fight/axe_kick", 0.22, Vector3(3.2, 0, -1.9), PI - 1.0], # Jin: axe kick raised high, at the back
+	[5, &"fight/flip_kick", 0.14, Vector3(0.45, 0, 0.35), PI + 1.15], # Mira: Sipa Flip at Valka
 ]
 
 
@@ -66,9 +67,9 @@ func _initialize() -> void:
 	world.add_child(orb)
 
 	var camera := Camera3D.new()
-	camera.fov = 46.0
+	camera.fov = 50.0
 	world.add_child(camera)
-	camera.look_at_from_position(Vector3(0.0, 0.85, 5.0), Vector3(0.05, 1.35, 0.0))
+	camera.look_at_from_position(Vector3(0.2, 0.85, 5.0), Vector3(0.25, 1.35, 0.0))
 	camera.current = true
 
 	for frame in 40:
@@ -100,10 +101,10 @@ func _initialize() -> void:
 	_save(SPLASH)
 
 	# itch.io cover: 630×500 is much taller than 16:9, so pull the camera back to keep all
-	# five fighters in frame and shrink the title to fit the narrower width.
+	# six fighters in frame and shrink the title to fit the narrower width.
 	root.size = Vector2i(1260, 1000)
 	DisplayServer.window_set_size(root.size)
-	camera.look_at_from_position(Vector3(0.1, 0.9, 6.9), Vector3(0.1, 1.85, 0.0))
+	camera.look_at_from_position(Vector3(0.25, 0.9, 7.2), Vector3(0.25, 1.85, 0.0))
 	title.add_theme_font_size_override("font_size", 215)
 	title.add_theme_constant_override("outline_size", 36)
 	title.offset_top = 30
