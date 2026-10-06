@@ -9,13 +9,14 @@ Its signature is a **dynamic action camera** that orbits and dollies in on every
 
 ## Features
 
-- **5 fighters**, each with normals, motion-input specials, a super and a distinct CPU personality:
+- **6 fighters**, each with normals, motion-input specials, a super and a distinct CPU personality (design notes in [docs/characters](docs/characters/README.md)):
   - **Kenji**: zoner;
   - **Rhea**: rushdown;
   - **Brutus**: punisher;
   - **Valka**: grappler with an unblockable command grab;
-  - **Jin**: Tae Kwon Do kicker who controls kick range.
-- **Outfits** that fit each style: a karate gi with headband, a Tae Kwon Do dobok, kickboxing gear, a wrestling singlet with knee pads and boots, a brawler's tank top and work pants. Mirror matches get alternate colours.
+  - **Jin**: Tae Kwon Do kicker who controls kick range;
+  - **Mira**: street brawler who powers up with Lakas Stance (Focus) until her rushes hit like a typhoon.
+- **Outfits** that fit each style: a karate gi with headband, a Tae Kwon Do dobok, kickboxing gear, a wrestling singlet with knee pads and boots, a brawler's tank top and work pants, a street fighter's zip-up, track pants and sneakers. Woven fabric textures, stitched hems and skin detail hold up in close-ups. Mirror matches get alternate colours.
 - **5 stages**: Boxing Ring, Dojo, Rooftop, Temple, Beach. Each has its own music.
 - **Modes**: Vs CPU, Arcade (ladder, scoring, shadow boss), local 2-player Versus, **Online** (rollback netcode, LAN discovery, join by IP, or an internet lobby server with rooms and spectating), and Training (frame data, input display, record/playback).
 - **Fighting-game systems**: super meter with cinematic super freezes, counter hits, combos, juggles, throws and throw breaks, high/mid/low blocking, and Tekken-style sidesteps.
