@@ -53,7 +53,6 @@ alt_outfit_colors = PackedColorArray(0.8, 0.8, 0.78, 1, 0.75, 0.08, 0.08, 1, 0.1
 detailed_textures = true
 victory_animations = Array[StringName]([&"fight/victory_fist_pump", &"fight/victory_point"])
 placeholder_color = Color(0.86, 0.62, 0.12, 1)
-max_health = 950
 walk_speed = 2.3
 back_walk_speed = 1.8
 dash_speed = 7.0

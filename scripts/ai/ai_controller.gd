@@ -100,6 +100,8 @@ const DEFAULT_PERSONALITY := {
 }
 ## Distance at which an incoming projectile may be jumped over instead of blocked.
 const PROJECTILE_JUMP_RANGE := 2.6
+## A power-up stance is only used from at least this far away.
+const STANCE_MIN_DISTANCE := 2.4
 
 var difficulty: Difficulty = Difficulty.NORMAL
 var reaction_frames := 14
@@ -433,7 +435,7 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 	if dist > FAR_RANGE:
 		options = [
 			[2.5 * _w("fireball") if can_fireball else 0.0, func() -> void: _queue_special(projectile_move)],
-			[1.5 * _w("stance") if stance else 0.0, func() -> void: _queue_special(stance)],
+			[1.0 * _w("stance") if stance else 0.0, func() -> void: _queue_special(stance)],
 			[1.0 * aggression * _w("rush") if rush and dist <= reach(rush) else 0.0, func() -> void: _queue_special(rush)],
 			[4.0 * _w("approach"), func() -> void: _plan.append([6, 0, _rng.randi_range(12, 28)])],
 			[2.0 * aggression * _w("dash"), func() -> void: _queue_dash()],
@@ -527,9 +529,12 @@ func _special_with(test: Callable) -> MoveData:
 	return null
 
 
-## The fighter's power-up stance while it can still gain focus, or null.
+## The fighter's power-up stance while it can still gain focus and it's safe to take the
+## time (no fireball in the air, the opponent not close), or null.
 func _stance(fighter: Fighter) -> MoveData:
-	if fighter.focus >= Fighter.MAX_FOCUS:
+	if fighter.focus >= Fighter.MAX_FOCUS or fighter.opponent.projectile != null:
+		return null
+	if fighter.position.distance_to(fighter.opponent.position) < STANCE_MIN_DISTANCE:
 		return null
 	for move: MoveData in _moves.values():
 		if move.focus_gain > 0:

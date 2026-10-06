@@ -21,7 +21,7 @@ the opponent lets her power up.
 
 | HP | Walk | Dash | Throw | Damage |
 |---|---|---|---|---|
-| 950 | 2.3 | 7.0 | 115 | ×0.95 |
+| 1000 | 2.3 | 7.0 | 115 | ×1.05 |
 
 ## Moves
 
@@ -32,7 +32,7 @@ the opponent lets her power up.
 | j.2K | Lawin Drop | Steep dive kick from a jump. Overhead; extra landing lag if it misses. |
 | 236P | Bagyo Rush | Travelling punch flurry, 3 hits. Each Focus level adds a hit and 15% damage. |
 | 623K | Lawin Rise | Rising flip kick with an invincible start. Launches. Each Focus level adds height and 15% damage. |
-| 214P | Lakas Stance | 33-frame power-up, punishable if she misses it. Raises Focus by 1 (max 3). |
+| 214P | Lakas Stance | 25-frame power-up, punishable if she misses it. Raises Focus by 1 (max 3). |
 | 236236P | Huling Hagupit (super) | 8-hit rush into a palm-strike knockdown. At Focus 3 the finisher becomes a shockwave strike with about 30% more damage. |
 
 Plus the shared base moves (jab, straight, kicks, crouching moves, jump attacks, throw)
@@ -57,6 +57,15 @@ Her signature mechanic, shown as three pips next to her SUPER meter.
 - Voice: the "Female Hurt Grunts & Groans" recording (AuraVoice), other takes pitched to 1.07.
 - Character select routine: Tapik ×3 → Sipa Flip → Lakas Stance ×3 → Bagyo Rush → the
   super at full Focus → fist pump.
+
+## Balance notes
+
+The balance simulator (`tools/balance_sim.gd -- 12 2 mira`) had her at 33% wins against
+the rest of the cast at first: slow Lakas Stance used in front of zoners, low health and
+damage. Tuned after v0.6.0: 1000 HP (was 950), damage ×1.05 (was ×0.95), Lakas Stance 25
+frames (was 33), Bagyo Rush travels 4.2 m/s and hits for 36 (was 3.5 and 32), Tapik 40
+(was 35), Sipa Flip 2 frames faster; her CPU no longer powers up with a fireball in the air
+or the opponent within 2.4 m. That brought her to about 40% in CPU-vs-CPU play.
 
 ## CPU style: Brawler
 

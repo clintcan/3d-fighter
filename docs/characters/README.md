@@ -11,7 +11,7 @@ the page here.
 | [Brutus](brutus.md) | Power | 1100 | Punisher | Ground-pound shockwave, cross-ring charge |
 | [Valka](valka.md) | Grappler | 1050 | Grappler | Command grabs |
 | [Jin](jin.md) | Kicker | 980 | Footsies | Longest reach, overhead axe kick |
-| [Mira](mira.md) | Brawler | 950 | Brawler | Focus: powers up with Lakas Stance |
+| [Mira](mira.md) | Brawler | 1000 | Brawler | Focus: powers up with Lakas Stance |
 
 ## Shared base moves
 
