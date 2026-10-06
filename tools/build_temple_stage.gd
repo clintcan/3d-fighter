@@ -15,6 +15,8 @@ const OUTPUT := "res://scenes/stages/temple.tscn"
 const TEX := "res://assets/stages/temple/textures/"
 const SKY := "res://assets/stages/temple/belfast_sunset_puresky_2k.hdr"
 const STAGE_SCRIPT := "res://scripts/stages/stage.gd"
+const FLICKER_SCRIPT := "res://scripts/stages/fire_flicker.gd"
+const AO_PATH := "res://assets/stages/temple/gravel_ao.res"
 
 const PLATFORM := 5.0 # half size
 const PLATFORM_HEIGHT := 0.4
@@ -28,6 +30,7 @@ const SKY_ROTATION_DEGREES := 0.0
 
 var stage: Node3D
 var _batches := {}
+var _footprints := [] # everything standing on the gravel (contact shadows)
 var mat_floor: StandardMaterial3D
 var mat_stone_wall: StandardMaterial3D
 var mat_gravel: StandardMaterial3D
@@ -63,7 +66,9 @@ func _initialize() -> void:
 	_build_trees()
 	_build_petals()
 	_build_mountains()
+	_build_lantern_flicker()
 	_flush_batches()
+	_bake_contact_shadows()
 	_add(stage, _marker(Vector3(-2, 0, 0)), "P1Spawn")
 	_add(stage, _marker(Vector3(2, 0, 0)), "P2Spawn")
 
@@ -439,7 +444,30 @@ func _batch_sphere(material: Material, size: float, at: Vector3) -> void:
 	_append(material, sphere, Transform3D(Basis(), at))
 
 
+## Candlelight wavering in the lit stone lanterns (FireFlicker).
+func _build_lantern_flicker() -> void:
+	var flicker := Node.new()
+	flicker.set_script(load(FLICKER_SCRIPT))
+	_add(stage, flicker, "LanternFlicker")
+	var lights: Array[NodePath] = []
+	for i in 4:
+		lights.append(NodePath("../LanternLight%d" % i))
+	flicker.set("lights", lights)
+	flicker.set("amount", 0.15)
+
+
+## Baked contact shadows on the gravel (StageAO) around the platform, its steps, the
+## lanterns, walls and trees.
+func _bake_contact_shadows() -> void:
+	StageAO.collect(_footprints, stage, GRAVEL_Y, ["Geometry"])
+	var half := Vector2(16.0, 16.0)
+	var image := StageAO.bake(_footprints, Vector2.ZERO, half, 256)
+	_add(stage, StageAO.overlay(StageAO.save(image, AO_PATH), Vector2.ZERO, half, GRAVEL_Y), "GravelShadows")
+	print("baked contact shadows from %d footprints" % _footprints.size())
+
+
 func _append(material: Material, mesh: PrimitiveMesh, xform: Transform3D) -> void:
+	StageAO.add_aabb(_footprints, xform * mesh.get_aabb(), GRAVEL_Y)
 	var st: SurfaceTool = _batches.get(material)
 	if st == null:
 		st = SurfaceTool.new()

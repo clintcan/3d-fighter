@@ -2,6 +2,9 @@ extends SceneTree
 ## Builds the boxing ring stage (res://scenes/stages/ring.tscn): ring, arena, crowd,
 ## lighting truss, and environment. Re-run after changing anything below.
 ##
+## Atmosphere: a restless crowd (Crowd sway/jump), dust in the beams and camera flashes
+## in the stands (StageFX), and baked contact shadows on the canvas and floor (StageAO).
+##
 ## Run: godot_console --headless --path . -s res://tools/build_ring_stage.gd
 ##
 ## Layout: canvas top at y = 0 (fighters stand on it), canvas 9 m square with corner
@@ -12,6 +15,7 @@ const TEX := "res://assets/stages/ring/textures/"
 const HDRI := "res://assets/stages/ring/basement_boxing_ring_1k.hdr"
 const STAGE_SCRIPT := "res://scripts/stages/stage.gd"
 const CROWD_SCRIPT := "res://scripts/stages/crowd.gd"
+const AO_DIR := "res://assets/stages/ring/"
 
 const CANVAS_HALF := 4.5
 const POST_OFFSET := 4.4
@@ -37,6 +41,8 @@ func _initialize() -> void:
 	_build_ring()
 	_build_arena()
 	_build_crowd()
+	_build_atmosphere()
+	_bake_contact_shadows()
 	_add(stage, _marker(Vector3(-2, 0, 0)), "P1Spawn")
 	_add(stage, _marker(Vector3(2, 0, 0)), "P2Spawn")
 
@@ -71,10 +77,13 @@ func _build_environment() -> void:
 	env.glow_enabled = true
 	env.glow_intensity = 0.6
 	env.glow_bloom = 0.05
+	env.adjustment_enabled = true # a little punch for the arena lights
+	env.adjustment_contrast = 1.05
+	env.adjustment_saturation = 1.08
 	# SSAO costs ~25% frame time on integrated GPUs for little visible gain here.
 	env.ssao_enabled = false
 	env.volumetric_fog_enabled = true
-	env.volumetric_fog_density = 0.006
+	env.volumetric_fog_density = 0.009 # enough haze for the beams to read
 	env.volumetric_fog_albedo = Color(0.9, 0.9, 1.0)
 	env.volumetric_fog_length = 40.0
 	var world_env := WorldEnvironment.new()
@@ -290,7 +299,34 @@ func _build_crowd() -> void:
 	crowd.set("row_width", TIER_WIDTH)
 	crowd.set("seat_spacing", SEAT_SPACING)
 	crowd.set("floor_y", FLOOR_Y)
+	crowd.set("sway", 0.02) # restless, and now and then someone jumps up
+	crowd.set("jump", 0.16)
 	_add(stage, crowd, "Crowd")
+
+
+## Dust drifting through the spotlight beams over the ring, and camera flashes popping
+## around the stands (StageFX).
+func _build_atmosphere() -> void:
+	var dust := StageFX.motes(Vector3(5.5, 3.0, 5.5), 260)
+	dust.position = Vector3(0, 3.5, 0)
+	_add(stage, dust, "Dust")
+	var flashes := StageFX.flashes(TIER_START + 0.5, TIER_START + CROWD_ROWS * TIER_DEPTH, CROWD_ROWS * TIER_RISE, 8)
+	flashes.position = Vector3(0, FLOOR_Y + CROWD_ROWS * TIER_RISE * 0.5 + 0.6, 0)
+	_add(stage, flashes, "CameraFlashes")
+
+
+## Baked contact shadows (StageAO): on the canvas around the posts, and on the arena
+## floor around the ring platform, its steps, the barricades and the first tiers.
+func _bake_contact_shadows() -> void:
+	var on_canvas := []
+	StageAO.collect(on_canvas, stage, 0.0)
+	var canvas_ao := StageAO.save(StageAO.bake(on_canvas, Vector2.ZERO, Vector2(CANVAS_HALF, CANVAS_HALF), 128), AO_DIR + "canvas_ao.res")
+	_add(stage, StageAO.overlay(canvas_ao, Vector2.ZERO, Vector2(CANVAS_HALF, CANVAS_HALF), 0.0), "CanvasShadows")
+	var on_floor := []
+	StageAO.collect(on_floor, stage, FLOOR_Y, ["Floor"])
+	var floor_ao := StageAO.save(StageAO.bake(on_floor, Vector2.ZERO, Vector2(12.5, 12.5), 256), AO_DIR + "arena_ao.res")
+	_add(stage, StageAO.overlay(floor_ao, Vector2.ZERO, Vector2(12.5, 12.5), FLOOR_Y), "ArenaShadows")
+	print("baked contact shadows: %d on the canvas, %d on the floor" % [on_canvas.size(), on_floor.size()])
 
 
 # --- Helpers ---------------------------------------------------------------------

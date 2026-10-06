@@ -17,6 +17,7 @@ const SKY := "res://assets/stages/beach/kloofendal_48d_partly_cloudy_puresky_2k.
 const OCEAN_SHADER := "res://assets/stages/beach/ocean.gdshader"
 const STAGE_SCRIPT := "res://scripts/stages/stage.gd"
 const CROWD_SCRIPT := "res://scripts/stages/crowd.gd"
+const AO_PATH := "res://assets/stages/beach/sand_ao.res"
 
 const SHORE_Z := -12.5
 ## Direction toward the sun once the sky is turned 180° (sun high behind the camera, a
@@ -25,6 +26,7 @@ const SUN_DIR := Vector3(-0.376, 0.743, 0.553)
 
 var stage: Node3D
 var _batches := {}
+var _footprints := [] # everything standing on the sand (contact shadows)
 var _rng := RandomNumberGenerator.new()
 var mat_sand: StandardMaterial3D
 var mat_wet_sand: StandardMaterial3D
@@ -62,7 +64,9 @@ func _initialize() -> void:
 	_build_umbrellas()
 	_build_rocks()
 	_build_crowd()
+	_build_spray()
 	_flush_batches()
+	_bake_contact_shadows()
 	_add(stage, _marker(Vector3(-2, 0, 0)), "P1Spawn")
 	_add(stage, _marker(Vector3(2, 0, 0)), "P2Spawn")
 
@@ -197,7 +201,14 @@ func _build_torches() -> void:
 		mi.mesh = flame
 		mi.position = p + Vector3(0, 2.24, 0)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.scale = Vector3.ONE * 0.6 # the glowing core; live flames and embers around it
 		_add(stage, mi, "TorchFlame%d" % i)
+		var fire := StageFX.flame(0.22, 20)
+		fire.position = p + Vector3(0, 2.14, 0)
+		_add(stage, fire, "TorchFire%d" % i)
+		var sparks := StageFX.embers(Vector3(0.05, 0.05, 0.05), 6, 1.6)
+		sparks.position = p + Vector3(0, 2.3, 0)
+		_add(stage, sparks, "TorchEmbers%d" % i)
 
 
 ## Leaning palm trees: a curved, ringed trunk, a crown of arching fronds, coconuts.
@@ -340,6 +351,8 @@ func _build_crowd() -> void:
 	crowd.set("empty_seat_chance", 0.4)
 	crowd.set("crowd_seed", 1401)
 	crowd.set("sides", PackedInt32Array([1, 3]))
+	crowd.set("sway", 0.025) # a lively beach crowd, cheering now and then
+	crowd.set("jump", 0.2)
 	crowd.set("palette", PackedColorArray([Color(0.95, 0.3, 0.3), Color(0.98, 0.8, 0.2), Color(0.2, 0.65, 0.85),
 		Color(0.95, 0.5, 0.7), Color(0.3, 0.8, 0.5), Color(0.98, 0.98, 0.95), Color(0.95, 0.6, 0.2)]))
 	_add(stage, crowd, "Crowd")
@@ -372,7 +385,26 @@ func _batch_sphere(material: Material, radius: float, at: Vector3) -> void:
 	_append(material, sphere, Transform3D(Basis(), at))
 
 
+## Spray: mist drifting off the surf along the shoreline.
+func _build_spray() -> void:
+	var spray := StageFX.spray(Vector3(16.0, 0.3, 0.8), 36)
+	spray.position = Vector3(0, 0.25, SHORE_Z - 1.5)
+	_add(stage, spray, "SeaSpray")
+
+
+## Baked contact shadows on the sand (StageAO) under the torches, bar, tower, umbrellas,
+## rocks and palms.
+func _bake_contact_shadows() -> void:
+	StageAO.collect(_footprints, stage, 0.0, ["Geometry", "Sea"])
+	var half := Vector2(18.0, 13.0)
+	var center := Vector2(0.0, -2.0)
+	var image := StageAO.bake(_footprints, center, half, 256)
+	_add(stage, StageAO.overlay(StageAO.save(image, AO_PATH), center, half, 0.0), "SandShadows")
+	print("baked contact shadows from %d footprints" % _footprints.size())
+
+
 func _append(material: Material, mesh: PrimitiveMesh, xform: Transform3D) -> void:
+	StageAO.add_aabb(_footprints, xform * mesh.get_aabb(), 0.0)
 	var st: SurfaceTool = _batches.get(material)
 	if st == null:
 		st = SurfaceTool.new()

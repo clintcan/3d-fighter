@@ -22,16 +22,29 @@ extends MultiMeshInstance3D
 ## Kneeling (seiza) students in gi and hakama instead of seated spectators. The figure
 ## carries its own colors; the instance color only varies it slightly.
 @export var kneeling := false
+## Life in the seats (assets/stages/shared/crowd.gdshader): metres each figure sways, and
+## how far cheering spectators spring up now and then (0 = they stay seated).
+@export var sway := 0.0
+@export var jump := 0.0
+
+const CROWD_SHADER := "res://assets/stages/shared/crowd.gdshader"
 
 
 func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = crowd_seed
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.vertex_color_is_srgb = true
-	mat.roughness = 0.9
-	material_override = mat
+	if sway > 0.0 or jump > 0.0:
+		var animated := ShaderMaterial.new()
+		animated.shader = load(CROWD_SHADER)
+		animated.set_shader_parameter("sway", sway)
+		animated.set_shader_parameter("jump", jump)
+		material_override = animated
+	else:
+		var mat := StandardMaterial3D.new()
+		mat.vertex_color_use_as_albedo = true
+		mat.vertex_color_is_srgb = true
+		mat.roughness = 0.9
+		material_override = mat
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	var seats: Array[Transform3D] = []

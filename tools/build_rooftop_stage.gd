@@ -15,8 +15,8 @@ extends SceneTree
 ## reflection probe (captured once) puts the neon and lights in the puddles, a drizzle
 ## falls around the fight, the neon flickers and the beacon blinks (NeonAmbience).
 ## Contact shadows are baked: every prop standing on the deck is recorded while building,
-## and _bake_ao() computes ambient occlusion over a height map of the roof
-## (assets/stages/rooftop/deck_ao.res, used by the deck shader).
+## and _bake_ao() computes ambient occlusion over a height map of the roof (StageAO,
+## tools/stage_ao.gd; assets/stages/rooftop/deck_ao.res, used by the deck shader).
 
 const OUTPUT := "res://scenes/stages/rooftop.tscn"
 const SKY_SHADER := "res://assets/stages/rooftop/night_skyline.gdshader"
@@ -27,9 +27,6 @@ const WET_SHADER := "res://assets/stages/rooftop/wet_deck.gdshader"
 const AMBIENCE_SCRIPT := "res://scripts/stages/neon_ambience.gd"
 const AO_PATH := "res://assets/stages/rooftop/deck_ao.res"
 const AO_SIZE := 256 # texels across the roof (about 10 cm each)
-const AO_DIRECTIONS := 16
-const AO_STEPS := [0.08, 0.16, 0.28, 0.45, 0.7, 1.0, 1.4, 1.9, 2.5] # metres
-const AO_STRENGTH := 1.35
 
 const ROOF := 13.0 # half size
 const PARAPET_HEIGHT := 1.1
@@ -399,69 +396,11 @@ func _build_ambience() -> void:
 	ambience.set("blink_material", mat_red_light)
 
 
-## Contact shadows on the deck: a height map of everything standing on it, then for each
-## texel the highest horizon in AO_DIRECTIONS directions (horizon-based ambient
-## occlusion). Saved as a texture the deck and paint shaders read.
+## Contact shadows on the deck (StageAO: horizon-based AO over a height map of every
+## prop standing on it), read by the deck and paint shaders.
 func _bake_ao() -> void:
-	var cell := ROOF * 2.0 / AO_SIZE
-	var heights := PackedFloat32Array()
-	heights.resize(AO_SIZE * AO_SIZE)
-	for f: Array in _footprints:
-		var x0 := clampi(int((f[0] + ROOF) / cell), 0, AO_SIZE - 1)
-		var x1 := clampi(int((f[2] + ROOF) / cell), 0, AO_SIZE - 1)
-		var z0 := clampi(int((f[1] + ROOF) / cell), 0, AO_SIZE - 1)
-		var z1 := clampi(int((f[3] + ROOF) / cell), 0, AO_SIZE - 1)
-		for z in range(z0, z1 + 1):
-			for x in range(x0, x1 + 1):
-				heights[z * AO_SIZE + x] = maxf(heights[z * AO_SIZE + x], f[4])
-	# Four rotated copies of the direction set, picked per texel: thin poles then blur into
-	# soft blobs instead of casting spokes.
-	var rotations := []
-	for r in 4:
-		var offsets := [] # per direction: [dx, dz, distance] in texels, per step
-		for d in AO_DIRECTIONS:
-			var a := TAU * (d + r * 0.25) / AO_DIRECTIONS
-			var steps := []
-			for dist: float in AO_STEPS:
-				steps.append([roundi(cos(a) * dist / cell), roundi(sin(a) * dist / cell), dist])
-			offsets.append(steps)
-		rotations.append(offsets)
-	var ao := PackedFloat32Array()
-	ao.resize(AO_SIZE * AO_SIZE)
-	for z in AO_SIZE:
-		for x in AO_SIZE:
-			var h0 := heights[z * AO_SIZE + x]
-			var occlusion := 0.0
-			for steps: Array in rotations[(x * 3 + z * 5) % 4]:
-				var horizon := 0.0
-				for step: Array in steps:
-					var xi: int = x + step[0]
-					var zi: int = z + step[1]
-					if xi < 0 or zi < 0 or xi >= AO_SIZE or zi >= AO_SIZE:
-						continue
-					var rise := heights[zi * AO_SIZE + xi] - h0
-					if rise > 0.0:
-						horizon = maxf(horizon, rise / sqrt(rise * rise + step[2] * step[2]))
-				occlusion += horizon
-			ao[z * AO_SIZE + x] = clampf(1.0 - occlusion / AO_DIRECTIONS * AO_STRENGTH, 0.2, 1.0)
-	# Soften the 10 cm texels.
-	for pass_index in 4:
-		var blurred := ao.duplicate()
-		for z in range(1, AO_SIZE - 1):
-			for x in range(1, AO_SIZE - 1):
-				var sum := 0.0
-				for dz in [-1, 0, 1]:
-					for dx in [-1, 0, 1]:
-						sum += ao[(z + dz) * AO_SIZE + x + dx]
-				blurred[z * AO_SIZE + x] = sum / 9.0
-		ao = blurred
-	var bytes := PackedByteArray()
-	bytes.resize(AO_SIZE * AO_SIZE)
-	for i in ao.size():
-		bytes[i] = int(ao[i] * 255.0)
-	var texture := ImageTexture.create_from_image(Image.create_from_data(AO_SIZE, AO_SIZE, false, Image.FORMAT_L8, bytes))
-	ResourceSaver.save(texture, AO_PATH)
-	var saved: Texture2D = load(AO_PATH)
+	var image := StageAO.bake(_footprints, Vector2.ZERO, Vector2(ROOF, ROOF), AO_SIZE)
+	var saved := StageAO.save(image, AO_PATH)
 	for material: ShaderMaterial in [mat_deck, mat_paint_yellow, mat_paint_white, mat_seam]:
 		material.set_shader_parameter("ao_tex", saved)
 	print("baked deck AO from %d footprints" % _footprints.size())
@@ -470,9 +409,7 @@ func _bake_ao() -> void:
 # --- Helpers ---------------------------------------------------------------------
 
 func _batch(material: Material, size: Vector3, xform: Transform3D) -> void:
-	var bounds := xform * AABB(-size * 0.5, size)
-	if bounds.position.y < 0.3 and bounds.end.y > 0.06: # stands on the deck: casts contact shadow
-		_footprints.append([bounds.position.x, bounds.position.z, bounds.end.x, bounds.end.z, bounds.end.y])
+	StageAO.add_box(_footprints, xform, size, 0.0) # contact shadows
 	var st: SurfaceTool = _batches.get(material)
 	if st == null:
 		st = SurfaceTool.new()

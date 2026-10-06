@@ -805,6 +805,37 @@ func stage_tests() -> void:
 	var gs = root.get_node("GameState")
 	check("Stages: every listed stage and thumbnail exists", gs.STAGES.all(func(st: Dictionary) -> bool:
 		return ResourceLoader.exists(st.path) and ResourceLoader.exists(st.thumb)))
+	# Polish: baked contact shadows (an AO overlay, or the rooftop's wet-deck shader) and
+	# each stage's ambient effects.
+	var polish := {gs.DEFAULT_STAGE: [["CanvasShadows", "ArenaShadows"], ["Dust", "CameraFlashes"]],
+		gs.DOJO_STAGE: [["FloorShadows"], ["Dust", "CandleFlicker", "IncenseSmoke"]],
+		gs.TEMPLE_STAGE: [["GravelShadows"], ["LanternFlicker"]],
+		gs.BEACH_STAGE: [["SandShadows"], ["SeaSpray", "TorchFire0", "TorchEmbers0"]]}
+	var missing := []
+	for path: String in polish:
+		var scene := (load(path) as PackedScene).instantiate()
+		for overlay_name: String in polish[path][0]:
+			var overlay := scene.get_node_or_null(overlay_name) as MeshInstance3D
+			var texture: Texture2D = (overlay.mesh.surface_get_material(0) as StandardMaterial3D).albedo_texture if overlay else null
+			# Somewhere shadowed (darker than 0.8) and somewhere open (brighter than 0.95).
+			var image := texture.get_image() if texture else null
+			var darkest := 1.0
+			var brightest := 0.0
+			if image:
+				for y in range(0, image.get_height(), 4):
+					for x in range(0, image.get_width(), 4):
+						darkest = minf(darkest, image.get_pixel(x, y).r)
+						brightest = maxf(brightest, image.get_pixel(x, y).r)
+			if darkest > 0.8 or brightest < 0.95:
+				missing.append("%s/%s" % [path.get_file(), overlay_name])
+		for effect: String in polish[path][1]:
+			if scene.get_node_or_null(effect) == null:
+				missing.append("%s/%s" % [path.get_file(), effect])
+		scene.free()
+	check("Stages: baked contact shadows and ambient effects", missing.is_empty(), "%s" % [missing])
+	var ring_crowd := (load(gs.DEFAULT_STAGE) as PackedScene).instantiate()
+	check("Stages: the ring crowd is animated", (ring_crowd.get_node("Crowd") as Crowd).jump > 0.0)
+	ring_crowd.free()
 
 	# Stage select: a choice sets the stage; Random picks one of the list.
 	gs.mode = gs.Mode.VS_CPU

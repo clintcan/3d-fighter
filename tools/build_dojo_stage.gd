@@ -10,11 +10,16 @@ extends SceneTree
 ## Layout: tatami top at y = 0 (fighters stand on it), 9 m square with the outer 0.9 m
 ## band in red (the fight bounds are ±3.6 m); hall 20 m square, 6 m to the ceiling.
 ## Repeated geometry (timber, lattice, mats) is merged into one mesh per material.
+## Atmosphere: dust in the light shafts, candle flicker in the lanterns and andon
+## (FireFlicker), incense smoke at the kamiza, students who breathe, and baked contact
+## shadows on the hall floor (StageAO).
 
 const OUTPUT := "res://scenes/stages/dojo.tscn"
 const TEX := "res://assets/stages/dojo/textures/"
 const STAGE_SCRIPT := "res://scripts/stages/stage.gd"
 const CROWD_SCRIPT := "res://scripts/stages/crowd.gd"
+const FLICKER_SCRIPT := "res://scripts/stages/fire_flicker.gd"
+const AO_PATH := "res://assets/stages/dojo/floor_ao.res"
 
 const HALL := 10.0 # half size
 const CEILING := 6.0
@@ -32,6 +37,7 @@ const WARM_LIGHT := Color(1.0, 0.84, 0.62)
 
 var stage: Node3D
 var _batches := {} # Material -> SurfaceTool
+var _footprints := [] # everything standing on the hall floor (contact shadows)
 var mat_dark_wood: StandardMaterial3D
 var mat_cedar: StandardMaterial3D
 var mat_hinoki: StandardMaterial3D
@@ -65,7 +71,9 @@ func _initialize() -> void:
 	_build_props()
 	_build_ceiling()
 	_build_students()
+	_build_atmosphere()
 	_flush_batches()
+	_bake_contact_shadows()
 	_add(stage, _marker(Vector3(-2, 0, 0)), "P1Spawn")
 	_add(stage, _marker(Vector3(2, 0, 0)), "P2Spawn")
 
@@ -386,15 +394,51 @@ func _build_students() -> void:
 		students.set("crowd_seed", 77 + side)
 		students.set("sides", PackedInt32Array([side]))
 		students.set("kneeling", true)
+		students.set("sway", 0.004) # breathing
 		students.set("palette", PackedColorArray([Color(1, 1, 1), Color(0.95, 0.95, 1.0), Color(1.0, 0.97, 0.93)]))
 		_add(stage, students, "Students%d" % side)
 		students.add_to_group(&"ring_side_%d" % groups[side], true)
+
+
+# --- Atmosphere -----------------------------------------------------------------
+
+## Dust drifting through the light over the tatami, candle flicker in the hanging
+## lanterns and the andon, and a thread of incense smoke rising at the kamiza.
+func _build_atmosphere() -> void:
+	var dust := StageFX.motes(Vector3(4.5, 2.4, 4.5), 220)
+	dust.position = Vector3(0, 3.0, 0)
+	_add(stage, dust, "Dust")
+	var flicker := Node.new()
+	flicker.set_script(load(FLICKER_SCRIPT))
+	_add(stage, flicker, "CandleFlicker")
+	var lights: Array[NodePath] = [NodePath("../AndonL"), NodePath("../AndonR")]
+	for x in [0, 1]:
+		for z in [0, 1]:
+			lights.append(NodePath("../LanternLight%d%d" % [x, z]))
+	flicker.set("lights", lights)
+	flicker.set("amount", 0.12)
+	# Incense: a small holder on the alcove dais, smoke curling up toward the scroll.
+	var holder := _wall(2, HALL - 0.5, 0.75, FLOOR_TOP + 0.4)
+	_batch(mat_dark_wood, Vector3(0.12, 0.08, 0.12), holder)
+	var smoke := StageFX.smoke()
+	smoke.transform = holder * Transform3D(Basis(), Vector3(0, 0.12, 0))
+	_add(stage, smoke, "IncenseSmoke")
+
+
+## Baked contact shadows on the hall floor (StageAO): the merged geometry is recorded as
+## it's batched, separate meshes (drum, lanterns) are collected here.
+func _bake_contact_shadows() -> void:
+	StageAO.collect(_footprints, stage, FLOOR_TOP, ["Geometry"])
+	var image := StageAO.bake(_footprints, Vector2.ZERO, Vector2(HALL, HALL), 256)
+	_add(stage, StageAO.overlay(StageAO.save(image, AO_PATH), Vector2.ZERO, Vector2(HALL, HALL), FLOOR_TOP), "FloorShadows")
+	print("baked contact shadows from %d footprints" % _footprints.size())
 
 
 # --- Helpers ---------------------------------------------------------------------
 
 ## Adds a box to the merged mesh for `material`.
 func _batch(material: Material, size: Vector3, xform: Transform3D) -> void:
+	StageAO.add_box(_footprints, xform, size, FLOOR_TOP)
 	var st: SurfaceTool = _batches.get(material)
 	if st == null:
 		st = SurfaceTool.new()
