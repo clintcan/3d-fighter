@@ -17,14 +17,29 @@ const ONLINE_SCENE := "res://scenes/online_menu.tscn"
 
 
 const WALLPAPER := "res://assets/ui/wallpaper.png"
+const LOGO := "res://assets/ui/logo.png" # the brush title, from tools/build_logo.py
+const LOGO_SIZE := Vector2(900, 167)
+
+
+## Swaps the text title for the brush logo, like the title screen's (the label stays as a
+## fallback if the image is missing).
+func _use_logo(title: Label) -> void:
+	if not ResourceLoader.exists(LOGO):
+		return
+	var logo := TextureRect.new()
+	logo.name = "Logo"
+	logo.texture = load(LOGO)
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.custom_minimum_size = LOGO_SIZE
+	title.add_sibling(logo)
+	title.get_parent().move_child(logo, title.get_index())
+	title.hide()
 
 
 func _ready() -> void:
 	_add_wallpaper()
-	var title := $Center/VBox/Title as Label # gold with a dark outline, like the splash
-	title.add_theme_color_override("font_color", Color(1.0, 0.84, 0.32))
-	title.add_theme_constant_override("outline_size", 22)
-	title.add_theme_color_override("font_outline_color", Color(0.12, 0.02, 0.0))
+	_use_logo($Center/VBox/Title as Label)
 	start_button.pressed.connect(_start.bind(GameState.Mode.VS_CPU))
 	arcade_button.pressed.connect(_start.bind(GameState.Mode.ARCADE))
 	versus_button.pressed.connect(_start.bind(GameState.Mode.VERSUS))

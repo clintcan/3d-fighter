@@ -96,7 +96,7 @@ tests/     headless simulation tests
 
 ## Credits
 
-All third-party assets are CC0, credited in [assets/CREDITS.md](assets/CREDITS.md):
+All third-party assets in the game are CC0, credited in [assets/CREDITS.md](assets/CREDITS.md) (the logo is lettered with the Permanent Marker font, Apache 2.0, kept in `tools/fonts/`):
 
 - **Characters and animations:** [Quaternius](https://quaternius.com).
 - **Skies and textures:** [Poly Haven](https://polyhaven.com).
@@ -110,5 +110,5 @@ Made with [Godot Engine](https://godotengine.org).
 © 2026 Clint Christopher Canada.
 
 - **Code:** [MIT License](LICENSE).
-- **Original assets** (stages, generated animations, portraits, key art, synthesized sounds): [CC BY 4.0](LICENSE-ASSETS.md).
-- **Third-party assets:** keep their own licenses (all CC0); see [assets/CREDITS.md](assets/CREDITS.md).
+- **Original assets** (stages, generated animations, portraits, key art and logo, synthesized sounds): [CC BY 4.0](LICENSE-ASSETS.md).
+- **Third-party assets:** keep their own licenses (CC0; the logo tool's font is Apache 2.0); see [assets/CREDITS.md](assets/CREDITS.md).

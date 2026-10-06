@@ -2,7 +2,7 @@
 
 Every third-party asset must be listed here. CC-BY assets must also appear on the in-game credits screen.
 
-Third-party assets are CC0. Assets made for this project are © Clint Christopher Canada under
+Third-party assets are CC0, except the Permanent Marker font that `tools/build_logo.py` letters the logo with (Apache 2.0; it stays in `tools/fonts/` and isn't part of the game). Assets made for this project are © Clint Christopher Canada under
 [CC BY 4.0](../LICENSE-ASSETS.md) (marked below); the code is MIT ([LICENSE](../LICENSE)).
 
 | Asset | Path | Author | Source URL | License |
@@ -39,6 +39,8 @@ Third-party assets are CC0. Assets made for this project are © Clint Christophe
 | Mira body texture (warm medium-brown skin) | `assets/characters/mira/T_Mira_Body.png` | Recoloured from the Quaternius `T_Superhero_Female_Dark_BaseColor.png` for this project | — | CC BY 4.0 (project original, from CC0 sources) |
 | Mira's bob hairstyle | `assets/characters/hair/Hair_Bob*` | Cut from the Quaternius `Hair_Long` by `tools/build_hair.gd` | — | CC BY 4.0 (project original, from CC0 sources) |
 | Skin pore detail normal map (procedural) | `assets/characters/detail/skin_pores_nor.png` | Generated for this project | — | CC BY 4.0 (project original) |
+| Title logo (brush lettering, dry-brush effects) | `assets/ui/logo.png` | Made by `tools/build_logo.py` from the Permanent Marker font | — | CC BY 4.0 (project original) |
+| Permanent Marker font (logo lettering only; not shipped with the game) | `tools/fonts/PermanentMarker-Regular.ttf` | Font Diner / Google Fonts | https://fonts.google.com/specimen/Permanent+Marker | Apache 2.0 (`tools/fonts/PermanentMarker-LICENSE.txt`) |
 | Stage-select thumbnails | `assets/ui/stages/` | Rendered by `tools/render_stage_thumbs.gd` | — | CC BY 4.0 (project original) |
 | Cotton Jersey texture (gi, dobok, tank top, hand wraps, belts, Mira's top; normal + roughness, 1K and 2K; the 2K diffuse as a greyscale weave map) | `assets/characters/outfits/textures/cotton_jersey_*`, `.../textures/detail/cotton_jersey_*` | colormass, Rico Cilliers / Poly Haven | https://polyhaven.com/a/cotton_jersey | CC0 1.0 |
 | Bi Stretch texture (singlet, sports top, shorts, Mira's track pants and trim; normal + roughness, 1K and 2K; the 2K diffuse as a greyscale weave map) | `assets/characters/outfits/textures/bi_stretch_*`, `.../textures/detail/bi_stretch_*` | colormass, Rico Cilliers / Poly Haven | https://polyhaven.com/a/bi_stretch | CC0 1.0 |

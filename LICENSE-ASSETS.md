@@ -23,4 +23,4 @@ Assets created for this project (they are marked **CC BY 4.0** in [assets/CREDIT
 ## What it doesn't cover
 
 - **Code** (scripts, tools, tests) is under the MIT License; see [LICENSE](LICENSE).
-- **Third-party assets** keep their own licenses (all CC0), listed in [assets/CREDITS.md](assets/CREDITS.md). Some original assets are built from those CC0 sources: the animations from Quaternius clips, the portraits and key art from Quaternius models, the stages with Poly Haven textures. The CC0 sources themselves remain CC0.
+- **Third-party assets** keep their own licenses (CC0, plus the Apache 2.0 font in `tools/fonts/` that only the logo tool uses), listed in [assets/CREDITS.md](assets/CREDITS.md). Some original assets are built from those CC0 sources: the animations from Quaternius clips, the portraits and key art from Quaternius models, the stages with Poly Haven textures. The CC0 sources themselves remain CC0.
