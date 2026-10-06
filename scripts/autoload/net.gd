@@ -305,7 +305,18 @@ func _on_connected() -> void:
 	connected.emit()
 	if smoke:
 		print("SMOKE TEST: online connected to %s, security code %s" % [peer.remote_name, peer.security_code])
-		pick(local_index) # host Kenji, guest Rhea
+		pick(_smoke_fighter()) # host Kenji, guest Rhea, unless --smoke-fighter=<id>
+
+
+## Smoke tests: the roster index from `--smoke-fighter=<id>`, or Kenji (host) / Rhea (guest).
+func _smoke_fighter() -> int:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--smoke-fighter="):
+			var id := arg.get_slice("=", 1)
+			for i in GameState.roster.size():
+				if String(GameState.roster[i].id) == id:
+					return i
+	return local_index
 
 
 func _on_connect_failed(reason: String) -> void:

@@ -128,6 +128,11 @@ def bump_version(new: str) -> None:
             (r'application/version="[^"]+"', f'application/version="{new}"'),
             (r'3DFighter-v[\d.]+-macos\.zip', f"3DFighter-v{new}-macos.zip"),
         ],
+        # The player's manual: its header and the download file names.
+        "dist/manual.html": [
+            (r"Player's manual · version [\d.]+", f"Player's manual · version {new}"),
+            (r"3DFighter-v[\d.]+-(windows\.zip|macos\.zip|linux\.tar\.gz)", f"3DFighter-v{new}-\\1"),
+        ],
         # Upload file names in the itch kit (local only, git-ignored; the devlog history keeps its own versions).
         "dist/itch/page.md": [(r"`3DFighter-v[\d.]+-(windows\.zip|macos\.zip|linux\.tar\.gz)`", f"`3DFighter-v{new}-\\1`")],
     }

@@ -3,8 +3,12 @@ extends RefCounted
 ## `-- --smoke-test --determinism`: plays a fixed fight for every fighter pairing with
 ## seeded random inputs and prints one combined checksum. Run it on each platform (and
 ## each build): online play needs every machine to print the same number.
+## Now and then a player inputs a special-move motion (MOTIONS) instead of a random
+## direction, so every fighter's specials (projectiles, grabs, Focus, supers) are covered.
 
 const TICKS := 1800
+## Special motions (P1's view, facing right) with the button pressed on the last step.
+const MOTIONS := ["236", "623", "214", "63214", "236236"]
 
 
 static func run(tree: SceneTree) -> int:
@@ -27,9 +31,24 @@ static func run(tree: SceneTree) -> int:
 		rngs[1].seed = 2000 + i
 		var held := [5, 5]
 		var hold := [0, 0]
+		var queued := [[], []] # pending motion steps: [direction, buttons]
 		for t in TICKS:
 			for k in 2:
 				var buttons := 0
+				if not queued[k].is_empty():
+					var next: Array = queued[k].pop_front()
+					controllers[k].raw = InputBuffer.pack(next[0], next[1])
+					continue
+				if hold[k] <= 0 and rngs[k].randf() < 0.12:
+					var motion: String = MOTIONS[rngs[k].randi() % MOTIONS.size()]
+					var button: int = [InputBuffer.LP, InputBuffer.HP, InputBuffer.LK, InputBuffer.HK][rngs[k].randi() % 4]
+					for c in motion.length():
+						var d := int(motion[c])
+						if k == 1: # P2 starts on the right, facing left: mirror the motion
+							d = [0, 3, 2, 1, 6, 5, 4, 9, 8, 7][d]
+						queued[k].append([d, button if c == motion.length() - 1 else 0])
+					queued[k].append([5, 0])
+					continue
 				if hold[k] <= 0:
 					var toward := 6 if k == 0 else 4
 					held[k] = [toward, toward, 5, 2, 3 if k == 0 else 1, 4 if k == 0 else 6, 8][rngs[k].randi() % 7]

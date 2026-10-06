@@ -32,7 +32,7 @@ On the character select screen each player picks in turn with
 Light Punch (select) and Heavy Punch (back).
 
 STAGES: after picking fighters, choose the Boxing Ring, the Dojo, the Rooftop,
-the Temple, the Beach or Random.
+the Temple, the Beach, the Night Market or Random.
 
 ARCADE - choose "Arcade" in the main menu
 Fight your way up a ladder of CPU opponents to the final boss: your own
@@ -96,10 +96,19 @@ SPECIAL MOVES (P = either punch, K = either kick; written facing right)
   Jin     down, down-forward, forward + K ... Spinning Back Kick
           forward, down, down-forward + K ... Tornado Kick (invincible anti-air)
           forward + Heavy Kick .............. Axe Kick (overhead)
+  Mira    down, down-forward, forward + P ... Bagyo Rush (punch flurry)
+          forward, down, down-forward + K ... Lawin Rise (rising flip kick)
+          down, down-back, back + P ......... Lakas Stance (+1 Focus)
+          down + K in the air ............... Lawin Drop (dive kick)
 Normal attacks that connect can be cancelled into a special.
 
+FOCUS (Mira): each Lakas Stance adds a Focus level, up to 3 (the pips by
+her SUPER meter). Every level makes Bagyo Rush and Lawin Rise stronger, and
+at level 3 her super ends in a shockwave strike. She loses it all when
+she's knocked down.
+
 SUPER: landing and taking hits fills the SUPER meter (bottom corners).
-When it's full, do down, down-forward, forward twice + P (Kenji, Brutus)
+When it's full, do down, down-forward, forward twice + P (Kenji, Brutus, Mira)
 or + K (Rhea, Jin) for the character's super. Valka's super is a command grab. Sidestep dodges fireballs.
 
 Remap any key or gamepad button (triggers too) in Options -> Controls.
@@ -125,20 +134,27 @@ All third-party assets are CC0 (public domain), credited with thanks:
   Kumar), Japanese Stone Wall, Gravel Floor 03, Grey Roof Tiles; Beach:
   "Kloofendal 48d Partly Cloudy" sky (Greg Zaal, Jarod Guest), Coast Sand
   01, Thatch Roof Angled (Rob Tuytel, Dimitrios Savva), Palm Tree Bark
-  (Dimitrios Savva, Rico Cilliers), Bamboo Wall (Amal Kumar); outfit fabrics:
+  (Dimitrios Savva, Rico Cilliers), Bamboo Wall (Amal Kumar); Night Market:
+  "Qwantani Dusk 2" sky (Greg Zaal, Jarod Guest), Asphalt 02 (Rob Tuytel),
+  Brick Pavement and Rusty Corrugated Iron (Charlotte Baglioni), Painted
+  Plaster Wall and Wood Planks (Amal Kumar), Painted Metal Shutter (Dario
+  Barresi, Rico Cilliers, Charlotte Baglioni); outfit fabrics:
   Cotton Jersey and Bi Stretch (colormass, Rico Cilliers), Denim Fabric 06
   (Greg Zaal, Rico Cilliers)
-- Music: "Heavy Battle 2" and "Space Battle" by MintoDog; "Determination" by
-  HydroGene (dojo); "Midnight Drive" by congusbongus (rooftop); "Boss_Koto"
-  by G_P (temple); "Funky House" by Of Far Different Nature (beach)
+- Music: "Heavy Battle 2", "Space Battle" and "Jazzy Battle Theme" (night
+  market) by MintoDog; "Determination" by HydroGene (dojo); "Midnight
+  Drive" by congusbongus (rooftop); "Boss_Koto" by G_P (temple); "Funky
+  House" by Of Far Different Nature (beach)
   - https://opengameart.org
 - Fighter voices: "Male Grunt/Yelling sounds" by HaelDB, "Female Hurt Grunts &
   Groans" by AuraVoice - https://opengameart.org
 - Sound effects & announcer: Kenney - Impact Sounds, Interface Sounds,
   Voiceover Pack: Fighter - https://kenney.nl
 
-Stages, crowds, additional fight and special-move animations, portraits,
-key art and synthesized sounds were created for this project.
+Stages (including the jeepneys), crowds, fighter outfits, additional fight
+and special-move animations, portraits, key art and logo, and synthesized
+sounds were created for this project. The logo is lettered with the
+"Permanent Marker" font by Font Diner (Apache 2.0).
 
 LICENSE: code (c) 2026 Clint Christopher Canada, MIT License. Original
 assets (c) 2026 Clint Christopher Canada, CC BY 4.0
