@@ -38,6 +38,7 @@ const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const VS_SCENE := "res://scenes/vs_screen.tscn"
 const SERVER_LOBBY_SCENE := "res://scenes/server_lobby.tscn"
 const EMOTES := ["clap", "fire", "wow", "laugh", "gg", "ouch"]
+const REPORT_DELAY_S := 2.5 # pings every 0.5 s: a few round trips measured by then
 
 # Reliable lobby message types.
 const M_PICK := 1 # u8 roster index (255 = undecided)
@@ -278,6 +279,7 @@ func _new_peer() -> void:
 	peer.connect_failed.connect(_on_connect_failed)
 	peer.disconnected.connect(_on_disconnected)
 	peer.message_received.connect(_on_message)
+	peer.path_changed.connect(func(_path: String) -> void: _report_connection())
 
 
 ## `--net-lag=MS --net-jitter=MS --net-loss=PERCENT`: the lag simulator, for testing.
@@ -293,7 +295,12 @@ func _apply_lag_args(target: NetPeer) -> void:
 
 func _on_connected() -> void:
 	if lobby and peer.server_ip != "":
-		lobby.send("connection_report", {path = peer.connection_path(), rtt_ms = clampi(roundi(peer.rtt_ms), 0, 65535)})
+		# Report the path once a few pings have measured the round trip (at connect time
+		# there's no sample yet), and again if the match moves to the relay.
+		var reported := peer
+		get_tree().create_timer(REPORT_DELAY_S).timeout.connect(func() -> void:
+			if peer == reported and is_active():
+				_report_connection())
 		report_room("character_select")
 	connected.emit()
 	if smoke:
@@ -446,6 +453,12 @@ func report_room(phase: String, extra: Dictionary = {}) -> void:
 	var fields := extra.duplicate()
 	fields.phase = phase
 	lobby.send("room_update", fields)
+
+
+## Tells the lobby server how the match connects (direct / relay) and its round trip.
+func _report_connection() -> void:
+	if is_server_open() and peer and peer.server_ip != "" and peer.is_connected_to_peer():
+		lobby.send("connection_report", {path = peer.connection_path(), rtt_ms = clampi(roundi(peer.rtt_ms), 0, 65535)})
 
 
 ## Sends a spectator-feed frame (players in an internet room publish their match).

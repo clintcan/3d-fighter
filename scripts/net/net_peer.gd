@@ -42,6 +42,11 @@ extends RefCounted
 ## RELAYED [datagram]. The relay is just another address (RELAY_IP) to the handshake, so
 ## encryption and the security code work the same on both paths. The server already asked
 ## the host, so the host lets in the expected addresses (and only those) without asking.
+## A direct path that answers once but then goes quiet isn't trusted for long: if the guest
+## isn't connected DIRECT_DEADLINE_MS after locking on to it, it starts again through the
+## relay (same nonce), and the host restarts the key exchange on the new path. During a
+## match, FAILOVER_MS of silence on a direct path moves both players to the relay (the
+## sealed datagrams don't depend on the path); packets are accepted from either path.
 
 signal connected
 signal connect_failed(reason: String)
@@ -54,6 +59,8 @@ signal join_requested(name: String)
 signal join_cancelled(name: String)
 ## Guest: the host is deciding whether to let us in.
 signal join_pending(host_name: String)
+## Server mode: the connection moved to the relay during a match ("relay").
+signal path_changed(path: String)
 
 const PROTOCOL := 3
 const DEFAULT_PORT := 7777
@@ -105,6 +112,8 @@ const BIND_INTERVAL_MS := 250
 const BIND_KEEPALIVE_MS := 15000
 const PUNCH_INTERVAL_MS := 100
 const PUNCH_TIMEOUT_MS := 3000 # no direct answer by then: use the relay
+const DIRECT_DEADLINE_MS := 4000 # locked on to a direct path but not connected by then: use the relay
+const FAILOVER_MS := 2000 # a direct path silent this long during a match: switch to the relay
 const ENDPOINTS_TIMEOUT_MS := 15000 # the server never sent the peer's addresses
 const MAX_RELAY_PAYLOAD := 1200
 const MAX_BIND_CANDIDATES := 4
@@ -197,6 +206,8 @@ var _server_since := 0
 var _candidates: Array[Dictionary] = [] # the peer's addresses: [{ip, port}]
 var _punch_at := -1 # msec: when to start punching (host) / sending HELLOs (guest)
 var _expected := {} # host: ip -> true for the matched peer's addresses (and RELAY_IP)
+var _direct_since := 0 # guest: when it locked on to a direct candidate
+var _direct_addr := [] # [ip, port] of the direct path after a failover (still accepted)
 
 
 func _init(version: String = "", data_hash: int = 0, name: String = "Player") -> void:
@@ -380,6 +391,7 @@ func close_socket() -> void:
 	_candidates.clear()
 	_punch_at = -1
 	_expected = {}
+	_direct_addr = []
 
 
 func send_input(bytes: PackedByteArray) -> void:
@@ -424,7 +436,9 @@ func poll() -> void:
 				for c: Dictionary in _candidates:
 					_send_to(c.ip, c.port, PackedByteArray([T_PUNCH]))
 		Status.JOINING:
-			if server_ip != "" and remote_ip == "":
+			if _direct_attempt_expired(now):
+				_fall_back_to_relay(now)
+			elif server_ip != "" and remote_ip == "":
 				_find_path(now)
 			elif now - _last_answer > JOIN_TIMEOUT_MS:
 				_fail("No answer from the host through the server" if remote_ip == RELAY_IP else "No answer from %s:%d" % [remote_ip, remote_port])
@@ -432,7 +446,9 @@ func poll() -> void:
 				_last_hello = now
 				_send_now(_hello())
 		Status.SECURING:
-			if now - _secure_started > SECURE_TIMEOUT_MS:
+			if _direct_attempt_expired(now):
+				_fall_back_to_relay(now)
+			elif now - _secure_started > SECURE_TIMEOUT_MS:
 				if is_host:
 					var gave_up := remote_name
 					_back_to_hosting()
@@ -446,6 +462,8 @@ func poll() -> void:
 				_last_key_sent = now
 				_send_now(_key_datagram())
 		Status.CONNECTED:
+			if server_ip != "" and remote_ip != RELAY_IP and now - _last_heard > FAILOVER_MS:
+				_switch_to_relay()
 			if now - _last_heard > timeout_ms:
 				close_socket()
 				status = Status.CLOSED
@@ -483,13 +501,13 @@ func _receive(bytes: PackedByteArray, ip: String, port: int, now: int) -> void:
 		if remote_ip == "":
 			if not _is_candidate(ip, port):
 				return
-		elif ip != remote_ip or port != remote_port:
+		elif not _from_peer(ip, port):
 			return
 	if is_host:
 		if type == T_HELLO:
 			_on_hello(bytes, ip, port, now)
 			return
-		if (status != Status.SECURING and status != Status.CONNECTED) or ip != remote_ip or port != remote_port:
+		if (status != Status.SECURING and status != Status.CONNECTED) or not _from_peer(ip, port):
 			return
 	elif status == Status.JOINING:
 		_on_handshake_reply(bytes, now, ip, port)
@@ -512,6 +530,8 @@ func _receive(bytes: PackedByteArray, ip: String, port: int, now: int) -> void:
 	if body == null:
 		return # forged, corrupted or replayed
 	_last_heard = now
+	if ip == RELAY_IP and remote_ip != RELAY_IP and server_ip != "":
+		_switch_to_relay() # the peer moved to the relay: it may not hear us directly any more
 	match type:
 		T_INPUT:
 			input_received.emit(body)
@@ -570,6 +590,15 @@ func _on_hello(bytes: PackedByteArray, ip: String, port: int, now: int) -> void:
 		_reply_to(ip, port, challenge, false)
 		return
 	# The address is proven from here on.
+	if server_ip != "" and hello.nonce == _nonce and (ip != remote_ip or port != remote_port) \
+			and (status == Status.SECURING or (status == Status.CONNECTED and _recv_highest < 0)):
+		# The matched guest gave up on the other path (it falls back to the relay when a
+		# direct path stalls): start the key exchange again on this one.
+		remote_ip = ip
+		remote_port = port
+		remote_name = hello.name
+		_start_securing()
+		return
 	var problem := ""
 	if hello.protocol != PROTOCOL or hello.version != game_version:
 		problem = "Different game version (host %s, you %s)" % [game_version, hello.version]
@@ -607,6 +636,7 @@ func _on_handshake_reply(bytes: PackedByteArray, now: int, ip: String, port: int
 	if remote_ip == "": # server mode: the first candidate to answer is the way through
 		remote_ip = ip
 		remote_port = port
+		_direct_since = now
 	match bytes[0]:
 		T_CHALLENGE:
 			if bytes.size() < 17:
@@ -901,6 +931,45 @@ func _find_path(now: int) -> void:
 		var hello := _hello()
 		for c: Dictionary in _candidates:
 			_send_to(c.ip, c.port, hello)
+
+
+## Guest: locked on to a direct path that hasn't led to a connection in time.
+func _direct_attempt_expired(now: int) -> bool:
+	return server_ip != "" and not is_host and remote_ip != "" and remote_ip != RELAY_IP \
+		and now - _direct_since > DIRECT_DEADLINE_MS
+
+
+## Guest: start the handshake again through the relay (same nonce, so the host can tell
+## it's the same player and restart the key exchange on the new path).
+func _fall_back_to_relay(now: int) -> void:
+	remote_ip = RELAY_IP
+	remote_port = 0
+	status = Status.JOINING
+	_token = 0
+	_cookie = 0
+	_commitment = PackedByteArray()
+	_key_cipher = PackedByteArray()
+	awaiting_accept = false
+	_last_answer = now
+	_last_hello = -HELLO_INTERVAL_MS
+
+
+## During a match: carry on through the relay, still accepting the old direct path.
+func _switch_to_relay() -> void:
+	_direct_addr = [remote_ip, remote_port]
+	remote_ip = RELAY_IP
+	remote_port = 0
+	path_changed.emit("relay")
+
+
+## Whether a datagram comes from the peer: its current address, or (connected in server
+## mode) the relay or the direct path it had before a failover.
+func _from_peer(ip: String, port: int) -> bool:
+	if ip == remote_ip and port == remote_port:
+		return true
+	if server_ip == "" or status != Status.CONNECTED:
+		return false
+	return ip == RELAY_IP or (_direct_addr.size() == 2 and ip == _direct_addr[0] and port == _direct_addr[1])
 
 
 func _is_candidate(ip: String, port: int) -> bool:

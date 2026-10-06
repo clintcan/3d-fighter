@@ -2264,6 +2264,66 @@ class FakeRendezvous:
 				relayed += 1
 
 
+## A "direct path" between the guest and the host that can fail: it forwards both ways,
+## but lets only the host's first `pass_from_host` replies through (-1 = all), and drops
+## everything once `blocked`. The host sees it as the guest's address (127.0.0.1).
+class FakeForward:
+	var socket := PacketPeerUDP.new()
+	var host_port := 0
+	var guest := []
+	var from_host := 0
+	var pass_from_host := -1
+	var blocked := false
+
+	func _init(port_of_host: int) -> void:
+		host_port = port_of_host
+		socket.bind(0, "127.0.0.1")
+
+	func port() -> int:
+		return socket.get_local_port()
+
+	func poll() -> void:
+		while socket.get_available_packet_count() > 0:
+			var bytes := socket.get_packet()
+			var ip := socket.get_packet_ip()
+			var from := socket.get_packet_port()
+			if blocked:
+				continue
+			if from == host_port:
+				from_host += 1
+				if guest.is_empty() or (pass_from_host >= 0 and from_host > pass_from_host):
+					continue
+				socket.set_dest_address(guest[0], guest[1])
+			else:
+				guest = [ip, from]
+				socket.set_dest_address("127.0.0.1", host_port)
+			socket.put_packet(bytes)
+
+
+## Host and guest matched through a FakeRendezvous, the guest's only candidate being a
+## FakeForward to the host. Returns {fake, fwd, host, guest}.
+func _forwarded_pair(pass_from_host: int) -> Dictionary:
+	var fake := FakeRendezvous.new()
+	var host := _net_peer("1.0", 42, "FwdHost")
+	var guest := _net_peer("1.0", 42, "FwdGuest")
+	host.auto_accept = false
+	guest.auto_accept = false
+	var tokens := [Crypto.new().generate_random_bytes(16), Crypto.new().generate_random_bytes(16)]
+	var keys := [Crypto.new().generate_random_bytes(8), Crypto.new().generate_random_bytes(8)]
+	fake.pair(tokens[0], keys[0], tokens[1], keys[1])
+	host.host(0)
+	guest.join_via_server()
+	host.use_server("127.0.0.1", fake.port(), tokens[0], keys[0], true)
+	guest.use_server("127.0.0.1", fake.port(), tokens[1], keys[1], false)
+	var fwd := FakeForward.new(host.local_port())
+	fwd.pass_from_host = pass_from_host
+	for i in 10:
+		_pump([host, guest, fake, fwd], 1)
+	guest.set_peer_candidates([{ip = "127.0.0.1", port = fwd.port()}], 100)
+	host.set_peer_candidates([{ip = "127.0.0.1", port = guest.local_port()}], 100)
+	return {fake = fake, fwd = fwd, host = host, guest = guest}
+
+
 ## Two NetPeers matched through a FakeRendezvous; `candidates` decides the path:
 ## "relay" (none: the relay only), "direct" (each other's real address) or "dead" (an
 ## address nobody answers: the guest must give up on it and fall back to the relay).
@@ -2550,6 +2610,54 @@ func server_tests() -> void:
 		and dead.rounds * 16 >= NetPeer.PUNCH_TIMEOUT_MS, "%s via %s after %d rounds" % [dead.guest.status, dead.guest.connection_path(), dead.rounds])
 	dead.host.close()
 	dead.guest.close()
+
+	# A direct path that answers once and then stalls: the guest must not stay stuck on it.
+	var stall := _forwarded_pair(1)
+	var sh: NetPeer = stall.host
+	var sg: NetPeer = stall.guest
+	var stall_fail := [""]
+	sg.connect_failed.connect(func(r: String) -> void: stall_fail[0] = r)
+	var locked_direct := false
+	var rounds := 0
+	while rounds < 900 and not (sh.is_connected_to_peer() and sg.is_connected_to_peer()) and stall_fail[0] == "":
+		_pump([sh, sg, stall.fake, stall.fwd], 1)
+		locked_direct = locked_direct or (sg.remote_ip == "127.0.0.1")
+		rounds += 1
+	check("a direct path that stalls after one reply falls back to the relay", locked_direct and sh.is_connected_to_peer()
+		and sg.is_connected_to_peer() and sg.connection_path() == "relay" and stall_fail[0] == ""
+		and rounds * 16 >= NetPeer.DIRECT_DEADLINE_MS,
+		"locked %s, %s / %s via %s after %d ms, failure '%s'" % [locked_direct, sh.status, sg.status, sg.connection_path(), rounds * 16, stall_fail[0]])
+	check("the restarted exchange still agrees on one security code", sh.security_code != "" and sh.security_code == sg.security_code)
+	sh.close()
+	sg.close()
+
+	# A direct path that dies during a match: both players carry on through the relay.
+	var mid := _forwarded_pair(-1)
+	var mh: NetPeer = mid.host
+	var mg: NetPeer = mid.guest
+	rounds = 0
+	while rounds < 400 and not (mh.is_connected_to_peer() and mg.is_connected_to_peer()):
+		_pump([mh, mg, mid.fake, mid.fwd], 1)
+		rounds += 1
+	var was_direct := mg.connection_path() == "direct" and mh.connection_path() == "direct"
+	var dropped := [""]
+	var paths: Array[String] = []
+	mh.disconnected.connect(func(r: String) -> void: dropped[0] = "host: " + r)
+	mg.disconnected.connect(func(r: String) -> void: dropped[0] = "guest: " + r)
+	mh.path_changed.connect(func(p: String) -> void: paths.append("host " + p))
+	mg.path_changed.connect(func(p: String) -> void: paths.append("guest " + p))
+	var got_mid := [""]
+	mg.message_received.connect(func(_t: int, payload: PackedByteArray) -> void: got_mid[0] = payload.get_string_from_utf8())
+	(mid.fwd as FakeForward).blocked = true # the direct path goes dead
+	mh.send_reliable(9, "after the failover".to_utf8_buffer())
+	for i in 800: # 12.8 s: longer than the 10 s connection timeout
+		_pump([mh, mg, mid.fake, mid.fwd], 1)
+	check("a direct path that dies mid-match moves both players to the relay", was_direct and dropped[0] == ""
+		and mh.is_connected_to_peer() and mg.is_connected_to_peer() and mh.connection_path() == "relay" and mg.connection_path() == "relay",
+		"was direct %s, now %s / %s, lost '%s', switches %s" % [was_direct, mh.connection_path(), mg.connection_path(), dropped[0], paths])
+	check("messages keep arriving after the failover", got_mid[0] == "after the failover", got_mid[0])
+	mh.close()
+	mg.close()
 
 	# A guest whose server never sends the host's addresses gives up.
 	var lonely := _net_peer("1.0", 42, "Lonely")
