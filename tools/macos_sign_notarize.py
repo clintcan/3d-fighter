@@ -24,6 +24,8 @@ import sys
 import tempfile
 import zipfile
 
+# Apple's notary queue can take well over the default 10 minutes when busy.
+NOTARY_WAIT_S = 3600
 SIGNING_DIR = os.environ.get("APPLE_SIGNING_DIR", os.path.expandvars(r"%USERPROFILE%\AppleDeveloper"))
 RCODESIGN = os.path.join(SIGNING_DIR, "rcodesign", "rcodesign.exe")
 EXTRA_README = os.path.join(os.path.dirname(__file__), "..", "dist", "README-macOS.txt")
@@ -98,7 +100,7 @@ def main() -> None:
         if args.notarize:
             run([RCODESIGN, "notary-submit",
                  "--api-key-file", "app_store_connect_key.json",
-                 "--wait", "--staple",
+                 "--wait", "--max-wait-seconds", str(NOTARY_WAIT_S), "--staple",
                  app])
         rezip(app, os.path.abspath(args.output_zip), args.readme)
         print(f"wrote {args.output_zip} ({os.path.getsize(args.output_zip) // 1048576} MB)")
