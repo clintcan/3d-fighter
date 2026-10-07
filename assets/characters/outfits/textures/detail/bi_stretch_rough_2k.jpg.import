@@ -3,23 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dhgfme8sq57d8"
-path.s3tc="res://.godot/imported/bi_stretch_rough_2k.jpg-9655c191df9fa15050fb8d057ff5ee9d.s3tc.ctex"
-path.etc2="res://.godot/imported/bi_stretch_rough_2k.jpg-9655c191df9fa15050fb8d057ff5ee9d.etc2.ctex"
+path="res://.godot/imported/bi_stretch_rough_2k.jpg-9655c191df9fa15050fb8d057ff5ee9d.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/characters/outfits/textures/detail/bi_stretch_rough_2k.jpg"
-dest_files=["res://.godot/imported/bi_stretch_rough_2k.jpg-9655c191df9fa15050fb8d057ff5ee9d.s3tc.ctex", "res://.godot/imported/bi_stretch_rough_2k.jpg-9655c191df9fa15050fb8d057ff5ee9d.etc2.ctex"]
+dest_files=["res://.godot/imported/bi_stretch_rough_2k.jpg-9655c191df9fa15050fb8d057ff5ee9d.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.7
+compress/lossy_quality=0.85
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1

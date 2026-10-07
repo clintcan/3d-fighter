@@ -3,27 +3,25 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b2620hpba3jxe"
-path.s3tc="res://.godot/imported/fabric_leather_02_nor_gl_2k.jpg-33ac6ca7b72ccbdcf89e66ff32c2e20c.s3tc.ctex"
-path.etc2="res://.godot/imported/fabric_leather_02_nor_gl_2k.jpg-33ac6ca7b72ccbdcf89e66ff32c2e20c.etc2.ctex"
+path="res://.godot/imported/fabric_leather_02_nor_gl_2k.jpg-33ac6ca7b72ccbdcf89e66ff32c2e20c.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/characters/outfits/textures/detail/fabric_leather_02_nor_gl_2k.jpg"
-dest_files=["res://.godot/imported/fabric_leather_02_nor_gl_2k.jpg-33ac6ca7b72ccbdcf89e66ff32c2e20c.s3tc.ctex", "res://.godot/imported/fabric_leather_02_nor_gl_2k.jpg-33ac6ca7b72ccbdcf89e66ff32c2e20c.etc2.ctex"]
+dest_files=["res://.godot/imported/fabric_leather_02_nor_gl_2k.jpg-33ac6ca7b72ccbdcf89e66ff32c2e20c.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.7
+compress/lossy_quality=0.9
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
-compress/normal_map=1
+compress/normal_map=0
 compress/channel_pack=0
 mipmaps/generate=true
 mipmaps/limit=-1

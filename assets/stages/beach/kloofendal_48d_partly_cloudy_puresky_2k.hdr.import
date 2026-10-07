@@ -3,27 +3,29 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://fyhqj6ipg52l"
-path="res://.godot/imported/kloofendal_48d_partly_cloudy_puresky_2k.hdr-838491d78478338e196e95231fc728d9.ctex"
+path.bptc="res://.godot/imported/kloofendal_48d_partly_cloudy_puresky_2k.hdr-838491d78478338e196e95231fc728d9.bptc.ctex"
+path.astc="res://.godot/imported/kloofendal_48d_partly_cloudy_puresky_2k.hdr-838491d78478338e196e95231fc728d9.astc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/stages/beach/kloofendal_48d_partly_cloudy_puresky_2k.hdr"
-dest_files=["res://.godot/imported/kloofendal_48d_partly_cloudy_puresky_2k.hdr-838491d78478338e196e95231fc728d9.ctex"]
+dest_files=["res://.godot/imported/kloofendal_48d_partly_cloudy_puresky_2k.hdr-838491d78478338e196e95231fc728d9.bptc.ctex", "res://.godot/imported/kloofendal_48d_partly_cloudy_puresky_2k.hdr-838491d78478338e196e95231fc728d9.astc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
-compress/hdr_compression=1
+compress/hdr_compression=2
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

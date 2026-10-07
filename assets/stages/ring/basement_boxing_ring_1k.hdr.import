@@ -3,27 +3,29 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dq1pri07ct0ul"
-path="res://.godot/imported/basement_boxing_ring_1k.hdr-b30bc0d9cb7e15f2b3e6afcc9d225811.ctex"
+path.bptc="res://.godot/imported/basement_boxing_ring_1k.hdr-b30bc0d9cb7e15f2b3e6afcc9d225811.bptc.ctex"
+path.astc="res://.godot/imported/basement_boxing_ring_1k.hdr-b30bc0d9cb7e15f2b3e6afcc9d225811.astc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/stages/ring/basement_boxing_ring_1k.hdr"
-dest_files=["res://.godot/imported/basement_boxing_ring_1k.hdr-b30bc0d9cb7e15f2b3e6afcc9d225811.ctex"]
+dest_files=["res://.godot/imported/basement_boxing_ring_1k.hdr-b30bc0d9cb7e15f2b3e6afcc9d225811.bptc.ctex", "res://.godot/imported/basement_boxing_ring_1k.hdr-b30bc0d9cb7e15f2b3e6afcc9d225811.astc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
-compress/hdr_compression=1
+compress/hdr_compression=2
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

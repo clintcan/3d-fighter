@@ -3,23 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bu6pqd5vqt0mj"
-path.s3tc="res://.godot/imported/cotton_jersey_weave_2k.jpg-d808c22f64c07e117b1d25f006a0f099.s3tc.ctex"
-path.etc2="res://.godot/imported/cotton_jersey_weave_2k.jpg-d808c22f64c07e117b1d25f006a0f099.etc2.ctex"
+path="res://.godot/imported/cotton_jersey_weave_2k.jpg-d808c22f64c07e117b1d25f006a0f099.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/characters/outfits/textures/detail/cotton_jersey_weave_2k.jpg"
-dest_files=["res://.godot/imported/cotton_jersey_weave_2k.jpg-d808c22f64c07e117b1d25f006a0f099.s3tc.ctex", "res://.godot/imported/cotton_jersey_weave_2k.jpg-d808c22f64c07e117b1d25f006a0f099.etc2.ctex"]
+dest_files=["res://.godot/imported/cotton_jersey_weave_2k.jpg-d808c22f64c07e117b1d25f006a0f099.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.7
+compress/lossy_quality=0.85
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1

@@ -802,6 +802,19 @@ func arcade_tests() -> void:
 	gs.mode = gs.Mode.VS_CPU
 
 
+## Every file path under `dir` (recursive).
+func _files_under(dir: String) -> Array[String]:
+	var out: Array[String] = []
+	var d := DirAccess.open(dir)
+	if d == null:
+		return out
+	for f in d.get_files():
+		out.append(dir.path_join(f))
+	for sub in d.get_directories():
+		out.append_array(_files_under(dir.path_join(sub)))
+	return out
+
+
 func stage_tests() -> void:
 	var gs = root.get_node("GameState")
 	check("Stages: every listed stage and thumbnail exists", gs.STAGES.all(func(st: Dictionary) -> bool:
@@ -837,6 +850,17 @@ func stage_tests() -> void:
 	check("Stages: baked contact shadows and ambient effects", missing.is_empty(), "%s" % [missing])
 	var ring_crowd := (load(gs.DEFAULT_STAGE) as PackedScene).instantiate()
 	check("Stages: the ring crowd is animated", (ring_crowd.get_node("Crowd") as Crowd).jump > 0.0)
+	# Download size: 3D textures must not be imported lossless (a 1K photo texture is 2-3 MB
+	# lossless, about 0.4 MB as lossy WebP). Godot only switches them automatically in the
+	# editor, so textures imported headless stay lossless unless their .import says otherwise.
+	var lossless := []
+	for dir in ["res://assets/stages/", "res://assets/characters/"]:
+		for path in _files_under(dir):
+			if path.ends_with(".import"):
+				var text := FileAccess.get_file_as_string(path)
+				if 'importer="texture"' in text and "compress/mode=0" in text:
+					lossless.append(path.get_file())
+	check("Download size: no 3D texture is imported lossless", lossless.is_empty(), "%s" % [lossless])
 	ring_crowd.free()
 
 	# Stage select: a choice sets the stage; Random picks one of the list.
