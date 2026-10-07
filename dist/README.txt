@@ -112,7 +112,10 @@ or + K (Rhea, Jin) for the character's super. Valka's super is a command grab. S
 Remap any key or gamepad button (triggers too) in Options -> Controls.
 
 Options (main menu): music / effects / announcer volume, action camera
-(Off / Subtle / Full), CPU difficulty (Easy / Normal / Hard), fullscreen.
+(Off / Subtle / Full), CPU difficulty (Easy / Normal / Hard), display
+(Windowed / Borderless / Exclusive), window size, resolution (720p to
+Native; 1080p by default) and graphics (High / Medium / Low). On a slow
+computer, try a lower resolution first: it helps the most.
 
 CREDITS
 -------
@@ -153,6 +156,12 @@ All third-party assets are CC0 (public domain), credited with thanks:
   "Beach Ocean Waves" by qubodup (recorded by jasinski), "Park ambiences" by
   thimras, "Fire Crackling" by antumdeluge, "Solo Seagull Sound Effects" by
   rango-mango - https://opengameart.org
+- Crowd reactions: "Group Ooh" and "Group Wow" by CHallSmith, "Crowd Ooohs and
+  Ahhhs" by noah0189, "Crowd Gasping In Surprise" by Shane Vincent, "Small
+  Crowd Gasps" and "Sporting Event with Steady Cheers" by craigsmith,
+  "Millerntor Stadium Crowd Reaction" by Philipp Feit (Sound Of Sankt Pauli),
+  "Football Crowd - Reaction To Goal" by D.jones, "Crowd aah" and "Crowd shock"
+  by an anonymous contributor - https://freesound.org (CC0)
 
 Stages (including the jeepneys), crowds, fighter outfits, additional fight
 and special-move animations, portraits, key art and logo, and synthesized

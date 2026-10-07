@@ -62,7 +62,7 @@ horizontal_alignment = 1
 [node name="Grid" type="GridContainer" parent="Center/Panel/VBox"]
 layout_mode = 2
 theme_override_constants/h_separation = 30
-theme_override_constants/v_separation = 18
+theme_override_constants/v_separation = 12
 columns = 2
 
 [node name="MusicLabel" type="Label" parent="Center/Panel/VBox/Grid"]
@@ -107,6 +107,20 @@ size_flags_vertical = 4
 max_value = 1.0
 step = 0.05
 
+[node name="AmbienceLabel" type="Label" parent="Center/Panel/VBox/Grid"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Ambience Volume"
+
+[node name="AmbienceSlider" type="HSlider" parent="Center/Panel/VBox/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(380, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.05
+
 [node name="CameraLabel" type="Label" parent="Center/Panel/VBox/Grid"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
@@ -129,15 +143,49 @@ custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 
-[node name="FullscreenLabel" type="Label" parent="Center/Panel/VBox/Grid"]
+[node name="DisplayLabel" type="Label" parent="Center/Panel/VBox/Grid"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
-text = "Fullscreen"
+text = "Display"
 
-[node name="FullscreenCheck" type="CheckButton" parent="Center/Panel/VBox/Grid"]
+[node name="DisplayOption" type="OptionButton" parent="Center/Panel/VBox/Grid"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
-size_flags_horizontal = 0
+theme_override_font_sizes/font_size = 24
+
+[node name="WindowSizeLabel" type="Label" parent="Center/Panel/VBox/Grid"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Window Size"
+
+[node name="WindowSizeOption" type="OptionButton" parent="Center/Panel/VBox/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="ResolutionLabel" type="Label" parent="Center/Panel/VBox/Grid"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Resolution"
+
+[node name="ResolutionOption" type="OptionButton" parent="Center/Panel/VBox/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="GraphicsLabel" type="Label" parent="Center/Panel/VBox/Grid"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Graphics"
+
+[node name="GraphicsOption" type="OptionButton" parent="Center/Panel/VBox/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
 
 [node name="SwapLabel" type="Label" parent="Center/Panel/VBox/Grid"]
 layout_mode = 2

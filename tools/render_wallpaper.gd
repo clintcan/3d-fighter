@@ -31,6 +31,11 @@ const POSES := [
 
 
 func _initialize() -> void:
+	await process_frame
+	var settings: Node = root.get_node("Settings") # render at full quality whatever the player's setting
+	settings.graphics = settings.Graphics.HIGH
+	settings.resolution = settings.RESOLUTIONS.size() - 1 # native
+	settings.apply_graphics(root)
 	var world := Node3D.new()
 	root.add_child(world)
 	var stage := (load(STAGE) as PackedScene).instantiate()

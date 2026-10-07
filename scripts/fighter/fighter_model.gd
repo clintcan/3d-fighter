@@ -167,15 +167,10 @@ func _dress(data: CharacterData, alt: bool) -> void:
 	outfit.skeleton = outfit.get_path_to(skeleton)
 	var colors := data.alt_outfit_colors if alt and not data.alt_outfit_colors.is_empty() else data.outfit_colors
 	for surface in data.outfit_mesh.get_surface_count():
-		var slot := ["main", "trim", "accent", "extra"].find(data.outfit_mesh.surface_get_name(surface))
-		if slot < 0:
-			slot = surface
-		var fabric_name: StringName = data.outfit_fabrics[slot] if slot < data.outfit_fabrics.size() else &"cotton"
-		var fabric: Array = FABRICS.get(fabric_name, FABRICS[&"cotton"])
+		var slot := _surface_slot(data, surface)
+		var fabric_name := _fabric_name(data, slot)
+		var fabric := _fabric(data, fabric_name)
 		var detailed: bool = data.detailed_textures and DETAILED_FABRICS.has(fabric_name)
-		if detailed: # same layout as FABRICS, the weave map in the middle
-			var d: Array = DETAILED_FABRICS[fabric_name]
-			fabric = [d[0], d[1], d[3], d[4], d[5]]
 		var color: Color = colors[slot] if slot < colors.size() else Color.WHITE
 		var brightest := maxf(color.r, maxf(color.g, color.b))
 		if brightest > MAX_FABRIC_ALBEDO:
@@ -196,6 +191,45 @@ func _dress(data: CharacterData, alt: bool) -> void:
 		if data.detailed_textures:
 			cloth.vertex_color_use_as_albedo = true # hem shading and stitch lines
 		outfit.set_surface_override_material(surface, cloth)
+
+
+## The textures build() loads by path for `data` (everything else comes with the
+## character's own resources). WebP textures take about 0.4 s each to decode and nothing
+## else keeps them loaded between screens, so GameState.preload_fighters() loads these
+## once at startup and holds them.
+static func texture_paths(data: CharacterData) -> PackedStringArray:
+	var paths := PackedStringArray()
+	if data.outfit_mesh:
+		for surface in data.outfit_mesh.get_surface_count():
+			var fabric_name := _fabric_name(data, _surface_slot(data, surface))
+			var fabric := _fabric(data, fabric_name)
+			paths.append(fabric[0])
+			if fabric[1] != "":
+				paths.append(fabric[1])
+			if data.detailed_textures and DETAILED_FABRICS.has(fabric_name):
+				paths.append(DETAILED_FABRICS[fabric_name][2])
+	if data.detailed_textures:
+		paths.append(SKIN_DETAIL_NORMAL)
+	return paths
+
+
+## The colour slot of an outfit surface (named main / trim / accent / extra).
+static func _surface_slot(data: CharacterData, surface: int) -> int:
+	var slot := ["main", "trim", "accent", "extra"].find(data.outfit_mesh.surface_get_name(surface))
+	return slot if slot >= 0 else surface
+
+
+static func _fabric_name(data: CharacterData, slot: int) -> StringName:
+	return data.outfit_fabrics[slot] if slot < data.outfit_fabrics.size() else &"cotton"
+
+
+## [normal map, roughness map, tiling, roughness, specular] for a fabric, using the
+## detailed maps when the character has them.
+static func _fabric(data: CharacterData, fabric_name: StringName) -> Array:
+	if data.detailed_textures and DETAILED_FABRICS.has(fabric_name):
+		var d: Array = DETAILED_FABRICS[fabric_name] # same layout as FABRICS, the weave map in the middle
+		return [d[0], d[1], d[3], d[4], d[5]]
+	return FABRICS.get(fabric_name, FABRICS[&"cotton"])
 
 
 ## The detail albedo is white (multiplying changes nothing); its alpha sets how much of

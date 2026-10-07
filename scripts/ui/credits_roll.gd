@@ -27,6 +27,7 @@ const CREDITS := [
 	["Fighter voices", "\"Male Grunt/Yelling sounds\" by HaelDB, \"Female Hurt\nGrunts & Groans\" by AuraVoice (OpenGameArt, CC0)"],
 	["Sound effects & announcer", "Kenney: Impact Sounds, Interface Sounds,\nVoiceover Pack: Fighter (CC0)"],
 	["Ambient sound", "\"AMB Rain Loop 1\" by kresiek-the-furry, \"High traffic road sounds\"\nby ignasd, \"Background voices\" by pauliuw, \"Crowd Shouting/Speaking\nAmbience\" by starninjas, \"Applause in a large hall or church\" by expl0it3r,\n\"Beach Ocean Waves\" by qubodup, \"Park ambiences\" by thimras, \"Fire Crackling\"\nby antumdeluge, \"Solo Seagull Sound Effects\" by rango-mango (OpenGameArt, CC0)"],
+	["Crowd reactions", "Freesound: \"Group Ooh\" and \"Group Wow\" by CHallSmith, \"Crowd Ooohs and Ahhhs\"\nby noah0189, \"Crowd Gasping In Surprise\" by Shane Vincent, \"Small Crowd Gasps\" and\n\"Sporting Event with Steady Cheers\" by craigsmith, \"Millerntor Stadium Crowd Reaction\"\nby Philipp Feit (Sound Of Sankt Pauli), \"Football Crowd - Reaction To Goal\" by D.jones,\n\"Crowd aah\" and \"Crowd shock\" by an anonymous contributor (CC0)"],
 	["Logo lettering", "Based on the \"Permanent Marker\" font by Font Diner"],
 	["Made for this project", "Ring, arena, dojo, rooftop, temple, beach, night market and crowds, fighter outfits,\nfight and special-move animations, portraits, key art and logo, swing,\nenergy and super sounds"],
 	["License", "Code: MIT  ·  Original assets: CC BY 4.0\nThird-party assets: CC0"],

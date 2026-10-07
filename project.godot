@@ -19,7 +19,7 @@ boot_splash/bg_color=Color(0.03, 0.03, 0.05, 1)
 boot_splash/image="res://assets/ui/splash.png"
 boot_splash/fullsize=true
 boot_splash/use_filter=true
-run/main_scene="res://scenes/main_menu.tscn"
+run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
 [autoload]

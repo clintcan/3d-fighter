@@ -215,10 +215,15 @@ func milestone4_tests() -> void:
 func _initialize() -> void:
 	OS.add_logger(errors)
 	await process_frame
+	# Several screens and tests save settings: keep the player's file byte for byte.
+	var settings_file: String = root.get_node("Settings").PATH
+	var had_settings := FileAccess.file_exists(settings_file)
+	var settings_bytes := FileAccess.get_file_as_bytes(settings_file) if had_settings else PackedByteArray()
 	# Fixed matchup: per-character frame data makes timings depend on who's fighting.
 	var gs = root.get_node("GameState")
 	gs.player_character = gs.roster[0] # Kenji
 	gs.p2_character = gs.roster[2] # Brutus
+	root.get_node("Settings").graphics = 2 # High: stage checks expect every effect, whatever the player's setting
 	change_scene_to_file("res://scenes/fight.tscn")
 	await process_frame
 	await process_frame
@@ -336,6 +341,7 @@ func _initialize() -> void:
 	await arcade_tests()
 	await stage_tests()
 	await polish_tests()
+	graphics_tests()
 	await personality_tests()
 	await showcase_tests()
 	await loading_tests()
@@ -352,6 +358,13 @@ func _initialize() -> void:
 	await net_tests()
 	await server_tests()
 
+	if had_settings:
+		var f := FileAccess.open(settings_file, FileAccess.WRITE)
+		f.store_buffer(settings_bytes)
+		f.close()
+	elif FileAccess.file_exists(settings_file):
+		DirAccess.remove_absolute(settings_file)
+	check("the player's settings file is left as it was", not had_settings or FileAccess.get_file_as_bytes(settings_file) == settings_bytes)
 	check("no script errors during the run", errors.count == 0, "%d, first: %s" % [errors.count, errors.first])
 	print("\n%d failure(s)" % fails)
 	quit(1 if fails else 0)
@@ -509,7 +522,11 @@ func fx_tests() -> void:
 	var before: int = m.fx.spawned
 	press(InputBuffer.LP); step(6)
 	check("hits spawn effects", m.fx.spawned > before, "%d -> %d" % [before, m.fx.spawned])
-	check("audio buses exist", AudioServer.get_bus_index("Music") > 0 and AudioServer.get_bus_index("SFX") > 0 and AudioServer.get_bus_index("Voice") > 0)
+	check("audio buses exist", AudioServer.get_bus_index("Music") > 0 and AudioServer.get_bus_index("SFX") > 0 and AudioServer.get_bus_index("Voice") > 0
+		and AudioServer.get_bus_index("Ambience") > 0)
+	var limiters := range(AudioServer.get_bus_effect_count(0)).filter(func(i: int) -> bool: return AudioServer.get_bus_effect(0, i) is AudioEffectHardLimiter)
+	check("the master bus has one limiter (ceiling -1 dB) so the mix never clips", limiters.size() == 1
+		and is_equal_approx((AudioServer.get_bus_effect(0, limiters[0]) as AudioEffectHardLimiter).ceiling_db, -1.0))
 
 ## Joypad device assigned to an action (first joypad event), or -99 if none.
 func _pad_device(action: String) -> int:
@@ -978,6 +995,159 @@ func polish_tests() -> void:
 	gs.stage_path = gs.DEFAULT_STAGE
 
 
+## The reacting crowd (StageAmbience on a stage with an audience): what it reacts to,
+## the excitement level and the cheering layer that follows it, cooldowns and priority.
+func _crowd_tests(sound: StageAmbience) -> void:
+	var counts := {}
+	for kind: StringName in sound.SHOUTS:
+		counts[kind] = (sound._shouts[kind] as Array).size()
+	check("Crowd: reaction takes load (ooh, gasp, wow, roar) and the cheering layer plays",
+		counts == {&"ooh": 8, &"gasp": 4, &"wow": 2, &"roar": 5} and sound._swell != null and sound._swell.playing, str(counts))
+	var calm := func() -> void: # the crowd settles completely, cooldowns over
+		sound.excitement = 0.0; sound._hold = 0.0; sound._swell_level = 0.0; sound._last_shout_time = -100.0
+	var kind_of := func() -> String: return str(sound._last_clip.resource_path).get_file().split("_")[1]
+	var jab: MoveData = p1._move_for_input("LP")
+	var launcher: MoveData = p1._move_for_input("2HP")
+	calm.call()
+	sound._on_hit(p1, p2, jab, Fighter.HitResult.BLOCKED)
+	check("Crowd: a blocked jab barely stirs it and stays quiet", sound.excitement < 0.05 and sound._last_shout_time < 0.0)
+	calm.call()
+	p2.combo_hits = 1
+	sound._on_hit(p1, p2, launcher, Fighter.HitResult.HIT)
+	check("Crowd: a launcher gets an \"ooh\"", kind_of.call() == "ooh" and sound.excitement > 0.15, "%s %.2f" % [kind_of.call(), sound.excitement])
+	calm.call()
+	sound._on_hit(p1, p2, jab, Fighter.HitResult.COUNTER)
+	check("Crowd: a counter hit gets a gasp", kind_of.call() == "gasp")
+	var before: float = sound._last_shout_time
+	sound._on_hit(p1, p2, launcher, Fighter.HitResult.HIT)
+	check("Crowd: another reaction waits out the cooldown", sound._last_shout_time == before)
+	p2.combo_hits = 5
+	sound._on_hit(p1, p2, jab, Fighter.HitResult.HIT)
+	check("Crowd: a 5-hit combo gets a \"wow\" (it outranks the cooldown)", kind_of.call() == "wow")
+	calm.call()
+	p2.combo_hits = 2
+	var finisher := MoveData.new()
+	finisher.input = "~test_finish"; finisher.damage = 60
+	sound._on_hit(p1, p2, finisher, Fighter.HitResult.HIT)
+	check("Crowd: a super's finisher gets a \"wow\"", kind_of.call() == "wow" and sound.excitement > 0.4)
+	p2.combo_hits = 0
+	# Excitement builds through a combo, the cheering layer swells with it, then both settle.
+	calm.call()
+	for hit in range(1, 7):
+		p2.combo_hits = hit
+		sound._on_hit(p1, p2, jab, Fighter.HitResult.HIT)
+		for i in 20: sound._process(1.0 / 60.0)
+	var peak: float = sound.excitement
+	var loud: float = sound._swell.volume_db
+	for i in 600: sound._process(1.0 / 60.0)
+	check("Crowd: a combo builds excitement and the cheering swells", peak > 0.6 and loud > sound.reaction_volume - 12.0, "%.2f, %.1f dB" % [peak, loud])
+	check("Crowd: it settles after the action stops", sound.excitement < 0.1 and sound._swell.volume_db < loud - 15.0, "%.2f, %.1f dB" % [sound.excitement, sound._swell.volume_db])
+	p2.combo_hits = 0
+	calm.call()
+
+
+## The graphics preset: what each level turns off on a stage and the viewport, that a
+## stage loaded afterwards at High gets its effects back (the environment is shared with
+## the cached scene), and that the setting is saved.
+func graphics_tests() -> void:
+	var gs = root.get_node("GameState")
+	var settings = root.get_node("Settings")
+	var settings_file: String = settings.PATH
+	var had_settings := FileAccess.file_exists(settings_file)
+	var settings_bytes := FileAccess.get_file_as_bytes(settings_file) if had_settings else PackedByteArray()
+	var saved_video := [settings.display_mode, settings.window_size, settings.resolution]
+	var probe := func(path: String, level: int) -> Dictionary:
+		settings.graphics = level
+		var stage: Node = (load(path) as PackedScene).instantiate()
+		root.add_child(stage) # Stage._ready applies the preset
+		var env: Environment = (stage.find_children("*", "WorldEnvironment", true, false)[0] as WorldEnvironment).environment
+		var info := {fog = env.volumetric_fog_enabled, glow = env.glow_enabled, shadows = 0, particles = 0, ratio = 1.0, probes = 0}
+		for l in stage.find_children("*", "Light3D", true, false):
+			if (l as Light3D).shadow_enabled: info.shadows += 1
+		for p in stage.find_children("*", "GPUParticles3D", true, false):
+			if (p as GPUParticles3D).visible: info.particles += 1
+			info.ratio = minf(info.ratio, (p as GPUParticles3D).amount_ratio)
+		for p in stage.find_children("*", "ReflectionProbe", true, false):
+			if (p as ReflectionProbe).visible: info.probes += 1
+		stage.free()
+		return info
+	var high: Dictionary = probe.call(gs.DEFAULT_STAGE, settings.Graphics.HIGH)
+	check("Graphics High: ring keeps fog, glow, both shadowed lights and its particles",
+		high.fog and high.glow and high.shadows == 2 and high.particles >= 2 and high.ratio == 1.0, str(high))
+	var low: Dictionary = probe.call(gs.DEFAULT_STAGE, settings.Graphics.LOW)
+	check("Graphics Low: ring drops fog, glow, particles and the extra shadow (key light keeps its own)",
+		not low.fog and not low.glow and low.shadows == 1 and low.particles == 0, str(low))
+	var medium: Dictionary = probe.call(gs.DEFAULT_STAGE, settings.Graphics.MEDIUM)
+	check("Graphics Medium: ring keeps fog and glow, one shadow, half the particles",
+		medium.fog and medium.glow and medium.shadows == 1 and medium.particles >= 2 and medium.ratio == 0.5, str(medium))
+	var again: Dictionary = probe.call(gs.DEFAULT_STAGE, settings.Graphics.HIGH)
+	check("Graphics: High after Low gets the shared environment back untouched", again == high, str(again))
+	var roof_low: Dictionary = probe.call(gs.ROOFTOP_STAGE, settings.Graphics.LOW)
+	var roof_high: Dictionary = probe.call(gs.ROOFTOP_STAGE, settings.Graphics.HIGH)
+	check("Graphics Low: rooftop hides its reflection probe (High keeps it)", roof_low.probes == 0 and roof_high.probes == 1,
+		"%d / %d" % [roof_low.probes, roof_high.probes])
+
+	settings.graphics = settings.Graphics.LOW
+	settings.apply_graphics(root)
+	check("Graphics Low: 75% render scale, FXAA instead of MSAA",
+		root.msaa_3d == Viewport.MSAA_DISABLED and root.screen_space_aa == Viewport.SCREEN_SPACE_AA_FXAA
+		and is_equal_approx(root.scaling_3d_scale, 0.75))
+	settings.graphics = settings.Graphics.MEDIUM
+	settings.apply_graphics(root)
+	check("Graphics Medium: 85% render scale, 2× MSAA", root.msaa_3d == Viewport.MSAA_2X and is_equal_approx(root.scaling_3d_scale, 0.85))
+	settings.graphics = settings.Graphics.LOW
+	settings.save_settings()
+	settings.graphics = settings.Graphics.HIGH
+	settings.load_settings()
+	check("Graphics: the setting is saved and loaded", settings.graphics == settings.Graphics.LOW)
+	settings.graphics = settings.Graphics.HIGH
+	settings.apply_graphics(root)
+	check("Graphics High: 4× MSAA at full resolution (the project default)",
+		root.msaa_3d == Viewport.MSAA_4X and root.screen_space_aa == Viewport.SCREEN_SPACE_AA_DISABLED and root.scaling_3d_scale == 1.0)
+
+	# Resolution caps the 3D render height; the preset scales on top; Native never caps.
+	settings.resolution = 2 # 1080p
+	check("Resolution: 1080p on a 3024×1898 screen draws 1080 lines", is_equal_approx(settings.render_scale(1898), 1080.0 / 1898.0))
+	check("Resolution: a window smaller than the cap renders at its own size", settings.render_scale(720) == 1.0)
+	settings.graphics = settings.Graphics.LOW
+	check("Resolution: Low scales on top of the cap (75% of 1080p)", is_equal_approx(settings.render_scale(1898), 0.75 * 1080.0 / 1898.0))
+	settings.resolution = settings.RESOLUTIONS.size() - 1
+	settings.graphics = settings.Graphics.HIGH
+	check("Resolution: Native at High is full resolution", settings.render_scale(1898) == 1.0)
+
+	# Display settings are saved; an old file with only "fullscreen" becomes borderless.
+	settings.display_mode = settings.DisplayMode.EXCLUSIVE
+	settings.window_size = 1
+	settings.resolution = 0
+	settings.save_settings()
+	settings.display_mode = settings.DisplayMode.WINDOWED
+	settings.window_size = 0
+	settings.resolution = 2
+	settings.load_settings()
+	check("Display: mode, window size and resolution are saved",
+		settings.display_mode == settings.DisplayMode.EXCLUSIVE and settings.window_size == 1 and settings.resolution == 0)
+	var legacy := ConfigFile.new()
+	legacy.set_value("video", "fullscreen", true)
+	legacy.save(settings_file)
+	settings.display_mode = settings.DisplayMode.WINDOWED
+	settings.load_settings()
+	check("Display: an old fullscreen setting loads as borderless fullscreen", settings.display_mode == settings.DisplayMode.BORDERLESS)
+	check("Display: the window size always fits the screen", settings.fitting_window_size(3) in settings.WINDOW_SIZES)
+
+	if had_settings:
+		var f := FileAccess.open(settings_file, FileAccess.WRITE)
+		f.store_buffer(settings_bytes)
+		f.close()
+		settings.load_settings()
+	else:
+		DirAccess.remove_absolute(settings_file)
+	settings.display_mode = saved_video[0] # an old-format file has no keys to reload these from
+	settings.window_size = saved_video[1]
+	settings.resolution = saved_video[2]
+	settings.graphics = settings.Graphics.HIGH
+	settings.apply_graphics(root)
+
+
 ## Average distance (and fireball count) the CPU keeps from a standing P1 over 30 s.
 func _cpu_spacing(gs, cpu_index: int) -> Dictionary:
 	gs.mode = gs.Mode.VS_CPU
@@ -1079,6 +1249,31 @@ func showcase_tests() -> void:
 
 func loading_tests() -> void:
 	var gs = root.get_node("GameState")
+	# The title screen preloads every fighter's textures and keeps them, then opens the menu.
+	check("Title: the game starts on the title screen", ProjectSettings.get_setting("application/run/main_scene") == "res://scenes/title.tscn")
+	var listed := true
+	var model := FighterModel.new()
+	root.add_child(model)
+	model.build(gs.roster[0])
+	for outfit: MeshInstance3D in model.skeleton.find_children("Outfit", "MeshInstance3D", true, false):
+		for surface in outfit.mesh.get_surface_count():
+			var cloth := outfit.get_surface_override_material(surface) as StandardMaterial3D
+			for texture in [cloth.normal_texture, cloth.roughness_texture, cloth.albedo_texture]:
+				if texture and not texture.resource_path in FighterModel.texture_paths(gs.roster[0]):
+					listed = false
+	model.free()
+	check("Title: FighterModel.texture_paths lists every texture a build loads by path", listed)
+	change_scene_to_file("res://scenes/title.tscn")
+	var title_frames := 0
+	while (current_scene == null or current_scene.scene_file_path != "res://scenes/main_menu.tscn") and title_frames < 2400:
+		await process_frame
+		title_frames += 1
+	var held: Array = gs._fighter_textures
+	check("Title: loads the fighters, then opens the main menu", current_scene != null and current_scene.scene_file_path == "res://scenes/main_menu.tscn",
+		"%d frames" % title_frames)
+	check("Title: every fighter texture is loaded and kept for the session", held.size() > 0 and held.size() == gs._fighter_texture_paths.size()
+		and held.all(func(t) -> bool: return t is Texture2D) and Array(gs._fighter_texture_paths).all(func(p: String) -> bool: return ResourceLoader.has_cached(p)),
+		"%d of %d" % [held.size(), gs._fighter_texture_paths.size()])
 	gs.mode = gs.Mode.VS_CPU
 	gs.player_character = gs.roster[1]; gs.p2_character = gs.roster[2]
 	gs.stage_path = gs.ROOFTOP_STAGE
@@ -1225,18 +1420,24 @@ func market_tests() -> void:
 	check("Market: grill light flickers and the neon is wired", grill != null and grill._lights.size() == 2
 		and neon != null and neon._labels.size() == 1 and neon._hums.size() == 1)
 	check("Market: in the stage list as the Night Market", gs.stage_name(gs.MARKET_STAGE) == "Night Market")
-	# Ambient sound: the loops play on the Effects bus, the crowd cheers on a K.O., and not
-	# while rollback re-simulates frames.
+	# Ambient sound: the loops play on the Ambience bus (its own volume), the crowd roars on
+	# a K.O. (applause follows), and not while rollback re-simulates frames.
 	var sound := m.stage.get_node_or_null("Sound") as StageAmbience
-	check("Market: ambient loops play on the SFX bus", sound != null and sound._loop_players.size() == 3
-		and sound._loop_players.all(func(pl: AudioStreamPlayer) -> bool: return pl.playing and pl.bus == &"SFX"))
+	check("Market: ambient loops play on the Ambience bus", sound != null and sound._loop_players.size() == 3
+		and sound._loop_players.all(func(pl: AudioStreamPlayer) -> bool: return pl.playing and pl.bus == &"Ambience"))
 	if sound:
+		var shouting := func() -> bool: return sound._shout_players.any(func(pl: AudioStreamPlayer) -> bool: return pl.playing)
+		sound.excitement = 0.0 # the jab above already stirred it
 		m.resimulating = true
 		p2.knocked_out.emit(p2)
-		var quiet_in_rollback := not sound._reaction_player.playing
+		var quiet_in_rollback: bool = not shouting.call() and sound.excitement == 0.0
 		m.resimulating = false
 		p2.knocked_out.emit(p2)
-		check("Market: the crowd cheers on a K.O., but not during rollback", quiet_in_rollback and sound._reaction_player.playing)
+		check("Market: the crowd roars on a K.O., but not during rollback", quiet_in_rollback and shouting.call()
+			and str(sound._last_clip.resource_path).contains("roar") and sound.excitement == 1.0)
+		for i in 90: sound._process(1.0 / 60.0)
+		check("Market: applause follows the roar", sound._reaction_player.playing)
+		_crowd_tests(sound)
 	var jeeps := [m.stage.get_node_or_null("Jeepney0"), m.stage.get_node_or_null("Jeepney1")]
 	var painted := jeeps.all(func(j) -> bool:
 		if not j is MeshInstance3D or (j as MeshInstance3D).mesh.resource_path != "res://assets/stages/market/jeepney.res":
@@ -1898,6 +2099,11 @@ func net_tests() -> void:
 	var boot_exit := OS.execute(OS.get_executable_path(), ["--headless", "--path", ProjectSettings.globalize_path("res://"),
 		"res://scenes/main_menu.tscn", "--quit-after", "5"])
 	check("the game exits cleanly right after boot (background key task)", boot_exit == 0, "exit code %d" % boot_exit)
+	# The title screen (the main scene) loads the fighters on background threads: quitting
+	# in the middle of that must not crash either.
+	var title_exit := OS.execute(OS.get_executable_path(), ["--headless", "--path", ProjectSettings.globalize_path("res://"),
+		"--quit-after", "3"])
+	check("the game exits cleanly during the title screen's loading", title_exit == 0, "exit code %d" % title_exit)
 	check("game data hash is stable", gs.content_hash() == gs.content_hash() and gs.content_hash() != 0)
 
 	var host := _net_peer("1.0", 42, "Hosty")

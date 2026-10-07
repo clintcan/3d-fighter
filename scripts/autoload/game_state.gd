@@ -49,9 +49,57 @@ var preloaded_stage: Resource
 
 const LOADING_SCENE := "res://scenes/loading_screen.tscn"
 
+## The fighters' textures, loaded on background threads by the title screen and kept for
+## the whole session (FighterModel.texture_paths: decoding them took ~6 s, repeated on
+## every visit to character select because nothing else held them).
+var _fighter_texture_paths := PackedStringArray()
+var _fighter_textures: Array[Resource] = []
+
 
 func _ready() -> void:
 	_load_roster()
+
+
+## Starts loading every roster fighter's textures in the background (once per session).
+func preload_fighters() -> void:
+	if not _fighter_texture_paths.is_empty():
+		return
+	var unique := {}
+	for character in roster:
+		for path in FighterModel.texture_paths(character):
+			unique[path] = true
+	_fighter_texture_paths = PackedStringArray(unique.keys())
+	for path in _fighter_texture_paths:
+		ResourceLoader.load_threaded_request(path, "", true)
+
+
+## How far preload_fighters() has got (0–1). Collects and keeps the textures once all
+## are loaded, so call it until it returns 1.
+func fighter_preload_progress() -> float:
+	if _fighter_texture_paths.is_empty() or _fighter_textures.size() == _fighter_texture_paths.size():
+		return 1.0
+	var done := 0.0
+	var finished := true
+	for path in _fighter_texture_paths:
+		var progress := []
+		match ResourceLoader.load_threaded_get_status(path, progress):
+			ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+				done += progress[0] if not progress.is_empty() else 0.0
+				finished = false
+			_: # loaded, or failed (FighterModel then loads it itself)
+				done += 1.0
+	if not finished:
+		return done / _fighter_texture_paths.size()
+	for path in _fighter_texture_paths:
+		_fighter_textures.append(ResourceLoader.load_threaded_get(path))
+	return 1.0
+
+
+## Waits for any preload still running (quitting with loads in flight can crash on exit).
+func _exit_tree() -> void:
+	if _fighter_textures.size() < _fighter_texture_paths.size():
+		for path in _fighter_texture_paths:
+			ResourceLoader.load_threaded_get(path)
 
 
 func _load_roster() -> void:

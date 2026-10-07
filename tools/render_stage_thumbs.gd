@@ -11,6 +11,10 @@ const SIZE := Vector2i(640, 360)
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	await process_frame
+	var settings: Node = root.get_node("Settings") # render at full quality whatever the player's setting
+	settings.graphics = settings.Graphics.HIGH
+	settings.resolution = settings.RESOLUTIONS.size() - 1 # native
+	settings.apply_graphics(root)
 	var gs = root.get_node("GameState")
 	gs.player_character = gs.roster[0]
 	gs.p2_character = gs.roster[1]

@@ -20,6 +20,10 @@ const SIDE_NORMALS := [Vector3(0, 0, -1), Vector3(0, 0, 1), Vector3(-1, 0, 0), V
 var _side_hidden := [false, false, false, false]
 
 
+func _ready() -> void:
+	Settings.apply_graphics_to_stage(self)
+
+
 func update_camera_occlusion(camera_position: Vector3) -> void:
 	for side in SIDE_NORMALS.size():
 		var outside: float = camera_position.dot(SIDE_NORMALS[side]) - rope_line

@@ -1,6 +1,7 @@
 extends Node
 ## Audio playback: pooled sound effects, an announcer voice channel, and crossfading
-## music, on the Music / SFX / Voice buses (created here). Every Button in the game gets
+## music, on the Music / SFX / Voice / Ambience buses (created here; Ambience carries each
+## stage's background sound and crowd, so it can be turned down on its own). Every Button in the game gets
 ## focus/press sounds automatically. Purely cosmetic: nothing here affects gameplay.
 
 const SFX_DIR := "res://assets/audio/sfx/"
@@ -44,13 +45,29 @@ var _rng := RandomNumberGenerator.new() # cosmetic only, never gameplay RNG
 var _voice_queue: Array[String] = []
 var _shouts := {} # "<id>_<kind>" -> Array[AudioStream]
 
+const LIMITER_CEILING_DB := -1.0
+
+
+func _has_limiter() -> bool:
+	for i in AudioServer.get_bus_effect_count(0):
+		if AudioServer.get_bus_effect(0, i) is AudioEffectHardLimiter:
+			return true
+	return false
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	for bus in ["Music", "SFX", "Voice"]:
+	for bus in ["Music", "SFX", "Voice", "Ambience"]:
 		if AudioServer.get_bus_index(bus) < 0:
 			AudioServer.add_bus()
 			AudioServer.set_bus_name(AudioServer.bus_count - 1, bus)
+	# Announcer, hits and music together used to reach 0 dBFS and clip. A limiter on the
+	# master keeps peaks just under it and leaves everything quieter untouched.
+	if not _has_limiter():
+		var limiter := AudioEffectHardLimiter.new()
+		limiter.ceiling_db = LIMITER_CEILING_DB
+		limiter.release = 0.12
+		AudioServer.add_bus_effect(0, limiter)
 	for sound: StringName in SFX:
 		var streams: Array[AudioStream] = []
 		for file: String in SFX[sound]:
