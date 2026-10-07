@@ -47,9 +47,22 @@ static func create(player_character: CharacterData, roster: Array[CharacterData]
 		var swap = others[i]
 		others[i] = others[j]
 		others[j] = swap
+	# Stages are drawn at random once, when the run starts: every arena comes up once before
+	# any repeats (a reshuffle never opens with the stage just played), and a continue
+	# replays the same stage.
+	var order: Array = []
 	for i in others.size():
+		if order.is_empty():
+			order = arenas.duplicate()
+			for k in range(order.size() - 1, 0, -1):
+				var j := rng.randi_range(0, k)
+				var swap = order[k]
+				order[k] = order[j]
+				order[j] = swap
+			if i > 0 and order.size() > 1 and order[0] == run.stages[i - 1].stage_path:
+				order.push_back(order.pop_front())
 		var difficulty := clampi(base_difficulty - 1 + i, AIController.Difficulty.EASY, AIController.Difficulty.HARD)
-		run.stages.append({character = others[i], difficulty = difficulty, boss = false, stage_path = arenas[i % arenas.size()]})
+		run.stages.append({character = others[i], difficulty = difficulty, boss = false, stage_path = order.pop_front()})
 	run.stages.append({character = player_character, difficulty = AIController.Difficulty.HARD, boss = true,
 		stage_path = boss_stage})
 	return run

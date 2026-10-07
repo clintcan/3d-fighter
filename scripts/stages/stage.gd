@@ -5,6 +5,14 @@ extends Node3D
 
 ## Fighters are clamped to +/- this distance from the center on X and Z.
 @export var bounds_half_extent: float = 3.6
+## Narrower limit across the stage (Z), for long thin stages like the train roof.
+## Negative = the same as bounds_half_extent.
+@export var bounds_depth: float = -1.0
+
+
+## The Z limit actually in force.
+func depth_limit() -> float:
+	return bounds_depth if bounds_depth > 0.0 else bounds_half_extent
 ## Fight music track (a key of Audio.MUSIC).
 @export var music: StringName = &"fight"
 

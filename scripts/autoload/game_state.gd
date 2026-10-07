@@ -8,6 +8,7 @@ const ROOFTOP_STAGE := "res://scenes/stages/rooftop.tscn"
 const TEMPLE_STAGE := "res://scenes/stages/temple.tscn"
 const BEACH_STAGE := "res://scenes/stages/beach.tscn"
 const MARKET_STAGE := "res://scenes/stages/market.tscn"
+const TRAIN_STAGE := "res://scenes/stages/train.tscn"
 ## Selectable stages: scene, display name, select-screen thumbnail (rendered by
 ## tools/render_stage_thumbs.gd) and a one-line description.
 const STAGES := [
@@ -23,6 +24,8 @@ const STAGES := [
 		blurb = "Sun, sand and turquoise surf, ringed by tiki torches."},
 	{path = MARKET_STAGE, name = "Night Market", thumb = "res://assets/ui/stages/market.png",
 		blurb = "A Manila street at dusk: grill smoke, jeepneys and fiesta flags."},
+	{path = TRAIN_STAGE, name = "Express", thumb = "res://assets/ui/stages/train.png",
+		blurb = "On the roof of an express train racing through the hills at sunset."},
 ]
 
 const ROUNDS_TO_WIN := 2

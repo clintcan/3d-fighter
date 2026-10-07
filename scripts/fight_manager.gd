@@ -164,6 +164,7 @@ func _spawn_fighter(character: CharacterData, controller: FighterController, alt
 	var fighter := FIGHTER_SCENE.instantiate() as Fighter
 	fighter.setup(character, controller, alt_look)
 	fighter.bounds_half_extent = stage.bounds_half_extent
+	fighter.bounds_depth = stage.depth_limit()
 	add_child(fighter)
 	fighters.append(fighter)
 	return fighter
@@ -531,7 +532,7 @@ func _resolve_throws() -> void:
 func _tick_projectiles() -> void:
 	for fighter in fighters:
 		var p := fighter.projectile
-		if p and not p.tick(stage.bounds_half_extent):
+		if p and not p.tick(stage.bounds_half_extent, stage.depth_limit()):
 			_remove_projectile(fighter)
 	var a := fighters[0].projectile
 	var b := fighters[1].projectile

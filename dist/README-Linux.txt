@@ -37,7 +37,7 @@ On the character select screen each player picks in turn with
 Light Punch (select) and Heavy Punch (back).
 
 STAGES: after picking fighters, choose the Boxing Ring, the Dojo, the Rooftop,
-the Temple, the Beach, the Night Market or Random.
+the Temple, the Beach, the Night Market, the Express or Random.
 
 ARCADE - choose "Arcade" in the main menu
 Fight your way up a ladder of CPU opponents to the final boss: your own
@@ -145,13 +145,15 @@ All third-party assets are CC0 (public domain), credited with thanks:
   "Qwantani Dusk 2" sky (Greg Zaal, Jarod Guest), Asphalt 02 (Rob Tuytel),
   Brick Pavement and Rusty Corrugated Iron (Charlotte Baglioni), Painted
   Plaster Wall and Wood Planks (Amal Kumar), Painted Metal Shutter (Dario
-  Barresi, Rico Cilliers, Charlotte Baglioni); outfit fabrics:
+  Barresi, Rico Cilliers, Charlotte Baglioni); Express: "Kloppenheim 06" sky
+  (Greg Zaal, Jarod Guest), Aerial Grass Rock (Rob Tuytel); outfit fabrics:
   Cotton Jersey and Bi Stretch (colormass, Rico Cilliers), Denim Fabric 06
   (Greg Zaal, Rico Cilliers)
 - Music: "Heavy Battle 2", "Space Battle" and "Jazzy Battle Theme" (night
   market) by MintoDog; "Determination" by HydroGene (dojo); "Midnight
   Drive" by congusbongus (rooftop); "Boss_Koto" by G_P (temple); "Funky
-  House" by Of Far Different Nature (beach)
+  House" by Of Far Different Nature (beach); "Determined Pursuit" by Emma_MA
+  (Express)
   - https://opengameart.org
 - Fighter voices: "Male Grunt/Yelling sounds" by HaelDB, "Female Hurt Grunts &
   Groans" by AuraVoice - https://opengameart.org
@@ -169,6 +171,9 @@ All third-party assets are CC0 (public domain), credited with thanks:
   "Millerntor Stadium Crowd Reaction" by Philipp Feit (Sound Of Sankt Pauli),
   "Football Crowd - Reaction To Goal" by D.jones, "Crowd aah" and "Crowd shock"
   by an anonymous contributor - https://freesound.org (CC0)
+- Train sounds: "freight train pass fast short heavy rail track clacks" by
+  kyles, "Train Track Joints Slow (Loop)" by KayleRustone, "Train Pass By" by
+  GreekIrish - https://freesound.org (CC0)
 
 Stages (including the jeepneys), crowds, fighter outfits, additional fight
 and special-move animations, portraits, key art and logo, and synthesized

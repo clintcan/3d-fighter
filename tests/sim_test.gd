@@ -351,6 +351,7 @@ func _initialize() -> void:
 	await mira_tests()
 	await beach_tests()
 	await market_tests()
+	await train_tests()
 	await scores_credits_tests()
 	await controls_tests()
 	await outfit_tests()
@@ -914,11 +915,35 @@ func stage_tests() -> void:
 	check("Dojo: students between the camera and the fight hide", not front.is_empty() and front.all(func(n: Node3D) -> bool: return not n.visible))
 
 	# Arcade stages: alternate arenas, boss in the dojo.
-	var run := ArcadeRun.create(gs.roster[0], gs.roster, 1, 9, gs.arcade_arenas(), gs.DOJO_STAGE)
-	check("Arcade: ring, rooftop, temple, beach, market, then the boss in the dojo", run.stages[0].stage_path == gs.DEFAULT_STAGE
-		and run.stages[1].stage_path == gs.ROOFTOP_STAGE and run.stages[2].stage_path == gs.TEMPLE_STAGE
-		and run.stages[3].stage_path == gs.BEACH_STAGE and run.stages[4].stage_path == gs.MARKET_STAGE
-		and run.stages[-1].stage_path == gs.DOJO_STAGE)
+	# Stages: drawn at random once per run, no arena twice (with more arenas than fights,
+	# some sit out), boss always in the dojo.
+	var arenas: Array = gs.arcade_arenas()
+	var orders := {}
+	var each_once := true
+	for seed_value in 12:
+		var run := ArcadeRun.create(gs.roster[0], gs.roster, 1, seed_value, arenas, gs.DOJO_STAGE)
+		var regular: Array = run.stages.slice(0, -1).map(func(e: Dictionary) -> String: return e.stage_path)
+		var distinct := {}
+		for path: String in regular:
+			distinct[path] = true
+		var all_arenas := regular.all(func(p: String) -> bool: return p in arenas)
+		if distinct.size() != mini(regular.size(), arenas.size()) or not all_arenas or run.stages[-1].stage_path != gs.DOJO_STAGE:
+			each_once = false
+		orders[str(regular)] = true
+	check("Arcade: no arena twice in a run (random order), then the boss in the dojo", each_once)
+	check("Arcade: the stage order differs between runs", orders.size() >= 6, "%d different orders in 12 runs" % orders.size())
+	var two: Array = arenas.slice(0, 2) # more fights than stages: reshuffles, never the same stage twice in a row
+	var repeats := false
+	for seed_value in 12:
+		var run := ArcadeRun.create(gs.roster[0], gs.roster, 1, seed_value, two, gs.DOJO_STAGE)
+		for i in range(1, run.stages.size() - 1):
+			if run.stages[i].stage_path == run.stages[i - 1].stage_path:
+				repeats = true
+	check("Arcade: with fewer stages than fights, no stage twice in a row", not repeats)
+	var run := ArcadeRun.create(gs.roster[0], gs.roster, 1, 9, arenas, gs.DOJO_STAGE)
+	var stage_before: String = run.current().stage_path
+	run.restart_stage(true)
+	check("Arcade: a continue replays the same stage", run.current().stage_path == stage_before)
 	# The rooftop: loads, fights, and its sky shader compiles.
 	gs.stage_path = gs.ROOFTOP_STAGE
 	change_scene_to_file("res://scenes/fight.tscn")
@@ -955,7 +980,7 @@ func polish_tests() -> void:
 	gs.mode = gs.Mode.VS_CPU
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 	# Each stage brings its own music.
-	for entry in [[gs.DOJO_STAGE, &"dojo"], [gs.ROOFTOP_STAGE, &"rooftop"], [gs.TEMPLE_STAGE, &"temple"], [gs.BEACH_STAGE, &"beach"], [gs.MARKET_STAGE, &"market"], [gs.DEFAULT_STAGE, &"fight"]]:
+	for entry in [[gs.DOJO_STAGE, &"dojo"], [gs.ROOFTOP_STAGE, &"rooftop"], [gs.TEMPLE_STAGE, &"temple"], [gs.BEACH_STAGE, &"beach"], [gs.MARKET_STAGE, &"market"], [gs.TRAIN_STAGE, &"train"], [gs.DEFAULT_STAGE, &"fight"]]:
 		gs.stage_path = entry[0]
 		change_scene_to_file("res://scenes/fight.tscn")
 		await process_frame; await process_frame
@@ -1044,6 +1069,82 @@ func _crowd_tests(sound: StageAmbience) -> void:
 	check("Crowd: it settles after the action stops", sound.excitement < 0.1 and sound._swell.volume_db < loud - 15.0, "%.2f, %.1f dB" % [sound.excitement, sound._swell.volume_db])
 	p2.combo_hits = 0
 	calm.call()
+
+
+## The train roof: a narrow stage (sideways limit), a world that streams past, and a train
+## passing the other way.
+func train_tests() -> void:
+	var gs = root.get_node("GameState")
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+	gs.stage_path = gs.TRAIN_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	reset(DummyController.Mode.STAND); approach(1.1)
+	var hp := p2.health
+	press(InputBuffer.LP); step(6)
+	check("Train: loads and combat works", m.stage.name == "Train" and p2.health == hp - dmg(p1, "LP"), "hp %d -> %d" % [hp, p2.health])
+	check("Train: in the stage list as the Express, with its own music", gs.stage_name(gs.TRAIN_STAGE) == "Express" and m.stage.music == &"train")
+	check("Train: the roof is narrow (sideways limit 1.1 m), the length is standard", is_equal_approx(m.stage.depth_limit(), 1.1)
+		and m.stage.bounds_half_extent == 3.6 and is_equal_approx(p1.bounds_depth, 1.1) and is_equal_approx(p2.bounds_depth, 1.1))
+	var widest := 0.0
+	for i in 6: # sidestep into the screen, then toward the camera, again and again
+		press(InputBuffer.SIDESTEP, 5 if i < 3 else 2); step(30)
+		widest = maxf(widest, maxf(absf(p1.position.z), absf(p2.position.z)))
+	check("Train: sidesteps never leave the roof", widest <= 1.1001, "widest %.3f m" % widest)
+	var square = load("res://scripts/stages/stage.gd").new() # not the class name: stage.gd uses an autoload, which -s scripts compile before
+	check("Train: square stages keep one limit for both directions", square.depth_limit() == square.bounds_half_extent)
+	square.free()
+	var shot := Projectile.new()
+	shot.ticks_left = 10
+	shot.position = Vector3(0, 1, 1.5)
+	var inside: bool = shot.tick(3.6, 1.1)
+	shot.position = Vector3(0, 1, 1.7)
+	var off_side: bool = shot.tick(3.6, 1.1)
+	var square_stage: bool = shot.tick(3.6)
+	shot.free()
+	check("Train: projectiles expire past the roof's sides (only on narrow stages)", inside and not off_side and square_stage)
+
+	var motion := m.stage.get_node_or_null("Motion") as TrainMotion
+	check("Train: the moving-world driver is there", motion != null)
+	if motion == null:
+		return
+	var trees := 0
+	var poles := 0
+	for child in motion.get_children():
+		if child is MultiMeshInstance3D:
+			if String(child.name).begins_with("Trees"): trees += (child as MultiMeshInstance3D).multimesh.instance_count
+			elif child.name == "Poles": poles = (child as MultiMeshInstance3D).multimesh.instance_count
+	check("Train: trees and telegraph poles are laid out at runtime", trees == motion.tree_count and poles == int(TrainMotion.SCENERY_PERIOD / motion.pole_spacing),
+		"%d trees, %d poles" % [trees, poles])
+	var before := motion.travelled
+	for i in 30: motion._process(1.0 / 60.0)
+	var moved := fposmod(motion.travelled - before, TrainMotion.WRAP)
+	var synced := motion.materials.size() >= 4 and motion.materials.all(func(mat: ShaderMaterial) -> bool: return is_equal_approx(mat.get_shader_parameter("scroll"), motion.travelled))
+	check("Train: the world streams past at the train's speed, every scenery material in step", is_equal_approx(moved, motion.speed * 0.5) and synced,
+		"%.2f m in 0.5 s, %d materials" % [moved, motion.materials.size()])
+	var seamless := true
+	for period in [TrainMotion.SCENERY_PERIOD, 2400.0, 240.0, 60.0, 12.0, 2.4, 0.6]: # loops and tilings in the shaders
+		if absf(TrainMotion.WRAP / period - roundf(TrainMotion.WRAP / period)) > 0.0001:
+			seamless = false
+	check("Train: every loop and tiling divides the scroll wrap (no jump when it wraps)", seamless)
+	motion._next_pass = motion._time
+	motion._process(1.0 / 60.0)
+	var appeared := motion.passing_train.visible and motion.passing_sound.playing
+	var frames := 0
+	while motion.passing_train.visible and frames < 1200:
+		motion._process(1.0 / 60.0)
+		frames += 1
+	check("Train: a train passes the other way (with its sound), then is gone", appeared and not motion.passing_train.visible and frames > 60,
+		"%.1f s on the move" % (frames / 60.0))
+	var sound := m.stage.get_node_or_null("Sound") as StageAmbience
+	check("Train: rumble, clatter and wind on the Ambience bus, no crowd", sound != null and sound._loop_players.size() == 3
+		and sound._loop_players.all(func(pl: AudioStreamPlayer) -> bool: return pl.bus == &"Ambience") and sound.reaction == null)
+	gs.stage_path = gs.DEFAULT_STAGE
 
 
 ## The graphics preset: what each level turns off on a stage and the viewport, that a

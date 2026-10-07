@@ -17,7 +17,7 @@ Its signature is a **dynamic action camera** that orbits and dollies in on every
   - **Jin**: Tae Kwon Do kicker who controls kick range;
   - **Mira**: street brawler who powers up with Lakas Stance (Focus) until her rushes hit like a typhoon.
 - **Outfits** that fit each style: a karate gi with headband, a Tae Kwon Do dobok, kickboxing gear, a wrestling singlet with knee pads and boots, a brawler's tank top and work pants, a street fighter's zip-up, track pants and sneakers. Woven fabric textures, stitched hems and skin detail hold up in close-ups. Mirror matches get alternate colours.
-- **6 stages**: Boxing Ring, Dojo, Rooftop, Temple, Beach, Night Market. Each has its own music and ambient life (crowds, flames, smoke, rain, neon).
+- **7 stages**: Boxing Ring, Dojo, Rooftop, Temple, Beach, Night Market and the Express, a fight on the roof of a speeding train. Each has its own music and ambient life (crowds, flames, smoke, rain, neon, passing trains).
 - **Modes**: Vs CPU, Arcade (ladder, scoring, shadow boss), local 2-player Versus, **Online** (rollback netcode, LAN discovery, join by IP, or an internet lobby server with rooms and spectating), and Training (frame data, input display, record/playback).
 - **Fighting-game systems**: super meter with cinematic super freezes, counter hits, combos, juggles, throws and throw breaks, high/mid/low blocking, and Tekken-style sidesteps.
 - **Engine**: a deterministic 60 Hz simulation (verified identical on Windows and Linux) with a headless regression test suite.

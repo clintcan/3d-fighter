@@ -30,6 +30,7 @@ const MUSIC := {
 	&"temple": "fight_temple_boss_koto",
 	&"beach": "fight_beach_funky_house",
 	&"market": "fight_market_jazzy_battle",
+	&"train": "fight_train_determined_pursuit",
 }
 const SFX_VOICES := 16
 const MUSIC_FADE := 1.2

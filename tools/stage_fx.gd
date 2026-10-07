@@ -147,6 +147,28 @@ static func spray(extents: Vector3, amount: int, wind := Vector3(0.6, 0.15, 0.0)
 	return _particles(_quad(0.6, material, true), process, amount, 5.0, extents + Vector3(4, 2, 2))
 
 
+## Wind streaks: faint thin lines rushing along `velocity` (the train stage's slipstream).
+## The quads lie along X and face +Z (the camera side), so `velocity` should be along X.
+static func streaks(extents: Vector3, amount: int, velocity: Vector3) -> GPUParticles3D:
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = extents
+	process.direction = velocity.normalized()
+	process.spread = 2.0
+	process.initial_velocity_min = velocity.length() * 0.8
+	process.initial_velocity_max = velocity.length() * 1.2
+	process.gravity = Vector3.ZERO
+	process.color_ramp = _fade(Color(1, 1, 1, 0.4), 0.15, 0.6)
+	var material := _billboard(false)
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_DISABLED
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var quad := _quad(1.0, material)
+	quad.size = Vector2(1.6, 0.015)
+	var p := _particles(quad, process, amount, 0.45, extents + Vector3(20, 1, 1))
+	p.preprocess = 0.45
+	return p
+
+
 # --- Helpers ------------------------------------------------------------------------
 
 static func _particles(mesh: Mesh, process: ParticleProcessMaterial, amount: int, lifetime: float, reach: Vector3) -> GPUParticles3D:

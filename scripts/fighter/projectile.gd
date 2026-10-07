@@ -99,11 +99,10 @@ func _sphere(r: float, color: Color, additive: bool) -> MeshInstance3D:
 
 
 ## One simulation tick. Returns false when it has expired (FightManager removes it).
-func tick(bounds_half_extent: float) -> bool:
+func tick(bounds_half_extent: float, bounds_depth: float = bounds_half_extent) -> bool:
 	position += direction * speed * Fighter.DT
 	ticks_left -= 1
-	var limit := bounds_half_extent + 0.5
-	return ticks_left > 0 and absf(position.x) <= limit and absf(position.z) <= limit
+	return ticks_left > 0 and absf(position.x) <= bounds_half_extent + 0.5 and absf(position.z) <= bounds_depth + 0.5
 
 
 ## Rollback snapshot of the simulation fields (the visuals rebuild themselves).

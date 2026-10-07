@@ -127,6 +127,8 @@ var input := InputBuffer.new()
 ## When true, read_input() feeds neutral (used after a KO).
 var input_locked := false
 var bounds_half_extent := 3.6
+## Z limit (Stage.depth_limit(); the same as bounds_half_extent on square stages).
+var bounds_depth := 3.6
 
 ## Set by FightManager each tick from the camera's logical view direction.
 var view_right := Vector3.RIGHT
@@ -968,13 +970,14 @@ func is_actionable() -> bool:
 ## True if being pushed along `direction` would be stopped by the ring edge.
 func is_pinned_against_bounds(direction: Vector3) -> bool:
 	var limit := bounds_half_extent - 0.01
+	var depth := bounds_depth - 0.01
 	return (direction.x > 0.1 and position.x >= limit) or (direction.x < -0.1 and position.x <= -limit) \
-			or (direction.z > 0.1 and position.z >= limit) or (direction.z < -0.1 and position.z <= -limit)
+			or (direction.z > 0.1 and position.z >= depth) or (direction.z < -0.1 and position.z <= -depth)
 
 
 func clamp_to_bounds() -> void:
 	position.x = clampf(position.x, -bounds_half_extent, bounds_half_extent)
-	position.z = clampf(position.z, -bounds_half_extent, bounds_half_extent)
+	position.z = clampf(position.z, -bounds_depth, bounds_depth)
 
 
 func face_opponent() -> void:
