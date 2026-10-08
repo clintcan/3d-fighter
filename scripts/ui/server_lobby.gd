@@ -16,6 +16,8 @@ const DIM := Color(0.72, 0.75, 0.82)
 const BAD := Color(1.0, 0.55, 0.45)
 const LIST_ROWS := 6
 const REFRESH_MS := 3000
+## Below this many players the lobby shows "under 5 online" instead of exact counts.
+const FEW_ONLINE := 5
 const DEFAULT_SERVER := "wss://104-248-147-130.sslip.io/v1/ws"
 const SERVER_LIST_URL := "https://raw.githubusercontent.com/clintcan/3d-fighter/main/online/servers.json"
 
@@ -301,7 +303,8 @@ func _show_online(online: Variant) -> void:
 
 
 ## The server's aggregate `online` object as one line: "23 online · 6 in matches · 3 watching".
-## Zero parts are left out; anything missing or malformed (an older server) gives "".
+## Zero parts are left out; under FEW_ONLINE players it only says "under 5 online"; anything
+## missing or malformed (an older server) gives "".
 static func online_text(online: Variant) -> String:
 	if not (online is Dictionary) or not online.has("players"):
 		return ""
@@ -311,6 +314,9 @@ static func online_text(online: Variant) -> String:
 	var players: int = count.call("players")
 	if players <= 0:
 		return ""
+	# Small numbers stay vague, and so do the other counts, which would give the number away.
+	if players < FEW_ONLINE:
+		return "under %d online" % FEW_ONLINE
 	var parts := ["%d online" % players]
 	var in_match: int = count.call("in_match")
 	if in_match > 0:

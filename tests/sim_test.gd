@@ -3349,12 +3349,13 @@ func server_tests() -> void:
 	check("online/servers.json in the repository names the default server", lobby_screen.official_server(shipped) == lobby_screen.DEFAULT_SERVER,
 		lobby_screen.official_server(shipped))
 	check("the lobby header reads the server's online counts", lobby_screen.online_text({players = 23, in_match = 6, spectating = 3, rooms = 7}) == "23 online  ·  6 in matches  ·  3 watching"
-		and lobby_screen.online_text({players = 1, in_match = 0, spectating = 0, rooms = 0}) == "1 online"
-		and lobby_screen.online_text({players = 4.0, spectating = 2}) == "4 online  ·  2 watching",
+		and lobby_screen.online_text({players = 1, in_match = 0, spectating = 0, rooms = 0}) == "under 5 online"
+		and lobby_screen.online_text({players = 4.0, in_match = 2, spectating = 2}) == "under 5 online"
+		and lobby_screen.online_text({players = 5}) == "5 online",
 		lobby_screen.online_text({players = 23, in_match = 6, spectating = 3, rooms = 7}))
 	check("no online counts from an older server or bad data", lobby_screen.online_text(null) == "" and lobby_screen.online_text({}) == ""
 		and lobby_screen.online_text("23") == "" and lobby_screen.online_text({players = "lots"}) == "" and lobby_screen.online_text({players = -5}) == ""
-		and lobby_screen.online_text({players = 2, in_match = "x", spectating = [1]}) == "2 online")
+		and lobby_screen.online_text({players = 7, in_match = "x", spectating = [1]}) == "7 online")
 	check("room codes are typed in any case", net._room_key(" kx7q2m ") == "KX7Q2M" and net._room_key("r_7f3a9c2e") == "r_7f3a9c2e")
 	gs.mode = gs.Mode.VS_CPU
 	await process_frame
