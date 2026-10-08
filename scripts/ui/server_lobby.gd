@@ -25,6 +25,8 @@ var _connect_button: Button
 var _relay_check: CheckBox
 var _list: VBoxContainer
 var _list_empty: Label
+## "23 online · 6 in matches" beside the ROOMS heading (the server's `online` object).
+var _online: Label
 var _rows := {} # room id -> HBoxContainer
 var _password_edit: LineEdit
 var _spectators_check: CheckBox
@@ -75,7 +77,8 @@ func _exit_tree() -> void:
 
 
 func _process(_delta: float) -> void:
-	if Net.is_server_open() and Net.room_role == "" and Time.get_ticks_msec() - _last_refresh >= REFRESH_MS:
+	# A waiting host keeps refreshing too: the list is hidden, but the online count stays current.
+	if Net.is_server_open() and Net.room_role in ["", "host"] and Time.get_ticks_msec() - _last_refresh >= REFRESH_MS:
 		_last_refresh = Time.get_ticks_msec()
 		Net.list_rooms()
 
@@ -87,6 +90,7 @@ func _toggle_connection() -> void:
 		Net.disconnect_server()
 		_connecting = false
 		_clear_rows()
+		_show_online(null)
 		_set_status("Disconnected.", DIM)
 		_update_controls()
 		return
@@ -174,6 +178,7 @@ func _on_server_connected() -> void:
 	if welcome.has("latest_game_version"):
 		text += "\nVersion %s is out: %s" % [welcome.latest_game_version, welcome.get("update_url", "")]
 	_set_status(text, GOLD)
+	_show_online(welcome.get("online"))
 	_update_controls()
 	Net.list_rooms()
 
@@ -182,6 +187,7 @@ func _on_server_closed(reason: String) -> void:
 	_connecting = false
 	_join_prompt.visible = false
 	_clear_rows()
+	_show_online(null)
 	_set_status(reason, BAD)
 	_update_controls()
 
@@ -189,6 +195,7 @@ func _on_server_closed(reason: String) -> void:
 func _on_message(msg: Dictionary) -> void:
 	match str(msg.type):
 		"rooms":
+			_show_online(msg.get("online"))
 			_show_rooms(msg.get("rooms", []))
 		"room_created":
 			_clear_rows()
@@ -286,6 +293,32 @@ func _show_rooms(rooms: Array) -> void:
 			_rows[str(r.id)] = row
 		_fill_row(row, r)
 		_list.move_child(row, i)
+
+
+func _show_online(online: Variant) -> void:
+	_online.text = online_text(online)
+	_online.visible = _online.text != ""
+
+
+## The server's aggregate `online` object as one line: "23 online · 6 in matches · 3 watching".
+## Zero parts are left out; anything missing or malformed (an older server) gives "".
+static func online_text(online: Variant) -> String:
+	if not (online is Dictionary) or not online.has("players"):
+		return ""
+	var count := func(key: String) -> int:
+		var v: Variant = online.get(key, 0)
+		return clampi(int(v), 0, 9_999_999) if (v is int or v is float) else 0
+	var players: int = count.call("players")
+	if players <= 0:
+		return ""
+	var parts := ["%d online" % players]
+	var in_match: int = count.call("in_match")
+	if in_match > 0:
+		parts.append("%d in matches" % in_match)
+	var watching: int = count.call("spectating")
+	if watching > 0:
+		parts.append("%d watching" % watching)
+	return "  ·  ".join(parts)
 
 
 ## Open rooms first, then matches to watch, then the rest; newest first within each.
@@ -443,7 +476,14 @@ func _build() -> void:
 	_relay_check.add_theme_font_size_override("font_size", 20)
 	column.add_child(_relay_check)
 
-	column.add_child(_label("ROOMS", 22, GOLD))
+	var heading := HBoxContainer.new()
+	heading.alignment = BoxContainer.ALIGNMENT_CENTER
+	heading.add_theme_constant_override("separation", 24)
+	column.add_child(heading)
+	heading.add_child(_label("ROOMS", 22, GOLD))
+	_online = _label("", 20, DIM)
+	_online.visible = false
+	heading.add_child(_online)
 	var box := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.0, 0.0, 0.0, 0.35)
