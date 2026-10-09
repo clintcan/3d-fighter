@@ -1,8 +1,9 @@
 extends Control
 ## Loading screen shown while a fight loads: the key-art wallpaper, the matchup and
 ## stage, a progress bar and a gameplay tip. The fight scene and its stage load on a
-## background thread (ResourceLoader.load_threaded_request); FightManager's own load()
-## of the stage then comes straight from the cache. Use GameState.go_to_fight().
+## background thread (ResourceLoader.load_threaded_request), then the stage is
+## instantiated on a worker thread (GameState.preloaded_stage_node), so the fight scene
+## only has to add it. Use GameState.go_to_fight().
 
 const FIGHT_SCENE := "res://scenes/fight.tscn"
 const WALLPAPER := "res://assets/ui/wallpaper.png"
@@ -28,6 +29,8 @@ var _percent: Label
 var _shown := 0.0
 var _elapsed := 0.0
 var _done := false
+var _stage_task := -1 # WorkerThreadPool task instantiating the stage
+var _stage_node: Node
 
 
 func _ready() -> void:
@@ -43,27 +46,48 @@ func _process(delta: float) -> void:
 	_elapsed += delta
 	var total := 0.0
 	var all_loaded := true
-	for path in _paths:
-		var progress := []
-		var status := ResourceLoader.load_threaded_get_status(path, progress)
-		match status:
-			ResourceLoader.THREAD_LOAD_LOADED:
-				total += 1.0
-			ResourceLoader.THREAD_LOAD_IN_PROGRESS:
-				total += float(progress[0]) if not progress.is_empty() else 0.0
-				all_loaded = false
-			_:
-				push_error("Loading failed: %s" % path)
-				all_loaded = false
-	var target := total / _paths.size()
+	if _stage_task >= 0:
+		total = _paths.size() # both fetched (load_threaded_get ends a request's status)
+	else:
+		for path in _paths:
+			var progress := []
+			var status := ResourceLoader.load_threaded_get_status(path, progress)
+			match status:
+				ResourceLoader.THREAD_LOAD_LOADED:
+					total += 1.0
+				ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+					total += float(progress[0]) if not progress.is_empty() else 0.0
+					all_loaded = false
+				_:
+					push_error("Loading failed: %s" % path)
+					all_loaded = false
+		if all_loaded:
+			# Kept referenced (the stage stays cached for anything else that loads it), and
+			# instantiated on a worker thread.
+			var scene := ResourceLoader.load_threaded_get(GameState.stage_path) as PackedScene
+			GameState.preloaded_stage = scene
+			_stage_task = WorkerThreadPool.add_task(func() -> void: _stage_node = scene.instantiate())
+	var instantiated := _stage_task >= 0 and WorkerThreadPool.is_task_completed(_stage_task)
+	var target := (total + (1.0 if instantiated else 0.0)) / (_paths.size() + 1)
 	_shown = move_toward(_shown, target, delta * 2.5) # smooth, never jumps backwards
 	_bar.value = _shown
 	_percent.text = "%d%%" % roundi(_shown * 100.0)
-	if all_loaded and _shown >= 0.999 and _elapsed >= MIN_SECONDS:
+	if instantiated and _shown >= 0.999 and _elapsed >= MIN_SECONDS:
 		_done = true
-		GameState.preloaded_stage = ResourceLoader.load_threaded_get(GameState.stage_path)
+		WorkerThreadPool.wait_for_task_completion(_stage_task)
+		_stage_task = -1
+		GameState.preloaded_stage_node = _stage_node
+		_stage_node = null
 		var fight := ResourceLoader.load_threaded_get(FIGHT_SCENE) as PackedScene
 		get_tree().change_scene_to_packed(fight)
+
+
+## Leaving before the fight starts (quitting): a pool task never waited for crashes on exit.
+func _exit_tree() -> void:
+	if _stage_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_stage_task)
+	if _stage_node:
+		_stage_node.free()
 
 
 func _build() -> void:

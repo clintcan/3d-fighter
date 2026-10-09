@@ -172,6 +172,21 @@ func build(data: CharacterData, alt: bool = false) -> void:
 	for library_name: StringName in LIBRARIES:
 		player.add_animation_library(library_name, LIBRARIES[library_name])
 	player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	_keep_materials("%s/%s/%s" % [data.id, alt, realistic])
+
+
+## Hands one copy of this look's materials to GameState to hold, so their shaders survive
+## scene changes (GameState.keep_materials). Tools run without the autoload.
+func _keep_materials(key: String) -> void:
+	var game_state := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("GameState")
+	if game_state == null:
+		return
+	var materials := []
+	for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
+		for surface in mesh.get_surface_override_material_count():
+			if mesh.get_surface_override_material(surface):
+				materials.append(mesh.get_surface_override_material(surface))
+	game_state.keep_materials("fighter/" + key, materials)
 
 
 func clip_length(clip: StringName) -> float:

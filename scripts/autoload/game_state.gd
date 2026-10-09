@@ -49,6 +49,9 @@ var arcade: ArcadeRun
 ## Stage preloaded by the loading screen, kept referenced so it stays in the resource
 ## cache until the fight scene loads it (the loading screen itself is freed first).
 var preloaded_stage: Resource
+## The stage already instantiated by the loading screen (on a worker thread: big stages
+## took 200–400 ms on the main thread), for FightManager to take with take_stage_node().
+var preloaded_stage_node: Node
 
 const LOADING_SCENE := "res://scenes/loading_screen.tscn"
 
@@ -57,6 +60,8 @@ const LOADING_SCENE := "res://scenes/loading_screen.tscn"
 ## every visit to character select because nothing else held them).
 var _fighter_texture_paths := PackedStringArray()
 var _fighter_textures: Array[Resource] = []
+## Materials kept for the session so their generated shaders are too (keep_materials).
+var _kept_materials := {}
 
 
 func _ready() -> void:
@@ -98,8 +103,31 @@ func fighter_preload_progress() -> float:
 	return 1.0
 
 
+## The loading screen's instantiated stage if it is `path`'s, else null (the caller then
+## instantiates it itself). Hands it over only once.
+func take_stage_node(path: String) -> Node:
+	var node := preloaded_stage_node
+	preloaded_stage_node = null
+	if node and node.scene_file_path != path:
+		node.free()
+		return null
+	return node
+
+
+## Holds one set of `materials` under `key` for the rest of the session. Godot frees a
+## generated material's shader once nothing uses it, so each scene's first fighter used to
+## rebuild its skin, hair and cloth shaders (~220 ms) and each fight its effect shaders,
+## all while the loading screen sat frozen at 100%. FighterModel keeps one set per look,
+## FightFx its particle materials.
+func keep_materials(key: String, materials: Array) -> void:
+	if not _kept_materials.has(key):
+		_kept_materials[key] = materials
+
+
 ## Waits for any preload still running (quitting with loads in flight can crash on exit).
 func _exit_tree() -> void:
+	if preloaded_stage_node:
+		preloaded_stage_node.free() # quit while the fight was about to start
 	if _fighter_textures.size() < _fighter_texture_paths.size():
 		for path in _fighter_texture_paths:
 			ResourceLoader.load_threaded_get(path)

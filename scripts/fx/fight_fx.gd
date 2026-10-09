@@ -66,6 +66,23 @@ func setup(fight_manager: Node) -> void:
 		_strike_sparks[fighter] = _make_strike_sparks()
 		fighter.landed_hard.connect(manager.cosmetic(_on_landed_hard))
 		fighter.throw_impact.connect(manager.cosmetic(_on_throw_impact))
+	_keep_materials()
+
+
+## Hands the particle materials to GameState to hold, so the next fight doesn't rebuild
+## their shaders while the loading screen waits (GameState.keep_materials).
+func _keep_materials() -> void:
+	var game_state := get_tree().root.get_node_or_null("GameState")
+	if game_state == null:
+		return
+	var materials := []
+	for particles: GPUParticles3D in find_children("*", "GPUParticles3D", true, false):
+		materials.append(particles.process_material)
+		materials.append(particles.material_override)
+		if particles.draw_pass_1:
+			for surface in particles.draw_pass_1.get_surface_count():
+				materials.append(particles.draw_pass_1.surface_get_material(surface))
+	game_state.keep_materials("fight_fx", materials.filter(func(m: Material) -> bool: return m != null))
 
 
 func _on_hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult) -> void:

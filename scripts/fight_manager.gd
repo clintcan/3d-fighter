@@ -77,6 +77,11 @@ var resimulating := false
 ## The online match driver (ONLINE mode only): a NetplayMatch, or a SpectatorMatch when
 ## watching an internet match.
 var netplay: Node
+## True until the fight's first frames are on screen (offline, with a window). Drawing the
+## first frame takes a few hundred ms (the stage's pipelines compile then) while the
+## loading screen stays up, so the intro's ticks, the round call and the music wait for
+## it instead of starting behind the loading screen.
+var _waiting_for_screen := false
 
 @onready var camera: ActionCamera = $ActionCamera
 @onready var hud: FightHud = $HUD
@@ -84,7 +89,9 @@ var netplay: Node
 
 func _ready() -> void:
 	GameState.ensure_selections()
-	stage = (load(GameState.stage_path) as PackedScene).instantiate() as Stage
+	stage = GameState.take_stage_node(GameState.stage_path) as Stage
+	if stage == null:
+		stage = (load(GameState.stage_path) as PackedScene).instantiate() as Stage
 	add_child(stage)
 
 	_cosmetic_rng.randomize()
@@ -130,7 +137,11 @@ func _ready() -> void:
 	fx.name = "FightFx"
 	add_child(fx)
 	fx.setup(self)
-	Audio.music(stage.music)
+	_waiting_for_screen = not is_online() and DisplayServer.get_name() != "headless"
+	if _waiting_for_screen:
+		_start_when_on_screen()
+	else:
+		Audio.music(stage.music)
 	if is_training():
 		var training := TrainingMode.new()
 		training.name = "TrainingMode"
@@ -207,8 +218,12 @@ func _start_round() -> void:
 		fighter.input_locked = true
 	if is_arcade() and GameState.arcade.current().boss:
 		fighters[1].add_meter(Fighter.MAX_METER) # the boss starts every round with a super ready
-	if is_training() or resimulating:
-		return # no round call-outs; start_match skips straight to the fight
+	if is_training() or resimulating or _waiting_for_screen:
+		return # no round call-outs (training skips straight to the fight)
+	_announce_round()
+
+
+func _announce_round() -> void:
 	var final := round_wins[0] == GameState.ROUNDS_TO_WIN - 1 and round_wins[1] == GameState.ROUNDS_TO_WIN - 1
 	hud.announce("FINAL ROUND" if final else "ROUND %d" % round_number)
 	Audio.voice("final_round" if final else "round_%d" % clampi(round_number, 1, 5))
@@ -416,7 +431,17 @@ func _reset_round() -> void:
 # --- Simulation ------------------------------------------------------------------
 
 func _physics_process(_delta: float) -> void:
-	step()
+	if not _waiting_for_screen:
+		step()
+
+
+func _start_when_on_screen() -> void:
+	for i in 2:
+		await RenderingServer.frame_post_draw
+	_waiting_for_screen = false
+	Audio.music(stage.music)
+	if phase == Phase.INTRO and phase_ticks == 0 and not is_training():
+		_announce_round()
 
 
 ## One 60 Hz simulation tick. Netplay drives this itself (see RollbackSession) instead

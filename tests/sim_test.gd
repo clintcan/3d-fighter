@@ -1386,13 +1386,41 @@ func loading_tests() -> void:
 	check("Loading screen: shown on the way to a fight", current_scene.scene_file_path == "res://scenes/loading_screen.tscn")
 	var bar_moved := false
 	var frames := 0
+	var built_stage: Node
 	while current_scene.scene_file_path != "res://scenes/fight.tscn" and frames < 1200:
 		if current_scene.get("_bar") and current_scene._bar.value > 0.0:
 			bar_moved = true
+		if current_scene.get("_stage_node"):
+			built_stage = current_scene._stage_node
 		await process_frame
 		frames += 1
 	check("Loading screen: progress bar fills, then the fight starts on the chosen stage",
 		bar_moved and current_scene.scene_file_path == "res://scenes/fight.tscn" and current_scene.stage.name == "Rooftop", "%d frames" % frames)
+	check("Loading screen: the fight uses the stage it instantiated on a worker thread, and nothing is left over",
+		built_stage != null and current_scene.stage == built_stage and gs.preloaded_stage_node == null)
+	check("Loading: each fighter look's materials and the effects' are kept for the session (their shaders survive scene changes)",
+		gs._kept_materials.has("fighter/rhea/false/true") and gs._kept_materials.has("fighter/brutus/false/true")
+		and gs._kept_materials.has("fight_fx") and (gs._kept_materials["fight_fx"] as Array).size() >= 10,
+		str(gs._kept_materials.keys()))
+	var fight = current_scene
+	check("Fight: starts at once without a window (tests, smoke tests)", not fight._waiting_for_screen)
+	# With a window, the intro waits for the first frames on screen: no ticks, no round call.
+	fight._waiting_for_screen = true
+	fight.hud.announce("")
+	fight.start_match()
+	var ticks_before: int = fight.phase_ticks
+	fight._physics_process(1.0 / 60.0)
+	check("Fight: while waiting to be on screen the intro doesn't tick or call the round",
+		fight.phase_ticks == ticks_before and fight.phase == fight.Phase.INTRO and fight.hud.center_label.text == "",
+		"ticks %d, '%s'" % [fight.phase_ticks, fight.hud.center_label.text])
+	fight._waiting_for_screen = false
+	fight._physics_process(1.0 / 60.0)
+	check("Fight: once on screen the intro runs", fight.phase_ticks == ticks_before + 1)
+	# A stage node built for another stage is refused (and freed), never used.
+	var stray := (load(gs.DEFAULT_STAGE) as PackedScene).instantiate()
+	gs.preloaded_stage_node = stray
+	check("Loading: a preloaded stage for another path isn't handed over",
+		gs.take_stage_node(gs.ROOFTOP_STAGE) == null and not is_instance_valid(stray) and gs.preloaded_stage_node == null)
 	gs.stage_path = gs.DEFAULT_STAGE
 
 
