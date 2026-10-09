@@ -47,6 +47,7 @@ outfit_colors = PackedColorArray(0.8, 0.12, 0.16, 1, 0.08, 0.08, 0.1, 1, 0.8, 0.
 outfit_fabrics = Array[StringName]([&"stretch", &"stretch", &"cotton"])
 alt_outfit_colors = PackedColorArray(0.12, 0.32, 0.78, 1, 0.8, 0.8, 0.82, 1, 0.15, 0.15, 0.18, 1)
 detailed_textures = true
+realistic_shading = true
 victory_animations = Array[StringName]([&"fight/victory_point", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.9, 0.25, 0.4, 1)
 max_health = 960

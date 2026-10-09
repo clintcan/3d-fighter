@@ -1841,12 +1841,12 @@ func mira_tests() -> void:
 	check("Kenji gets the detailed materials too", looks[&"kenji"] == [true, true], "%s" % [looks])
 	check("Every fighter has detailed textures", gs.roster.all(func(c: CharacterData) -> bool: return c.detailed_textures))
 
-	# Realistic shading (pilot on Kenji): wrapped skin with a backlight (never screen-space
+	# Realistic shading (every fighter): wrapped skin with a backlight (never screen-space
 	# scattering: it costs a third of the frame rate), wet eyes with their own eye light,
-	# anisotropic hair; off for other fighters and on the Low preset.
+	# anisotropic hair; off on the Low preset.
 	var settings: Node = root.get_node("Settings")
 	var kenji := gs.roster[0] as CharacterData
-	check("Kenji uses realistic shading, Mira doesn't", kenji.id == &"kenji" and kenji.realistic_shading and not mira.realistic_shading)
+	check("Every fighter uses realistic shading", kenji.id == &"kenji" and gs.roster.all(func(c: CharacterData) -> bool: return c.realistic_shading))
 	var shading := {}
 	for run: Array in [[kenji, settings.Graphics.HIGH], [mira, settings.Graphics.HIGH], [kenji, settings.Graphics.LOW]]:
 		settings.graphics = run[1]
@@ -1876,7 +1876,7 @@ func mira_tests() -> void:
 	var all_off := {"skin": false, "sss": false, "eyes": false, "hair": false, "eye_layer": false, "eye_light": false}
 	check("Kenji: wrapped skin, wet eyes with an eye light, anisotropic hair, no scattering pass",
 		shading["kenji_%d" % settings.Graphics.HIGH] == all_on, "%s" % [shading])
-	check("Mira keeps the standard shading", shading["mira_%d" % settings.Graphics.HIGH] == all_off, "%s" % [shading])
+	check("Mira (female body, matte bob) gets it too", shading["mira_%d" % settings.Graphics.HIGH] == all_on, "%s" % [shading])
 	check("The Low preset skips realistic shading", shading["kenji_%d" % settings.Graphics.LOW] == all_off, "%s" % [shading])
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 
