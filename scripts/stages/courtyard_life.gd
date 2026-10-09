@@ -13,8 +13,11 @@ extends Node
 ## - Props react: pigeons scatter from the wall and ledges on supers, knockdowns and
 ##   K.O.s and come back later; the cat on the wall bolts; laundry billows and lanterns
 ##   swing; the kitchen steam puffs.
-## - Now and then a jet comes in low over the skyline (a nod to Kai Tak), its roar rising
-##   and fading, rattling the laundry and the camera as it passes.
+## - Now and then a jet comes in low over the rooftops (a nod to Kai Tak). The fight camera
+##   looks down at the courtyard and never sees that much sky, so the jet is seen through
+##   what it does: its path is set from the sun so its shadow sweeps across the courtyard
+##   (or, before sunrise, its landing lights do), the roar rises and fades, and it rattles
+##   the laundry, the pigeons and the camera. Wide shots (intros, wins) show the plane.
 ##
 ## Cosmetic only: real time, its own random numbers, fight events through
 ## FightManager.cosmetic() (never during rollback re-simulation), and nothing here is read
@@ -44,8 +47,10 @@ const JET_FIRST := Vector2(22.0, 38.0)
 const JET_INTERVAL := Vector2(55.0, 85.0)
 const JET_SECONDS := 26.0
 const JET_PEAK := 13.5 # when it's closest (the sound's loudest moment)
-const JET_SPEED := 78.0
-const JET_PATH_Z := -190.0
+const JET_SPEED := 60.0
+const JET_ALTITUDE := 42.0 # at the peak, right over the courtyard's shadow line
+const JET_DESCENT := 0.6 # metres lost per second on the approach
+const DAWN_PATH_Z := 18.0 # no sun yet: it passes just behind the camera, lights sweeping ahead
 const PIGEON_RETURN := Vector2(8.0, 15.0)
 const CAT_RETURN := Vector2(18.0, 30.0)
 const FIGURE_SHADER := "res://assets/stages/courtyard/figure.gdshader"
@@ -114,6 +119,7 @@ var _jet: Node3D
 var _jet_time := -1.0
 var _next_jet := 0.0
 var _jet_peaked := false
+var _jet_line := Vector3.ZERO # x at the peak, altitude at the peak, z of the path
 var _lantern_nodes: Array[Node3D] = []
 var _lantern_swing := [] # per lantern [angle, velocity]
 var _steam_nodes: Array[GPUParticles3D] = []
@@ -488,9 +494,21 @@ func start_flyover() -> void:
 		return
 	_jet_time = 0.0
 	_jet_peaked = false
+	_jet_line = jet_path()
 	_jet.visible = true
 	_jet_player.play()
 
+
+## Where the jet's path runs so its shadow crosses the middle of the courtyard at
+## JET_PEAK: back along the sunlight from the floor's centre, up to JET_ALTITUDE. With
+## the sun not up yet, a path just behind the camera (the landing lights do the sweeping).
+func jet_path() -> Vector3:
+	if _sun and _sun.light_energy > 0.05:
+		var light := -_sun.global_basis.z # the way the sunlight travels
+		if light.y < -0.05:
+			var back := JET_ALTITUDE / -light.y
+			return Vector3(-light.x * back, JET_ALTITUDE, -light.z * back)
+	return Vector3(0.0, JET_ALTITUDE, DAWN_PATH_Z)
 
 func _update_jet(delta: float) -> void:
 	if _jet == null:
@@ -500,10 +518,9 @@ func _update_jet(delta: float) -> void:
 			start_flyover()
 		return
 	_jet_time += delta
-	var x := (_jet_time - JET_PEAK) * JET_SPEED
-	var descent := clampf(_jet_time / JET_SECONDS, 0.0, 1.0)
-	_jet.position = Vector3(x, lerpf(52.0, 34.0, descent), JET_PATH_Z)
-	_jet.rotation = Vector3(0.0, 0.0, -0.05)
+	var from_peak := _jet_time - JET_PEAK
+	_jet.position = Vector3(_jet_line.x + from_peak * JET_SPEED, _jet_line.y - from_peak * JET_DESCENT, _jet_line.z)
+	_jet.rotation = Vector3(0.0, 0.0, -0.02)
 	# The roar shakes things as it passes over.
 	var near := 1.0 - clampf(absf(_jet_time - JET_PEAK) / 4.0, 0.0, 1.0)
 	gust = maxf(gust, near * 0.7)

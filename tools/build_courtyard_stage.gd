@@ -831,9 +831,10 @@ func _build_cat() -> void:
 	_add(stage, cat, "Cat")
 
 
-## An airliner on approach (CourtyardLife flies it over the skyline now and then): white
-## fuselage, swept wings with engines, a tall fin, landing and navigation lights. Nose
-## toward local +X, about 38 m long.
+## An airliner on approach (CourtyardLife flies it low over the courtyard now and then):
+## white fuselage, swept wings with engines, a tall fin, navigation lights and a landing
+## light that sweeps the courtyard before sunrise. It casts a shadow (the fight camera sees
+## that, not the plane). Nose toward local +X, about 38 m long.
 func _build_jet() -> void:
 	var white := _material(Color(0.92, 0.93, 0.95), 0.2, 0.4)
 	var grey := _material(Color(0.6, 0.62, 0.66), 0.4, 0.4)
@@ -885,8 +886,17 @@ func _build_jet() -> void:
 	_add(stage, jet, "Jet")
 	var hull := MeshInstance3D.new()
 	hull.mesh = mesh
-	hull.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_add(jet, hull, "Hull")
+	var landing := SpotLight3D.new()
+	landing.position = Vector3(14.0, -1.8, 0)
+	landing.basis = Basis.looking_at(Vector3(1.0, -0.6, 0.0).normalized())
+	landing.light_color = Color(1.0, 0.96, 0.88)
+	landing.light_energy = 60.0
+	landing.spot_range = 160.0
+	landing.spot_angle = 18.0
+	landing.spot_attenuation = 0.4
+	landing.light_volumetric_fog_energy = 0.6
+	_add(jet, landing, "LandingLight")
 	for light in [[Vector3(12.0, -1.5, 0), Color(1.0, 0.97, 0.88), 0.9, 12.0], [Vector3(-1.0, -0.8, -16.5), Color(1.0, 0.1, 0.05), 0.45, 8.0], [Vector3(-1.0, -0.8, 16.5), Color(0.1, 1.0, 0.3), 0.45, 8.0]]:
 		var bulb := MeshInstance3D.new()
 		var ball := SphereMesh.new()

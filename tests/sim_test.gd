@@ -1654,15 +1654,22 @@ func courtyard_tests() -> void:
 	p2.knocked_out.emit(p2)
 	tick.call(1.0)
 	check("Courtyard: a K.O. sends the cat running off the wall", life._cat_state != CourtyardLife.Cat.SITTING)
+	# The fight camera never sees that much sky: the jet's path is set from the sun so its
+	# shadow crosses the middle of the courtyard at the loudest moment.
 	life.start_flyover()
-	tick.call(CourtyardLife.JET_PEAK + 0.1)
-	var passing: bool = life.jet_flying() and life._jet.visible and absf(life._jet.position.x) < 20.0 and life.gust > 0.4
+	tick.call(CourtyardLife.JET_PEAK)
+	var light: Vector3 = -life._sun.global_basis.z
+	var jet_at: Vector3 = life._jet.global_position
+	var shadow := jet_at + light * (jet_at.y / -light.y)
+	var passing: bool = life.jet_flying() and life._jet.visible and life.gust > 0.4 and Vector2(shadow.x, shadow.z).length() < 2.0
 	tick.call(CourtyardLife.JET_SECONDS)
-	check("Courtyard: the jet passes over at its loudest moment, rattling the laundry, then is gone",
-		passing and not life.jet_flying() and not life._jet.visible)
+	check("Courtyard: the jet's shadow sweeps across the courtyard at its loudest moment, rattling the laundry, then it's gone",
+		passing and not life.jet_flying() and not life._jet.visible, "shadow at %s" % shadow.snapped(Vector3.ONE * 0.1))
 	sound.excitement = 0.0 # the K.O. above stirred it; only life._process runs here, so it never fades
 	m.start_match()
 	tick.call(0.1)
+	check("Courtyard: before sunrise the jet passes just behind the camera, its landing light sweeping the courtyard",
+		life.jet_path().z == CourtyardLife.DAWN_PATH_Z and life._jet.get_node_or_null("LandingLight") is SpotLight3D)
 	check("Courtyard: a restarted match is dawn again, shutter down, neighbours indoors",
 		life.day == 0.0 and life.shutter_open == 0.0 and life.visible_neighbours() <= 2,
 		"day %.2f shutter %.2f out %d round %d" % [life.day, life.shutter_open, life.visible_neighbours(), m.round_number])
