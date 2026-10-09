@@ -20,6 +20,27 @@ const METER_SIZE := Vector2(360, 18)
 const METER_COLOR := Color(0.25, 0.6, 1.0)
 const METER_FULL_COLOR := Color(1.0, 0.8, 0.2)
 const SUPER_DIM := 0.45
+## Super cut-ins (tools/render_cutins.gd): the face slides across a band of speed lines.
+const CUTIN_DIR := "res://assets/ui/cutins/"
+const CUTIN_HEIGHT := 300.0 # band height at the 1920×1080 design size
+const CUTIN_FACE_SCALE := 1.45 # the face image is this much taller than the band (cropped)
+const CUTIN_FACE_WIDTH := CUTIN_HEIGHT * CUTIN_FACE_SCALE * 1024.0 / 400.0 # the images are 1024×400
+const CUTIN_EYE_LINE := 0.4 # the eyes' height in the images (from the top)
+const CUTIN_TIME := 0.62 # seconds the band stays open (the super freeze is 0.75 s)
+const CUTIN_SHADER := """
+shader_type canvas_item;
+uniform vec4 tint : source_color = vec4(1.0);
+uniform float direction = 1.0; // +1 streaks run left to right, -1 right to left
+void fragment() {
+	float row = floor(UV.y * 48.0);
+	float h = fract(sin(row * 91.7) * 43758.5);
+	float x = fract(UV.x * (0.8 + h * 1.6) - direction * TIME * (1.6 + h * 2.4) + h * 7.0);
+	float streak = smoothstep(0.62, 0.7, x) * smoothstep(1.0, 0.86, x) * step(0.35, h);
+	float edge = 1.0 - pow(abs(UV.y - 0.5) * 2.0, 6.0);
+	vec3 base = mix(vec3(0.02, 0.01, 0.05), tint.rgb * 0.35, edge * 0.8);
+	COLOR = vec4(mix(base, tint.rgb, streak * 0.75), 0.94);
+}
+"""
 ## Numpad digits as arrows, for move notation.
 const ARROWS := {"1": "↙", "2": "↓", "3": "↘", "4": "←", "6": "→", "7": "↖", "8": "↑", "9": "↗"}
 
@@ -54,6 +75,12 @@ var _meter_labels: Array[Label] = []
 var _super_dim: ColorRect
 var _super_label: Label
 var _super_tween: Tween
+var _cutin_band: Control # clips the face to the band
+var _cutin_lines: ColorRect
+var _cutin_face: TextureRect
+var _cutin_edges: Array[ColorRect] = []
+var _cutin_tween: Tween
+var _cutins := {} # player index -> [Texture2D or null, colour], from prepare_cutin()
 var _score_label: Label
 var _bonus_label: Label
 var _bonus_tween: Tween
@@ -221,7 +248,15 @@ func _build_score() -> void:
 # --- Super meter & super flash -----------------------------------------------------
 
 ## Dims the screen and calls out the super's name on the attacker's side.
+## Remembers player `index`'s cut-in for their supers (loaded at the start of the fight so
+## a super never waits on a file).
+func prepare_cutin(index: int, character: CharacterData, alt: bool) -> void:
+	var path := CUTIN_DIR + String(character.id) + ("_alt" if alt else "") + ".png"
+	_cutins[index] = [load(path) if ResourceLoader.exists(path) else null, character.placeholder_color]
+
+
 func super_flash(player_index: int, move_name: String) -> void:
+	_play_cutin(player_index)
 	_super_label.text = move_name.to_upper()
 	_super_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if player_index == 0 else HORIZONTAL_ALIGNMENT_RIGHT
 	if _super_tween:
@@ -234,6 +269,38 @@ func super_flash(player_index: int, move_name: String) -> void:
 	_super_tween.tween_property(_super_label, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_super_tween.tween_property(_super_dim, "color:a", 0.0, 0.25).set_delay(0.6)
 	_super_tween.tween_property(_super_label, "modulate:a", 0.0, 0.4).set_delay(1.1)
+
+
+## The band snaps open across the middle of the screen, the face slides in from the
+## player's side and drifts, then the band closes so the camera's close-up plays out.
+func _play_cutin(player_index: int) -> void:
+	var cutin: Array = _cutins.get(player_index, [null, Color.WHITE])
+	if cutin[0] == null:
+		return
+	var p1 := player_index == 0
+	var color: Color = (cutin[1] as Color).lerp(Color.WHITE, 0.2)
+	_cutin_face.texture = cutin[0]
+	_cutin_face.flip_h = not p1 # the images look right; P2's look left
+	(_cutin_lines.material as ShaderMaterial).set_shader_parameter("tint", color)
+	(_cutin_lines.material as ShaderMaterial).set_shader_parameter("direction", 1.0 if p1 else -1.0)
+	for edge in _cutin_edges:
+		edge.color = color
+	var width := _cutin_band.size.x
+	var rest := 40.0 if p1 else width - 40.0 - CUTIN_FACE_WIDTH
+	var start := -CUTIN_FACE_WIDTH if p1 else width
+	var drift := 60.0 if p1 else -60.0
+	if _cutin_tween:
+		_cutin_tween.kill()
+	_cutin_band.visible = true
+	_cutin_band.scale = Vector2(1.0, 0.0)
+	_cutin_face.position.x = start
+	_cutin_face.modulate.a = 1.0
+	_cutin_tween = create_tween().set_parallel()
+	_cutin_tween.tween_property(_cutin_band, "scale:y", 1.0, 0.07).set_ease(Tween.EASE_OUT)
+	_cutin_tween.tween_property(_cutin_face, "position:x", rest, 0.13).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_cutin_tween.tween_property(_cutin_face, "position:x", rest + drift, CUTIN_TIME - 0.13).set_delay(0.13)
+	_cutin_tween.tween_property(_cutin_band, "scale:y", 0.0, 0.09).set_delay(CUTIN_TIME).set_ease(Tween.EASE_IN)
+	_cutin_tween.chain().tween_callback(func() -> void: _cutin_band.visible = false)
 
 
 func _build_super_flash() -> void:
@@ -257,6 +324,46 @@ func _build_super_flash() -> void:
 	_super_label.offset_right = -80
 	_super_label.modulate.a = 0.0
 	add_child(_super_label)
+
+	_cutin_band = Control.new()
+	_cutin_band.clip_contents = true
+	_cutin_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cutin_band.anchor_left = 0.0
+	_cutin_band.anchor_right = 1.0
+	_cutin_band.anchor_top = 0.47
+	_cutin_band.anchor_bottom = 0.47
+	_cutin_band.offset_top = -CUTIN_HEIGHT / 2.0
+	_cutin_band.offset_bottom = CUTIN_HEIGHT / 2.0
+	_cutin_band.visible = false
+	add_child(_cutin_band)
+	move_child(_cutin_band, _super_label.get_index()) # under the move name
+	_cutin_band.resized.connect(func() -> void: _cutin_band.pivot_offset = _cutin_band.size / 2.0)
+	_cutin_lines = ColorRect.new()
+	_cutin_lines.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_cutin_lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shader := Shader.new()
+	shader.code = CUTIN_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	_cutin_lines.material = material
+	_cutin_band.add_child(_cutin_lines)
+	_cutin_face = TextureRect.new()
+	_cutin_face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_cutin_face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_cutin_face.size = Vector2(CUTIN_FACE_WIDTH, CUTIN_HEIGHT * CUTIN_FACE_SCALE)
+	_cutin_face.position.y = CUTIN_HEIGHT * 0.5 - CUTIN_HEIGHT * CUTIN_FACE_SCALE * CUTIN_EYE_LINE # eyes on the band's middle
+	_cutin_face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cutin_band.add_child(_cutin_face)
+	for top in [true, false]:
+		var edge := ColorRect.new()
+		edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		edge.anchor_right = 1.0
+		edge.anchor_top = 0.0 if top else 1.0
+		edge.anchor_bottom = edge.anchor_top
+		edge.offset_top = 0.0 if top else -4.0
+		edge.offset_bottom = 4.0 if top else 0.0
+		_cutin_band.add_child(edge)
+		_cutin_edges.append(edge)
 
 
 ## Meters sit in the bottom corners; P2's fills from the right.

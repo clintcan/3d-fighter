@@ -124,6 +124,8 @@ func _ready() -> void:
 	hud.main_menu_pressed.connect(_on_main_menu_pressed)
 	camera.setup(self)
 	camera.mode = Settings.camera_mode
+	for i in fighters.size():
+		hud.prepare_cutin(i, fighters[i].data, fighters[i].alt)
 	fx = FightFx.new()
 	fx.name = "FightFx"
 	add_child(fx)

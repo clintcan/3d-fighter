@@ -70,6 +70,7 @@ const THROW_RANGE := 0.95
 const THROW_HOLD_FRAMES := 30
 const THROW_RECOVERY := 14
 const THROW_HOLD_DISTANCE := 0.75
+const GRAB_SNAP_FRAMES := 8.0 # the grabbed fighter's model eases into the hold this long
 ## Defender can break a throw with LP+LK during the first ticks of being held.
 const THROW_TECH_WINDOW := 10
 const TECH_FRAMES := 18
@@ -151,6 +152,9 @@ var throw_grab_frame := -1
 var grab_move: MoveData
 ## False while held by a command grab (no tech).
 var throw_techable := true
+## Cosmetic: where the fighter was relative to the hold position when grabbed; the model
+## eases across it over GRAB_SNAP_FRAMES (not simulation state).
+var _grab_snap := Vector3.ZERO
 var current_move: MoveData
 var move_has_hit := false
 ## Multi-hit bookkeeping for the current move.
@@ -891,10 +895,15 @@ func on_grabbed_by(attacker: Fighter, techable: bool = true) -> void:
 	throw_techable = techable
 	current_move = null
 	velocity = Vector3.ZERO
+	var before := position
 	position = attacker.position + attacker.forward * THROW_HOLD_DISTANCE
 	clamp_to_bounds()
 	face_opponent()
 	_set_state(State.THROWN)
+	# Cosmetic: the model eases into the hold instead of jumping (a reversed jump-in is
+	# pulled down from the air).
+	_grab_snap = before - position
+	reset_physics_interpolation()
 
 
 ## Both fighters break apart. Used for a defender tech and for simultaneous throws.
@@ -1094,6 +1103,9 @@ func _update_model(delta: float) -> void:
 	var shake := Vector3.ZERO
 	if frozen and state in [State.HITSTUN, State.BLOCKSTUN, State.AIR_HIT, State.KO]:
 		shake.x = randf_range(-0.03, 0.03)
+	if state == State.THROWN and state_frame < GRAB_SNAP_FRAMES:
+		var f := (float(state_frame) + Engine.get_physics_interpolation_fraction()) / GRAB_SNAP_FRAMES
+		shake += global_transform.basis.inverse() * (_grab_snap * (1.0 - smoothstep(0.0, 1.0, f)))
 	model.position = shake
 
 
@@ -1186,7 +1198,9 @@ func _animation_request(frozen: bool) -> Array:
 				return [&"fight/reversal_throw", t, 1.0]
 			return [&"fight/throw", t if throw_grab_frame >= 0 else minf(t, 0.25), 1.0]
 		State.THROWN:
-			return [&"fight/thrown", 0.0, 1.0]
+			if opponent and opponent.grab_move and opponent.grab_move.reversal:
+				return [&"fight/reversed", t, 1.0]
+			return [&"fight/thrown", t, 1.0]
 		State.TECH:
 			return [&"fight/block_stand", 0.0, 1.0]
 	if victory and victory_clip != &"":

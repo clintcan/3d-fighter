@@ -85,6 +85,7 @@ func _initialize() -> void:
 	lib.add_animation("chain_punch", build_chain_punch(12))
 	lib.add_animation("chain_punch_short", build_chain_punch(3))
 	lib.add_animation("reversal_throw", build_reversal_throw())
+	lib.add_animation("reversed", build_reversed())
 	lib.add_animation("slide_kick",build_in_place_ranges([[ual2.get_animation("Slide_Start"), 0.2, 0.83], [ual2.get_animation("Slide_Exit"), 0.0, 0.3]], crouch, 0.25))
 	lib.add_animation("shoulder_charge", build_in_place_ranges([[ual2.get_animation("Shield_Dash"), 0.0, 0.5]], guard, 0.3))
 	var err := ResourceSaver.save(lib, OUTPUT)
@@ -136,11 +137,50 @@ func build_throw() -> Animation:
 		[0.6, heave], [0.85, guard]], false)
 
 
-## Held in a grab: doubled over, arms limp.
+## Held in a grab, timed against the thrower's clip (released at 0.5 s): jolted as the
+## grab lands, doubled over while held, then twisted off balance by the heave.
 func build_thrown() -> Animation:
+	var jolt := sample(ual1.get_animation("Hit_Chest"), 0.06)
 	var held := sample(ual1.get_animation("Hit_Chest"), 0.12)
 	rotate_bone(held, "spine_01", Vector3.RIGHT, 20.0)
-	return make_animation([[0.0, held], [0.5, held]], false)
+	var strain := duplicate_pose(held)
+	rotate_bone(strain, "spine_02", Vector3.RIGHT, 6.0)
+	var heaved := duplicate_pose(held)
+	var turn := -1.0 if rear == "r" else 1.0 # against the thrower's heave
+	rotate_bone(heaved, "pelvis", Vector3.UP, turn * 30.0)
+	rotate_bone(heaved, "spine_01", Vector3(0, 0, 1), turn * 15.0)
+	move_bone(heaved, "pelvis", Vector3(0, 0.06, 0))
+	for side in ["l", "r"]:
+		var x := 0.6 if side == "l" else -0.6
+		aim(heaved, "upperarm_" + side, "lowerarm_" + side, Vector3(x, 0.5, -0.2)) # arms flung out
+	return make_animation([[0.0, jolt], [0.1, held], [0.3, strain], [0.46, heaved], [0.6, heaved]], false)
+
+
+## Caught by a reversal stance (against fight/reversal_throw, released at 0.5 s): the
+## striking arm still out and being drawn forward, off balance, then caved in by the palm.
+func build_reversed() -> Animation:
+	var lead_foot := global_origin(guard, "foot_" + lead)
+	var rear_foot := global_origin(guard, "foot_" + rear)
+	var strike := duplicate_pose(guard)
+	hip_turn(strike, 20.0)
+	plant_both(strike, lead_foot, rear_foot)
+	var shoulder := global_origin(strike, "upperarm_" + rear)
+	punch_arm(strike, rear, Vector3(shoulder.x * 0.3, shoulder.y - 0.05, shoulder.z + 0.62))
+
+	var pulled := duplicate_pose(guard)
+	move_bone(pulled, "pelvis", Vector3(0, -0.04, 0.12))
+	hip_turn(pulled, 35.0)
+	lean(pulled, -22.0, 0.0)
+	plant_foot(pulled, rear, rear_foot + Vector3(0, 0.08, 0.05)) # heel lifting
+	plant_foot(pulled, lead, lead_foot)
+	shoulder = global_origin(pulled, "upperarm_" + rear)
+	punch_arm(pulled, rear, Vector3(-rear_sign() * 0.3, shoulder.y - 0.15, shoulder.z + 0.55)) # drawn across
+	rotate_bone(pulled, "neck_01", Vector3.RIGHT, 15.0)
+
+	var struck := sample(ual1.get_animation("Hit_Chest"), 0.15)
+	lean(struck, 18.0, 0.0)
+	rotate_bone(struck, "neck_01", Vector3.RIGHT, -20.0) # head snaps back
+	return make_animation([[0.0, strike], [0.2, pulled], [0.36, pulled], [0.47, struck], [0.6, struck]], false)
 
 
 ## Front (push) kick with the rear leg, mae-geri style: knee chambers high toward the
@@ -1230,8 +1270,8 @@ func build_chain_punch(count: int) -> Animation:
 
 
 ## Reversal throw: the lead hand traps the caught limb and draws it past (0-0.2 s) as the
-## hips turn away, then the rear palm drives into the chest (0.42 s, when the opponent is
-## released) and the stance recovers.
+## hips turn away, then the rear palm drives into the chest (0.47 s, just before the
+## opponent is released at 0.5 s) and the stance recovers.
 func build_reversal_throw() -> Animation:
 	var s := rear_sign()
 	var lead_foot := global_origin(guard, "foot_" + lead)
@@ -1258,8 +1298,8 @@ func build_reversal_throw() -> Animation:
 	rotate_bone(strike, "hand_" + rear, Vector3.RIGHT, -55.0) # palm forward
 	reach_arm(strike, lead, Vector3(-s * 0.25, chest.y - 0.18, chest.z + 0.12))
 
-	return make_animation([[0.0, catch], [0.2, draw], [0.32, draw], [0.42, strike], [0.62, strike],
-		[0.85, guard]], false)
+	return make_animation([[0.0, catch], [0.2, draw], [0.34, draw], [0.47, strike], [0.65, strike],
+		[0.88, guard]], false)
 
 
 ## Resamples `source` keeping its `keep_bones`, with the rest of the body from the guard.

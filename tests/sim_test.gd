@@ -351,6 +351,7 @@ func _initialize() -> void:
 	await jin_tests()
 	await mira_tests()
 	await lian_tests()
+	presentation_tests()
 	await beach_tests()
 	await market_tests()
 	await train_tests()
@@ -1822,6 +1823,73 @@ func lian_tests() -> void:
 			if buttons != 0 and buttons != (InputBuffer.LP | InputBuffer.LK) and not (buttons == InputBuffer.LK and planned[0] == 2):
 				striking += 1
 	check("Lian: CPUs don't strike into the reversal stance", striking == 0, "%d" % striking)
+	p2.controller = m.dummy
+
+
+## Super cut-ins, limb trails, and the thrown / reversed reactions. Runs in the fight
+## lian_tests() left (Lian vs Kenji).
+func presentation_tests() -> void:
+	var gs = root.get_node("GameState")
+	var missing := []
+	for character: CharacterData in gs.roster:
+		for alt in [false, true]:
+			var path: String = FightHud.CUTIN_DIR + String(character.id) + ("_alt" if alt else "") + ".png"
+			if not ResourceLoader.exists(path):
+				missing.append(path.get_file())
+	check("Every fighter has a super cut-in, both looks", missing.is_empty(), "%s" % [missing])
+	reset(DummyController.Mode.STAND); step(4)
+	p1.add_meter(Fighter.MAX_METER)
+	motion("236236", InputBuffer.LP)
+	step(2)
+	check("A super opens the cut-in band with the fighter's face", m.hud._cutin_band.visible and m.hud._cutin_face.texture != null
+		and m.hud._cutin_face.texture.resource_path.get_file() == "lian.png")
+	step(120)
+
+	# Limb trails: heavy strikes, specials and supers; not light normals, fireballs or stances.
+	var kenji_moves := {}
+	for mv: MoveData in p2.data.moves:
+		kenji_moves[mv.input] = mv
+	check("Trails on heavy strikes, specials and supers only",
+		LimbTrail.wants(kenji_moves["HK"]) and LimbTrail.wants(kenji_moves["623P"]) and LimbTrail.wants(kenji_moves["236236P"])
+		and not LimbTrail.wants(kenji_moves["LP"]) and not LimbTrail.wants(kenji_moves["236P"])
+		and not LimbTrail.wants(p1._move_for_input("214P")))
+	var trail: LimbTrail = m.fx._limb_trails[0]
+	reset(DummyController.Mode.STAND); step(4)
+	press(InputBuffer.HP, 6) # Double Palm
+	var sampled := 0
+	for t in 24:
+		step()
+		p1._update_model(1.0 / 60.0) # the pose (headless runs skip _process)
+		trail.update(1.0 / 60.0)
+		sampled = maxi(sampled, trail._samples.size())
+	check("A heavy strike leaves a trail behind the striking limb", sampled >= 4, "%d samples" % sampled)
+	step(40)
+	for t in 20:
+		trail.update(1.0 / 60.0)
+	check("... that fades away", trail._samples.is_empty(), "%d left" % trail._samples.size())
+
+	# Thrown and reversed reactions, and the grab easing in.
+	reset(DummyController.Mode.STAND)
+	p2.controller = ctl2
+	approach(0.7); step(10)
+	ctl2.buttons = InputBuffer.LP | InputBuffer.LK
+	wait_until(func() -> bool: return p1.state == Fighter.State.THROWN, 20)
+	check("A thrown fighter plays the timed thrown reaction", p1._animation_request(false)[0] == &"fight/thrown"
+		and p1.model.player.has_animation(&"fight/thrown"))
+	step(90)
+	reset(DummyController.Mode.STAND)
+	p2.controller = ctl2
+	approach(1.0); step(10)
+	p2.position.y = 0.6 # pretend Kenji's straight comes from the air: the model eases down
+	ctl.dir = 2; step(1); ctl.dir = 1; step(1)
+	ctl.dir = 4; ctl.buttons = InputBuffer.LP; ctl2.buttons = InputBuffer.HP; step(1)
+	ctl.dir = 5
+	wait_until(func() -> bool: return p2.state == Fighter.State.THROWN, 30)
+	var eased_from: float = p2._grab_snap.y
+	check("A reversed fighter plays the caught reaction", p2.state == Fighter.State.THROWN
+		and p2._animation_request(false)[0] == &"fight/reversed" and p2.model.player.has_animation(&"fight/reversed"))
+	check("A grabbed fighter's model eases into the hold instead of jumping", eased_from > 0.1, "%.2f" % eased_from)
+	step(90)
 	p2.controller = m.dummy
 
 

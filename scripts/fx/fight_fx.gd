@@ -2,6 +2,8 @@ class_name FightFx
 extends Node3D
 ## Hit sparks, impact flashes, model hit-flash, knockdown dust and fight sounds, driven
 ## by FightManager / Fighter signals. Purely cosmetic: reads gameplay, never writes it.
+## Heavy strikes, specials and supers leave a fading ribbon behind the striking limb
+## (LimbTrail).
 ## Special moves add: fighter shouts (special / super / K.O.), motion trails while a
 ## travelling move is active, sparks along rising and flurry attacks, a ground-pound
 ## shockwave, projectile launch and impact bursts, and a big burst on super finishers.
@@ -31,6 +33,7 @@ var _flash_texture: Texture2D
 ## Per fighter: continuous emitters toggled each frame while a special is active.
 var _trails := {} # Fighter -> GPUParticles3D (streaks behind travelling moves)
 var _strike_sparks := {} # Fighter -> GPUParticles3D (sparks along rising/flurry hits)
+var _limb_trails: Array[LimbTrail] = [] # ribbons behind heavy strikes, specials and supers
 
 
 func setup(fight_manager: Node) -> void:
@@ -56,6 +59,10 @@ func setup(fight_manager: Node) -> void:
 			if hits == 5:
 				Audio.voice("combo")))
 		_trails[fighter] = _make_trail()
+		if fighter.model:
+			var limb_trail := LimbTrail.new(fighter, fighter.data.placeholder_color.lerp(Color.WHITE, 0.55))
+			add_child(limb_trail)
+			_limb_trails.append(limb_trail)
 		_strike_sparks[fighter] = _make_strike_sparks()
 		fighter.landed_hard.connect(manager.cosmetic(_on_landed_hard))
 		fighter.throw_impact.connect(manager.cosmetic(_on_throw_impact))
@@ -122,7 +129,9 @@ func _on_move_active(fighter: Fighter, move: MoveData) -> void:
 
 
 ## Trails and strike sparks follow fighters while a qualifying move is active.
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	for limb_trail in _limb_trails:
+		limb_trail.update(delta)
 	for fighter: Fighter in _trails:
 		var move := fighter.current_move
 		var active := fighter.state == Fighter.State.ATTACK and move != null \
