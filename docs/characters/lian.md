@@ -87,6 +87,8 @@ normals crouch now.
   pitched up about 10%.
 - Character select routine: Chain Punch → Double Palm → Still Water and the reversal throw
   → Inch Palm → the super → salute.
+- Home stage: the Kowloon Courtyard, an old tenement courtyard at dawn with her wooden
+  dummy (mook jong) by the wall and an earth god shrine at its foot.
 
 ## Originality
 

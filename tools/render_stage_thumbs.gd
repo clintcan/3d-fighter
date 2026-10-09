@@ -16,6 +16,7 @@ func _initialize() -> void:
 	settings.resolution = settings.RESOLUTIONS.size() - 1 # native
 	settings.display_mode = settings.DisplayMode.WINDOWED # 16:9 whatever the player's display setting
 	settings.window_size = settings.WINDOW_SIZES.find(Vector2i(1920, 1080))
+	settings.fight_intros = false # straight to the neutral fight view (not saved)
 	settings.apply_display()
 	for i in 10:
 		await process_frame
@@ -35,6 +36,10 @@ func _initialize() -> void:
 		manager.set_physics_process(false)
 		manager.hud.visible = false
 		manager.start_fight_immediately()
+		var life = manager.stage.get_node_or_null("Life") # the courtyard: show the final round's sunlight, not dawn
+		if life:
+			manager.round_number = 3
+			life.day = 1.0
 		for i in 40: # let the stance animations, reflection probe and camera settle
 			await process_frame
 		var image := root.get_texture().get_image()

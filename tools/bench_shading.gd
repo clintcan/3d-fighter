@@ -18,6 +18,7 @@ func _initialize() -> void:
 	root.size = Vector2i(1280, 720)
 	var settings: Node = root.get_node("Settings")
 	settings.graphics = settings.Graphics.HIGH
+	settings.fight_intros = false # measure the fight, not the pre-fight intro (not saved)
 	settings.resolution = settings.RESOLUTIONS.size() - 1
 	settings.apply_graphics(root)
 	var game_state: Node = root.get_node("GameState")

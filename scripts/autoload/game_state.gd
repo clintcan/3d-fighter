@@ -9,6 +9,7 @@ const TEMPLE_STAGE := "res://scenes/stages/temple.tscn"
 const BEACH_STAGE := "res://scenes/stages/beach.tscn"
 const MARKET_STAGE := "res://scenes/stages/market.tscn"
 const TRAIN_STAGE := "res://scenes/stages/train.tscn"
+const COURTYARD_STAGE := "res://scenes/stages/courtyard.tscn"
 ## Selectable stages: scene, display name, select-screen thumbnail (rendered by
 ## tools/render_stage_thumbs.gd) and a one-line description.
 const STAGES := [
@@ -26,6 +27,8 @@ const STAGES := [
 		blurb = "A Manila street at dusk: grill smoke, jeepneys and fiesta flags."},
 	{path = TRAIN_STAGE, name = "Express", thumb = "res://assets/ui/stages/train.png",
 		blurb = "On the roof of an express train racing through the hills at sunset."},
+	{path = COURTYARD_STAGE, name = "Kowloon Courtyard", thumb = "res://assets/ui/stages/courtyard.png",
+		blurb = "An old tenement courtyard at dawn. The neighbours wake up as the sun climbs."},
 ]
 
 const ROUNDS_TO_WIN := 2

@@ -355,6 +355,7 @@ func _initialize() -> void:
 	intro_tests()
 	await beach_tests()
 	await market_tests()
+	await courtyard_tests()
 	await train_tests()
 	await scores_credits_tests()
 	await controls_tests()
@@ -984,7 +985,7 @@ func polish_tests() -> void:
 	gs.mode = gs.Mode.VS_CPU
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 	# Each stage brings its own music.
-	for entry in [[gs.DOJO_STAGE, &"dojo"], [gs.ROOFTOP_STAGE, &"rooftop"], [gs.TEMPLE_STAGE, &"temple"], [gs.BEACH_STAGE, &"beach"], [gs.MARKET_STAGE, &"market"], [gs.TRAIN_STAGE, &"train"], [gs.DEFAULT_STAGE, &"fight"]]:
+	for entry in [[gs.DOJO_STAGE, &"dojo"], [gs.ROOFTOP_STAGE, &"rooftop"], [gs.TEMPLE_STAGE, &"temple"], [gs.BEACH_STAGE, &"beach"], [gs.MARKET_STAGE, &"market"], [gs.TRAIN_STAGE, &"train"], [gs.COURTYARD_STAGE, &"courtyard"], [gs.DEFAULT_STAGE, &"fight"]]:
 		gs.stage_path = entry[0]
 		change_scene_to_file("res://scenes/fight.tscn")
 		await process_frame; await process_frame
@@ -1582,6 +1583,89 @@ func market_tests() -> void:
 	check("Market: two modelled jeepneys, every surface painted", painted)
 	check("Market: the jeepneys are painted differently", painted
 		and (jeeps[0] as MeshInstance3D).get_surface_override_material(1) != (jeeps[1] as MeshInstance3D).get_surface_override_material(1))
+	gs.stage_path = gs.DEFAULT_STAGE
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+
+
+func courtyard_tests() -> void:
+	var gs = root.get_node("GameState")
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = gs.roster[6]; gs.p2_character = gs.roster[0]
+	gs.stage_path = gs.COURTYARD_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	reset(DummyController.Mode.STAND); approach(1.1)
+	var hp := p2.health
+	press(InputBuffer.LP); step(6)
+	check("Courtyard: loads with the standard bounds and combat works", m.stage.name == "Courtyard" and m.stage.bounds_half_extent == 3.6
+		and p2.health == hp - dmg(p1, "LP"), "hp %d -> %d" % [hp, p2.health])
+	check("Courtyard: in the stage list as the Kowloon Courtyard, with its own music",
+		gs.stage_name(gs.COURTYARD_STAGE) == "Kowloon Courtyard" and m.stage.music == &"courtyard")
+	var life := m.stage.get_node_or_null("Life") as CourtyardLife
+	check("Courtyard: the life is wired (pigeons, neighbours, lanterns, steam, cat, jet)", life != null and life.perches.size() >= 12
+		and life.neighbour_spots.size() == 9 and life._lantern_nodes.size() == 3 and life._steam_nodes.size() == 2
+		and life._cat != null and life._jet != null and life._sun != null and life.manager == m)
+	if life == null:
+		return
+	var tick := func(seconds: float) -> void:
+		for i in int(seconds * 60.0):
+			life._process(1.0 / 60.0)
+	var sound := m.stage.get_node("Sound") as StageAmbience
+	sound.excitement = 0.0
+	m.start_match()
+	tick.call(0.5)
+	check("Courtyard: round 1 is dawn: sun below the skyline, gate lamp and windows lit, shutter down",
+		life.day == 0.0 and life._sun.light_energy == 0.0 and life._lamp.light_energy > 1.0 and life.shutter_open == 0.0
+		and life.window_material.emission_energy_multiplier > 1.0)
+	m.round_number = 2
+	tick.call(6.0)
+	var low_sun: float = life._sun.light_energy
+	check("Courtyard: round 2 brings the low sun, the lamp goes out and the store's shutter rolls up",
+		is_equal_approx(life.day, 0.55) and low_sun > 0.5 and life._lamp.light_energy < 0.1 and life.shutter_open == 1.0
+		and life._shutter.scale.y < 0.2 and life._shop_light.light_energy > 1.0, "day %.2f sun %.2f" % [life.day, low_sun])
+	m.round_number = 3
+	tick.call(6.0)
+	var elevation := life._sun.global_basis.z.y # sine of the sun's elevation (the light shines along -Z)
+	check("Courtyard: the final round is full morning, the sun high over the floor",
+		life.day == 1.0 and life._sun.light_energy > low_sun and elevation > 0.5, "elevation %.2f" % elevation)
+	check("Courtyard: neighbours come out as the rounds go by", life.visible_neighbours() == 7, str(life.visible_neighbours()))
+	for i in 120:
+		sound.excitement = 1.0
+		life._process(1.0 / 60.0)
+	check("Courtyard: an excited crowd brings everyone out, arms up",
+		life.visible_neighbours() == 9 and life._neighbour_state.all(func(n: Array) -> bool: return n[4] > 2.0))
+	sound.excitement = 0.0
+	# Reactions: pigeons scatter and come back, the laundry billows, never during rollback.
+	var perched := life.perched_pigeons()
+	m.resimulating = true
+	m.super_flash.emit(p1, p1.data.moves[0])
+	var quiet := life.perched_pigeons() == perched and life.gust == 0.0
+	m.resimulating = false
+	for i in 3:
+		m.super_flash.emit(p1, p1.data.moves[0])
+	check("Courtyard: a super scatters the pigeons and billows the laundry, but not in rollback",
+		quiet and life.perched_pigeons() < perched / 2 and life.gust > 0.5, "%d -> %d" % [perched, life.perched_pigeons()])
+	tick.call(22.0)
+	check("Courtyard: the pigeons come back to their perches", life.perched_pigeons() == perched)
+	p2.knocked_out.emit(p2)
+	tick.call(1.0)
+	check("Courtyard: a K.O. sends the cat running off the wall", life._cat_state != CourtyardLife.Cat.SITTING)
+	life.start_flyover()
+	tick.call(CourtyardLife.JET_PEAK + 0.1)
+	var passing: bool = life.jet_flying() and life._jet.visible and absf(life._jet.position.x) < 20.0 and life.gust > 0.4
+	tick.call(CourtyardLife.JET_SECONDS)
+	check("Courtyard: the jet passes over at its loudest moment, rattling the laundry, then is gone",
+		passing and not life.jet_flying() and not life._jet.visible)
+	sound.excitement = 0.0 # the K.O. above stirred it; only life._process runs here, so it never fades
+	m.start_match()
+	tick.call(0.1)
+	check("Courtyard: a restarted match is dawn again, shutter down, neighbours indoors",
+		life.day == 0.0 and life.shutter_open == 0.0 and life.visible_neighbours() <= 2,
+		"day %.2f shutter %.2f out %d round %d" % [life.day, life.shutter_open, life.visible_neighbours(), m.round_number])
 	gs.stage_path = gs.DEFAULT_STAGE
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 
