@@ -9,6 +9,9 @@ extends SceneTree
 ##
 ## Hair_Bun (Lian): Hair_Long cut close all round (a sleek, pulled-back cap), plus a bun
 ## at the back of the head and a lacquered hairpin through it, both bound to the Head bone.
+## Long hair hangs away from the head, so cut short it would flare out like a bowl; the
+## lower part is shrink-wrapped onto the scalp (`_hug_scalp`), snug at the hem and
+## untouched at the crown, keeping the strand layers in order.
 
 const SOURCE := "res://assets/characters/hair/Hair_Long.gltf"
 const HAIR_DIR := "res://assets/characters/hair/"
@@ -26,9 +29,15 @@ const PIN_RADIUS := 0.0045
 const PIN_COLOR := Color(0.55, 0.06, 0.05) # red lacquer
 const HAIR_ROUGHNESS := 1.0 # like Hair_SimpleParted's material
 const HAIR_SPECULAR := 0.25
+const BODY := "res://assets/characters/base/Superhero_Female_FullBody.gltf"
+const HUG_GAP := 0.006 # the innermost strand layer sits this far off the scalp...
+const HUG_LAYERS := 0.2 # ...and the layers' spacing shrinks to this share
+const HUG_FROM := 0.12 # hugging fades in from this far above the cut down to the hem
 
 
 var _cut: Callable # signed distance above the cut (positive = kept)
+var _scalp := PackedVector3Array() # the female body's head vertices (T-pose)...
+var _scalp_normals := PackedVector3Array() # ...and their normals
 
 
 func _initialize() -> void:
@@ -62,6 +71,9 @@ func _build_style(style: String, cut: Callable, bun: bool) -> void:
 			polygon.append({p = verts[c], n = normals[c], uv = uvs[c],
 				bones = bones.slice(c * 4, c * 4 + 4), weights = weights.slice(c * 4, c * 4 + 4)})
 		polygon = _clip(polygon)
+		if bun:
+			for v: Dictionary in polygon:
+				v.p = _hug_scalp(v.p)
 		for i in range(1, polygon.size() - 1):
 			for v: Dictionary in [polygon[0], polygon[i], polygon[i + 1]]:
 				st.set_normal(v.n)
@@ -110,6 +122,42 @@ func _above_cut(p: Vector3) -> float:
 func _above_bun_cut(p: Vector3) -> float:
 	var back := clampf((-p.z - 0.02) / 0.1, 0.0, 1.0)
 	return p.y - (BUN_CUT - BUN_NAPE * back)
+
+
+## `p` pulled toward the scalp: below HUG_FROM above the cut, its distance from the nearest
+## scalp point shrinks toward HUG_GAP + HUG_LAYERS × distance (monotonic, so stacked strand
+## layers never cross), fully at the hem.
+func _hug_scalp(p: Vector3) -> Vector3:
+	var weight := 1.0 - smoothstep(0.0, HUG_FROM, _cut.call(p))
+	if weight <= 0.0:
+		return p
+	if _scalp.is_empty():
+		var body := (load(BODY) as PackedScene).instantiate()
+		for mi: MeshInstance3D in body.find_children("*", "MeshInstance3D", true, false):
+			if mi.name != "Superhero_Female":
+				continue
+			var arrays := mi.mesh.surface_get_arrays(0)
+			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+			for i in verts.size():
+				if verts[i].y > 1.5:
+					_scalp.append(verts[i])
+					_scalp_normals.append(normals[i])
+		body.free()
+	var nearest := 0
+	var best := INF
+	for i in _scalp.size():
+		var d := _scalp[i].distance_squared_to(p)
+		if d < best:
+			best = d
+			nearest = i
+	var q := _scalp[nearest]
+	var n := _scalp_normals[nearest]
+	var height := (p - q).dot(n)
+	if height <= HUG_GAP:
+		return p # already snug (or inside)
+	var target := q + (p - q - n * height) + n * (HUG_GAP + HUG_LAYERS * height)
+	return p.lerp(target, weight)
 
 
 func _clip(polygon: Array) -> Array:
