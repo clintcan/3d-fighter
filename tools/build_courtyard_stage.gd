@@ -45,7 +45,6 @@ var _batches := {}
 var _footprints := [] # everything standing on the courtyard floor (contact shadows)
 var _rng := RandomNumberGenerator.new()
 var _skyline := SurfaceTool.new()
-var _laundry := SurfaceTool.new()
 var mat_tiles: StandardMaterial3D
 var mat_concrete: StandardMaterial3D
 var mat_shutter: StandardMaterial3D
@@ -73,7 +72,14 @@ var _plastic := []
 ## ([position, yaw toward the fight, hidden offset, kind: 0 standing, 1 at a balcony rail,
 ## 2 sitting]).
 var _perches := PackedVector3Array()
+var _perch_sides := PackedInt32Array()
 var _neighbours := []
+## The side of the courtyard being built (-Z 0, -X 2, +X 3; -1 = always shown). Its nodes
+## and batches go in the "ring_side_N" occlusion group, so when the camera swings out past
+## the back wall or into a tenement, that side hides (Stage.side_lines) instead of
+## blocking the view; CourtyardLife hides its pigeons and neighbours too.
+var _side := -1
+var _laundries := {} # side -> SurfaceTool
 var _steam: Array[NodePath] = []
 var _lanterns: Array[NodePath] = []
 
@@ -83,23 +89,31 @@ func _initialize() -> void:
 	stage = Node3D.new()
 	stage.name = "Courtyard"
 	stage.set_script(load(STAGE_SCRIPT))
-	stage.set("rope_line", 50.0) # nothing sits between the camera and the fight
+	stage.set("rope_line", 50.0)
+	# Back wall at z -7, tenement fronts at x +-9.5 (balconies to +-8.6): hide a side once
+	# the camera is past these (Stage adds 0.3 m of hysteresis).
+	stage.set("side_lines", PackedFloat32Array([6.2, NEAR_Z - 0.8, 7.9, 7.9]))
 	stage.set("music", &"courtyard")
 	_skyline.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_laundry.begin(Mesh.PRIMITIVE_TRIANGLES)
 
 	_make_materials()
 	_build_environment()
 	_build_lights()
 	_build_floor()
+	_side = 0
 	_build_back_wall()
 	_build_lane_and_sheds()
-	_build_side_tenement(-1.0)
-	_build_side_tenement(1.0)
-	_build_scaffolding()
-	_build_courtyard_props()
 	_build_wooden_dummy(Vector3(-5.7, 0, -5.95))
 	_build_shrine(Vector3(-2.3, 0, BACK_Z - 0.02))
+	_side = 2
+	_build_side_tenement(-1.0)
+	_side = 3
+	_build_side_tenement(1.0)
+	_build_scaffolding()
+	_side = 1
+	_build_front_tenement()
+	_side = -1
+	_build_courtyard_props()
 	_build_overhead()
 	_build_skyline()
 	_build_cat()
@@ -272,7 +286,7 @@ func _build_back_wall() -> void:
 		for k in int(width / 1.6): # pigeons on the coping, away from the gate
 			var x: float = span[0] + 0.5 + k * 1.6 + _rng.randf_range(-0.3, 0.3)
 			if absf(x - GATE_X) > 1.6 and absf(x) < SIDE_X - 0.6:
-				_perches.append(Vector3(x, WALL_TOP + 0.08, BACK_Z - 0.15 + _rng.randf_range(-0.08, 0.08)))
+				_perch(Vector3(x, WALL_TOP + 0.08, BACK_Z - 0.15 + _rng.randf_range(-0.08, 0.08)))
 	# Gate posts (red, a 福 diamond on each) and the iron gate leaves swung open into the lane.
 	for side in [-1.0, 1.0]:
 		var post_x: float = GATE_X + side * (GATE_WIDTH / 2.0 + 0.075)
@@ -314,7 +328,7 @@ func _build_lane_and_sheds() -> void:
 		var wall: Material = _plaster[(index + 2) % _plaster.size()] if index % 3 != 1 else mat_concrete
 		_batch(wall, Vector3(width - 0.06, height, 4.0), Transform3D(Basis(), Vector3(center, height / 2.0, LANE_Z - 2.0)))
 		_batch(mat_iron, Vector3(width + 0.1, 0.06, 4.5), Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-6.0)), Vector3(center, height + 0.2, LANE_Z - 2.0)))
-		_perches.append(Vector3(center + _rng.randf_range(-0.8, 0.8), height + 0.12, LANE_Z + 0.15))
+		_perch(Vector3(center + _rng.randf_range(-0.8, 0.8), height + 0.12, LANE_Z + 0.15))
 		# A door and a small grilled window on each.
 		var lit := index == 3
 		_batch(mat_window_lit if lit else mat_dark, Vector3(0.9, 2.0, 0.04), Transform3D(Basis(), Vector3(center - width * 0.2, 1.0, LANE_Z + 0.02)))
@@ -332,8 +346,8 @@ func _build_lane_and_sheds() -> void:
 		index += 1
 	# A neighbour on the gate's threshold (walks in along the lane), and a kid who climbs
 	# up to sit on the wall.
-	_neighbours.append([Vector3(GATE_X + 0.2, 0, BACK_Z - 0.75), 0.15, Vector3(1.5, 0, -0.6), 0])
-	_neighbours.append([Vector3(GATE_X - 2.3, WALL_TOP + 0.08, BACK_Z - 0.15), 0.05, Vector3(0, -1.3, -0.5), 2])
+	_neighbour([Vector3(GATE_X + 0.2, 0, BACK_Z - 0.75), 0.15, Vector3(1.5, 0, -0.6), 0])
+	_neighbour([Vector3(GATE_X - 2.3, WALL_TOP + 0.08, BACK_Z - 0.15), 0.05, Vector3(0, -1.3, -0.5), 2])
 
 
 ## A tenement front closing the courtyard in on the left (side -1) or right (+1): ground
@@ -398,7 +412,7 @@ func _tea_house(face_x: float) -> void:
 	for b in 13:
 		_batch(mat_grille, Vector3(0.03, 1.45, 0.025), Transform3D(Basis(), Vector3(x + 0.08, 1.7, -4.9 + b * 0.2)))
 	_batch(mat_dark, Vector3(0.05, 2.2, 1.0), Transform3D(Basis(), Vector3(x, 1.1, -1.6)))
-	_neighbours.append([Vector3(face_x + 0.35, 0, -1.6), PI / 2.0 - 0.5, Vector3(-0.9, 0, 0), 0])
+	_neighbour([Vector3(face_x + 0.35, 0, -1.6), PI / 2.0 - 0.5, Vector3(-0.9, 0, 0), 0])
 	_batch(mat_red, Vector3(0.08, 0.6, 3.8), Transform3D(Basis(), Vector3(x + 0.05, 2.75, -3.1)))
 	var sign := _label("茶樓  TEA HOUSE", 90, GOLD)
 	sign.rotation.y = PI / 2.0
@@ -466,7 +480,7 @@ func _window(face_x: float, inward: float, y: float, z: float, laundry_pole: boo
 	if _rng.randf() < 0.5:
 		_batch(mat_metal, Vector3(0.45, 0.4, 0.65), Transform3D(Basis(), Vector3(face_x + inward * 0.25, y - 0.95, z + 0.2)))
 		if y < 6.0:
-			_perches.append(Vector3(face_x + inward * 0.25, y - 0.74, z + 0.2))
+			_perch(Vector3(face_x + inward * 0.25, y - 0.74, z + 0.2))
 	if laundry_pole:
 		var start := Vector3(face_x + inward * 0.4, y + 0.55, z)
 		var end := start + Vector3(inward * 1.6, 0.0, 0.0)
@@ -486,9 +500,39 @@ func _balcony(face_x: float, inward: float, z: float, side: float) -> void:
 	_batch(mat_dark, Vector3(0.04, 2.1, 0.9), Transform3D(Basis(), Vector3(face_x + inward * 0.02, floor_y + 1.05, z)))
 	var yaw := atan2(-face_x, -z) # toward the fight
 	# Waits indoors and steps out through the balcony door.
-	_neighbours.append([Vector3(face_x + inward * 0.5, floor_y + 0.06, z), yaw, Vector3(-inward * 1.2, 0, 0), 1])
+	_neighbour([Vector3(face_x + inward * 0.5, floor_y + 0.06, z), yaw, Vector3(-inward * 1.2, 0, 0), 1])
 	_cloth(Vector3(face_x + inward * 0.86, floor_y + 1.1, z - 0.4), 0.5, 0.55, Vector3.RIGHT) # towels over the parapet
 	_cloth(Vector3(face_x + inward * 0.86, floor_y + 1.1, z + 0.3), 0.45, 0.5, Vector3.RIGHT)
+
+
+## The courtyard's near end, behind the fight camera: only seen when the camera swings
+## round to film from behind the back wall. Casts no shadow, so the sunrise lighting (over
+## "SunBlocker") is the same either way.
+func _build_front_tenement() -> void:
+	var face_z := NEAR_Z
+	var height := GROUND_FLOOR + 5.0 * FLOOR_HEIGHT
+	_batch(_plaster[3], Vector3(SIDE_X * 2.0 + 1.0, height, 8.0), Transform3D(Basis(), Vector3(0, height / 2.0, face_z + 4.0)))
+	_batch(mat_concrete, Vector3(SIDE_X * 2.0, 0.25, 0.3), Transform3D(Basis(), Vector3(0, GROUND_FLOOR, face_z - 0.15)))
+	for shop in [[-6.0, true], [-1.5, false], [3.5, true]]:
+		_batch(mat_shutter if shop[1] else mat_window_lit, Vector3(3.4, 2.6, 0.05), Transform3D(Basis(), Vector3(shop[0], 1.3, face_z - 0.02)))
+	_batch(mat_red, Vector3(3.6, 0.55, 0.08), Transform3D(Basis(), Vector3(-1.5, 2.85, face_z - 0.06)))
+	var sign := _label("涼茶  HERBAL TEA", 80, GOLD)
+	sign.rotation.y = PI
+	sign.position = Vector3(-1.5, 2.85, face_z - 0.11)
+	sign.pixel_size = 0.0035
+	_add(stage, sign, "HerbalTeaSign")
+	for f in 5:
+		var y := GROUND_FLOOR + f * FLOOR_HEIGHT + 1.35
+		var x := -SIDE_X + 1.0
+		while x < SIDE_X - 0.5:
+			var lit := _rng.randf() < 0.35
+			_batch(mat_window_lit if lit else mat_window_dark, Vector3(1.1, 1.2, 0.04), Transform3D(Basis(), Vector3(x, y, face_z - 0.02)))
+			_batch(mat_grille, Vector3(1.24, 0.04, 0.36), Transform3D(Basis(), Vector3(x, y - 0.62, face_z - 0.18)))
+			for b in 7:
+				_batch(mat_grille, Vector3(0.025, 1.24, 0.025), Transform3D(Basis(), Vector3(x - 0.6 + b * 0.2, y, face_z - 0.38)))
+			if _rng.randf() < 0.45:
+				_batch(mat_metal, Vector3(0.65, 0.4, 0.45), Transform3D(Basis(), Vector3(x + 0.2, y - 0.95, face_z - 0.25)))
+			x += 2.0
 
 
 ## Bamboo scaffolding with green netting over part of the right tenement (repairs).
@@ -514,6 +558,7 @@ func _build_scaffolding() -> void:
 
 func _build_courtyard_props() -> void:
 	# A folding table with a tea set and two plastic stools, at the right.
+	_side = 3
 	var table := Vector3(6.9, 0, -3.6)
 	_batch(_material(Color(0.6, 0.35, 0.2), 0.0, 0.6), Vector3(0.8, 0.04, 0.8), Transform3D(Basis(), table + Vector3(0, 0.72, 0)))
 	for lx in [-0.35, 0.35]:
@@ -540,6 +585,7 @@ func _build_courtyard_props() -> void:
 			_batch(_plastic[s * 3 % _plastic.size()], Vector3(0.035, 0.42, 0.035), Transform3D(Basis(), spot + Vector3(cos(a) * 0.12, 0.21, sin(a) * 0.12)))
 	# Styrofoam planters and pots along the back wall, right of the gate; a big potted
 	# palm by the shrine.
+	_side = 0
 	for p in 6:
 		var at := Vector3(3.6 + p * 0.9, 0, BACK_Z + 0.4)
 		_batch(mat_styro, Vector3(0.6, 0.3, 0.4), Transform3D(Basis(), at + Vector3(0, 0.15, 0)))
@@ -548,6 +594,7 @@ func _build_courtyard_props() -> void:
 	_plant(Vector3(-3.3, 0, BACK_Z + 0.45), 1.2)
 	_plant(Vector3(-8.6, 0, BACK_Z + 0.5), 1.6)
 	# Bird cages hanging from a bracket on the left tenement.
+	_side = 2
 	for c in 2:
 		var at := Vector3(-SIDE_X + 0.6, 2.25, 5.5 + c * 0.7)
 		_batch(mat_metal, Vector3(0.6, 0.03, 0.03), Transform3D(Basis(), at + Vector3(-0.3, 0.45, 0)))
@@ -556,6 +603,7 @@ func _build_courtyard_props() -> void:
 			var a := b * TAU / 8.0
 			_batch(mat_bamboo, Vector3(0.012, 0.42, 0.012), Transform3D(Basis(), at + Vector3(cos(a) * 0.16, 0.21, sin(a) * 0.16)))
 		_batch(_material(Color(0.95, 0.85, 0.2), 0.0, 0.6), Vector3(0.06, 0.06, 0.1), Transform3D(Basis(), at + Vector3(0, 0.12, 0)))
+	_side = -1
 
 
 func _plant(at: Vector3, size: float) -> void:
@@ -672,6 +720,7 @@ func _build_overhead() -> void:
 				continue
 			var p := a.lerp(b, t) + Vector3.DOWN * sin(t * PI) * float(line[2])
 			_cloth(p, _rng.randf_range(0.35, 0.7), _rng.randf_range(0.45, 1.0), (b - a).normalized())
+	_side = 0
 	var lantern_line := [Vector3(GATE_X - 2.4, 3.6, BACK_Z + 0.25), Vector3(GATE_X + 2.4, 3.6, BACK_Z + 0.25)]
 	_wire(lantern_line[0], lantern_line[1], 0.25)
 	for post in lantern_line: # the line runs between two poles off the wall
@@ -703,6 +752,7 @@ func _build_overhead() -> void:
 		body.material_override = _emissive(Color(0.95, 0.12, 0.08), 0.6)
 		_add(pivot, body, "Body")
 		_lanterns.append(NodePath("../Lantern%d" % i))
+	_side = -1
 
 
 ## A piece of laundry hanging from `top` (its top edge centre), `width` along `along`,
@@ -719,11 +769,16 @@ func _cloth(top: Vector3, width: float, drop: float, along: Vector3) -> void:
 		var quad := [[top - right + Vector3.DOWN * drop * v0, Vector2(0, v0)], [top + right + Vector3.DOWN * drop * v0, Vector2(1, v0)],
 			[top + right + Vector3.DOWN * drop * v1, Vector2(1, v1)], [top - right + Vector3.DOWN * drop * v1, Vector2(0, v1)]]
 		var normal := along.cross(Vector3.UP).normalized()
+		var laundry: SurfaceTool = _laundries.get(_side)
+		if laundry == null:
+			laundry = SurfaceTool.new()
+			laundry.begin(Mesh.PRIMITIVE_TRIANGLES)
+			_laundries[_side] = laundry
 		for i in [0, 1, 2, 0, 2, 3]:
-			_laundry.set_color(color)
-			_laundry.set_normal(normal)
-			_laundry.set_uv(quad[i][1])
-			_laundry.add_vertex(quad[i][0])
+			laundry.set_color(color)
+			laundry.set_normal(normal)
+			laundry.set_uv(quad[i][1])
+			laundry.add_vertex(quad[i][0])
 
 
 # --- Skyline ------------------------------------------------------------------------
@@ -792,10 +847,13 @@ func _flush_skyline_and_laundry() -> void:
 	skyline.material_override = mat_skyline
 	skyline.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_add(stage, skyline, "Skyline")
-	var laundry := MeshInstance3D.new()
-	laundry.mesh = _laundry.commit()
-	laundry.material_override = mat_laundry
-	_add(stage, laundry, "Laundry")
+	for side: int in _laundries:
+		var laundry := MeshInstance3D.new()
+		laundry.mesh = (_laundries[side] as SurfaceTool).commit()
+		laundry.material_override = mat_laundry
+		_add(stage, laundry, "Laundry" if side < 0 else "LaundrySide%d" % side)
+		if side >= 0:
+			laundry.add_to_group(&"ring_side_%d" % side, true)
 
 
 # --- Cat and jet --------------------------------------------------------------------
@@ -936,15 +994,19 @@ func _build_life() -> void:
 	life.set("skyline_material", mat_skyline)
 	life.set("laundry_material", mat_laundry)
 	life.set("perches", _perches)
+	life.set("perch_sides", _perch_sides)
 	var spots := PackedVector3Array()
 	var yaws := PackedFloat32Array()
 	var hides := PackedVector3Array()
 	var kinds := PackedInt32Array()
+	var sides := PackedInt32Array()
 	for n: Array in _neighbours:
 		spots.append(n[0])
 		yaws.append(n[1])
 		hides.append(n[2])
 		kinds.append(n[3])
+		sides.append(n[4])
+	life.set("neighbour_sides", sides)
 	life.set("neighbour_spots", spots)
 	life.set("neighbour_yaws", yaws)
 	life.set("neighbour_hidden", hides)
@@ -957,7 +1019,8 @@ func _build_life() -> void:
 
 ## Baked contact shadows on the courtyard floor (StageAO).
 func _bake_contact_shadows() -> void:
-	StageAO.collect(_footprints, stage, 0.0, ["Geometry", "Skyline", "Hills", "Jet", "Laundry", "SunBlocker"])
+	StageAO.collect(_footprints, stage, 0.0, ["Geometry", "Side0", "Side1", "Side2", "Side3", "Skyline", "Hills", "Jet", "Laundry",
+		"LaundrySide2", "LaundrySide3", "SunBlocker"])
 	var half := Vector2(10.0, 11.0)
 	var center := Vector2(0.0, 3.0)
 	var image := StageAO.bake(_footprints, center, half, 256)
@@ -988,31 +1051,54 @@ func _batch(material: Material, size: Vector3, xform: Transform3D) -> void:
 
 func _append(material: Material, mesh: PrimitiveMesh, xform: Transform3D) -> void:
 	StageAO.add_aabb(_footprints, xform * mesh.get_aabb(), 0.0)
-	var st: SurfaceTool = _batches.get(material)
+	if not _batches.has(_side):
+		_batches[_side] = {}
+	var st: SurfaceTool = _batches[_side].get(material)
 	if st == null:
 		st = SurfaceTool.new()
 		st.begin(Mesh.PRIMITIVE_TRIANGLES)
-		_batches[material] = st
+		_batches[_side][material] = st
 	st.append_from(mesh, 0, xform)
 
 
 func _flush_batches() -> void:
-	var group := _add(stage, Node3D.new(), "Geometry")
-	var i := 0
-	for material: Material in _batches:
-		var mesh := (_batches[material] as SurfaceTool).commit()
-		mesh.surface_set_material(0, material)
-		var mi := MeshInstance3D.new()
-		mi.mesh = mesh
-		_add(group, mi, "Batch%d" % i)
-		i += 1
+	var building := _side
+	for side: int in _batches:
+		_side = -1 # the group node goes in its occlusion group by hand
+		var group := _add(stage, Node3D.new(), "Geometry" if side < 0 else "Side%d" % side)
+		if side >= 0:
+			group.add_to_group(&"ring_side_%d" % side, true)
+		var i := 0
+		for material: Material in _batches[side]:
+			var mesh := (_batches[side][material] as SurfaceTool).commit()
+			mesh.surface_set_material(0, material)
+			var mi := MeshInstance3D.new()
+			mi.mesh = mesh
+			if side == 1:
+				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF # the near end (see _build_front_tenement)
+			_add(group, mi, "Batch%d" % i)
+			i += 1
+	_side = building
 
 
 func _add(parent: Node, node: Node, node_name: String) -> Node:
 	node.name = node_name
 	parent.add_child(node)
 	node.owner = stage
+	if parent == stage and _side >= 0 and node is Node3D and not node is Light3D:
+		node.add_to_group(&"ring_side_%d" % _side, true) # hidden with its side (lights stay on)
 	return node
+
+
+func _perch(at: Vector3) -> void:
+	_perches.append(at)
+	_perch_sides.append(_side)
+
+
+## [position, yaw, hidden offset, kind] + the side it's on.
+func _neighbour(spot: Array) -> void:
+	spot.append(_side)
+	_neighbours.append(spot)
 
 
 func _marker(pos: Vector3) -> Marker3D:

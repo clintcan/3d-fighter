@@ -1673,6 +1673,24 @@ func courtyard_tests() -> void:
 		for i in int(seconds * 60.0):
 			life._process(1.0 / 60.0)
 	var sound := m.stage.get_node("Sound") as StageAmbience
+	# The camera can swing out behind the back wall or into a tenement: that side hides
+	# (with its neighbours and the cat) instead of blocking the fighters.
+	var stage = m.stage # untyped: naming Stage here would compile it before the autoloads
+	var gate := life.neighbour_sides.find(0)
+	life._neighbour_state[gate][1] = 1.0 # the gate neighbour is out
+	stage.update_camera_occlusion(Vector3(0, 2.3, -9.0))
+	tick.call(0.05)
+	var behind_back: bool = stage.side_hidden(0) and not stage.get_node("Side0").visible and stage.get_node("Side2").visible
+	behind_back = behind_back and life.neighbour_scale(gate) == 0.0 and not life._cat.visible
+	stage.update_camera_occlusion(Vector3(-12.0, 2.3, 0.0))
+	tick.call(0.05)
+	var in_left: bool = stage.side_hidden(2) and not stage.side_hidden(0) and not stage.get_node("Side2").visible and stage.get_node("Side0").visible
+	stage.update_camera_occlusion(Vector3(0, 2.3, 8.0))
+	tick.call(0.05)
+	check("Courtyard: a camera behind the back wall or inside a tenement hides that side, its neighbours and the cat",
+		behind_back and in_left and not stage.side_hidden(0) and not stage.side_hidden(2) and stage.get_node("Side0").visible
+		and life._cat.visible and life.neighbour_scale(gate) == 1.0) # (headless MultiMeshes keep no transforms to read back)
+	life._neighbour_state[gate][1] = 0.0
 	sound.excitement = 0.0
 	m.start_match()
 	tick.call(0.5)

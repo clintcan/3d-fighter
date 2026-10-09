@@ -64,6 +64,10 @@ const SHUTTER_SOUND := "res://assets/audio/ambience/shutter_roll.ogg"
 @export var skyline_material: ShaderMaterial
 @export var laundry_material: ShaderMaterial
 @export var perches := PackedVector3Array()
+## Which side of the courtyard each perch / neighbour is on (Stage occlusion side, -1 for
+## none): they hide with it when the camera swings out past that side.
+@export var perch_sides := PackedInt32Array()
+@export var neighbour_sides := PackedInt32Array()
 @export var neighbour_spots := PackedVector3Array()
 @export var neighbour_yaws := PackedFloat32Array()
 @export var neighbour_hidden := PackedVector3Array()
@@ -79,6 +83,7 @@ var day_target := 0.0
 var shutter_open := 0.0 # 0 closed .. 1 rolled up
 var gust := 0.0
 var manager: Node
+var _stage: Node
 var _applied_day := -1.0
 var _time := 0.0
 var _rng := RandomNumberGenerator.new()
@@ -131,6 +136,7 @@ var _puff_until := 0.0
 func _ready() -> void:
 	_rng.seed = hash(get_path()) ^ Time.get_ticks_usec()
 	var stage := get_parent()
+	_stage = stage
 	_sun = stage.get_node_or_null("Lights/Sun")
 	_world = stage.get_node_or_null("WorldEnvironment")
 	_lamp = stage.get_node_or_null("Lights/GateLamp")
@@ -353,12 +359,18 @@ func _update_neighbours(delta: float) -> void:
 		_place_neighbour(i, 0.06 * absf(sin(_time * 6.5 + state[3])) if cheering else 0.0)
 
 
+## A neighbour's size: 0 while indoors or while their wall is hidden (the camera is
+## behind it), 0.8 for the kid.
+func neighbour_scale(i: int) -> float:
+	if _neighbour_state[i][1] <= 0.0 or _side_hidden(neighbour_sides, i):
+		return 0.0
+	return 0.8 if neighbour_kinds[i] == 2 else 1.0
+
+
 func _place_neighbour(i: int, bounce := 0.0) -> void:
 	var state: Array = _neighbour_state[i]
 	var shown := smoothstep(0.0, 1.0, state[1])
-	var scale := 0.8 if neighbour_kinds[i] == 2 else 1.0
-	if state[1] <= 0.0:
-		scale = 0.0 # indoors
+	var scale := neighbour_scale(i)
 	var basis := Basis(Vector3.UP, neighbour_yaws[i]).scaled(Vector3.ONE * maxf(scale, 0.0001))
 	var at := neighbour_spots[i] + neighbour_hidden[i] * (1.0 - shown) + Vector3.UP * bounce
 	_people.multimesh.set_instance_transform(i, Transform3D(basis, at))
@@ -442,7 +454,7 @@ func _update_pigeons(delta: float) -> void:
 func _place_pigeon(i: int, _delta: float) -> void:
 	var state: Array = _pigeon_state[i]
 	var flying: bool = state[0] in [Pigeon.FLEEING, Pigeon.RETURNING] and state[1] >= 0.0
-	var hidden: bool = state[0] == Pigeon.AWAY
+	var hidden: bool = state[0] == Pigeon.AWAY or (state[0] == Pigeon.PERCHED and _side_hidden(perch_sides, i))
 	var basis := Basis(Vector3.UP, state[5]).scaled(Vector3.ONE * (0.0001 if hidden else 1.0))
 	if state[0] == Pigeon.PERCHED and state[1] < -0.2 and state[1] > -0.5: # head-bob peck
 		basis = basis * Basis(Vector3.RIGHT, 0.25)
@@ -457,21 +469,27 @@ func _place_pigeon(i: int, _delta: float) -> void:
 
 # --- Cat, jet, swinging things, steam ----------------------------------------------------
 
+## True if entry `i`'s side (from `sides`) is hidden by the stage's camera occlusion.
+func _side_hidden(sides: PackedInt32Array, i: int) -> bool:
+	var side := sides[i] if i < sides.size() else -1
+	return side >= 0 and _stage and _stage.has_method("side_hidden") and _stage.side_hidden(side)
+
+
 func _update_cat(delta: float) -> void:
 	if _cat == null:
 		return
+	# On the back wall: out of sight with it, and while it's off hiding.
+	_cat.visible = _cat_state != Cat.AWAY and not (_stage and _stage.has_method("side_hidden") and _stage.side_hidden(0))
 	match _cat_state:
 		Cat.RUNNING:
 			_move_cat(cat_escape, 4.5, delta, true)
 			if _cat.position.distance_to(cat_escape) < 0.05:
 				_cat_state = Cat.AWAY
 				_cat_timer = _rng.randf_range(CAT_RETURN.x, CAT_RETURN.y)
-				_cat.visible = false
 		Cat.AWAY:
 			_cat_timer -= delta
 			if _cat_timer <= 0.0:
 				_cat_state = Cat.RETURNING
-				_cat.visible = true
 		Cat.RETURNING:
 			_move_cat(_cat_home, 0.8, delta, false)
 			if _cat.position.distance_to(_cat_home) < 0.02:

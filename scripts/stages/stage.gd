@@ -23,9 +23,17 @@ func depth_limit() -> float:
 ## outside them, so near ropes don't cut across the view.
 const SIDE_NORMALS := [Vector3(0, 0, -1), Vector3(0, 0, 1), Vector3(-1, 0, 0), Vector3(1, 0, 0)]
 @export var rope_line := 4.4
+## Per-side lines (-Z, +Z, -X, +X), overriding rope_line, for stages whose sides sit at
+## different distances (the courtyard's back wall and tenements).
+@export var side_lines := PackedFloat32Array()
 @export var occlusion_hysteresis := 0.3
 
 var _side_hidden := [false, false, false, false]
+
+
+## True while the camera is outside `side` and its occlusion group is hidden.
+func side_hidden(side: int) -> bool:
+	return _side_hidden[side]
 
 
 func _ready() -> void:
@@ -34,7 +42,8 @@ func _ready() -> void:
 
 func update_camera_occlusion(camera_position: Vector3) -> void:
 	for side in SIDE_NORMALS.size():
-		var outside: float = camera_position.dot(SIDE_NORMALS[side]) - rope_line
+		var line: float = side_lines[side] if side_lines.size() == SIDE_NORMALS.size() else rope_line
+		var outside: float = camera_position.dot(SIDE_NORMALS[side]) - line
 		var hide: bool = outside > occlusion_hysteresis or (_side_hidden[side] and outside > -occlusion_hysteresis)
 		if hide == _side_hidden[side]:
 			continue
