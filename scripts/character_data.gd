@@ -44,6 +44,18 @@ extends Resource
 ## Tint used for graybox stand-ins and UI until real models/portraits exist.
 @export var placeholder_color: Color = Color.WHITE
 
+@export_group("Intro and quotes")
+## Pre-fight intro animation ("library/clip"), ending in the guard (FightIntro).
+@export var intro_animation: StringName
+## FighterModel.EXPRESSIONS preset worn through the intro.
+@export var intro_expression: StringName = &"neutral"
+## Pre-fight lines; one is picked at random unless a rival line applies.
+@export var intro_lines: PackedStringArray = PackedStringArray()
+## Match-win quotes; one is picked at random unless a rival quote applies.
+@export var win_quotes: PackedStringArray = PackedStringArray()
+## Rivalries: opponent id -> [intro line, win quote].
+@export var rival_lines: Dictionary = {}
+
 @export_group("Stats")
 @export var max_health: int = 1000
 ## Meters per second.

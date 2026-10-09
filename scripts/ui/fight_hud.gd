@@ -84,6 +84,8 @@ var _cutins := {} # player index -> [Texture2D or null, colour], from prepare_cu
 var _score_label: Label
 var _bonus_label: Label
 var _bonus_tween: Tween
+var _quote_label: Label # intro lines and win quotes, under the announcement
+var _quote_tween: Tween
 
 
 func _ready() -> void:
@@ -102,6 +104,7 @@ func _ready() -> void:
 	_build_super_flash()
 	_build_meters()
 	_build_score()
+	_build_quote()
 	%RematchButton.pressed.connect(func() -> void: rematch_pressed.emit())
 	%ResultSelectButton.pressed.connect(func() -> void: character_select_pressed.emit())
 	%ResultMenuButton.pressed.connect(func() -> void: main_menu_pressed.emit())
@@ -142,6 +145,7 @@ func setup(p1: Fighter, p2: Fighter, rounds_to_win: int, p2_tag: String = "CPU")
 func announce(text: String, sub: String = "", pop: bool = false) -> void:
 	center_label.text = text
 	sub_label.text = sub
+	sub_label.visible = sub != "" # an empty line would push the title up
 	if _announce_tween:
 		_announce_tween.kill()
 	center_label.scale = Vector2.ONE
@@ -438,9 +442,12 @@ func _process(_delta: float) -> void:
 
 # --- Victory cinematic ------------------------------------------------------------
 
-## Letterbox bars in, fight HUD out, announcements to the lower third.
-func start_cinematic() -> void:
+## Letterbox bars in, fight HUD out, announcements to the lower third. `instant` skips the
+## transition (the pre-fight intro starts that way).
+func start_cinematic(instant := false) -> void:
 	_animate_cinematic(1.0)
+	if instant:
+		_cinematic_tween.custom_step(1.0)
 	(center_label.get_parent() as Control).size_flags_vertical = Control.SIZE_SHRINK_END
 	# Keep the lower-third title and menu above the bottom letterbox bar.
 	$Margin.add_theme_constant_override("margin_bottom", int(get_viewport().get_visible_rect().size.y * 0.13))
@@ -454,6 +461,7 @@ func start_cinematic() -> void:
 func end_cinematic() -> void:
 	if _cinematic_tween:
 		_cinematic_tween.kill()
+	show_quote("")
 	_set_letterbox(0.0)
 	%Top.modulate.a = 1.0
 	debug_label.modulate.a = 1.0
@@ -488,6 +496,39 @@ func _set_letterbox(amount: float) -> void:
 	_letterbox[1].offset_bottom = 0.0
 	for bar in _letterbox:
 		bar.visible = amount > 0.0
+
+
+# --- Quotes ----------------------------------------------------------------------
+
+func _build_quote() -> void:
+	_quote_label = Label.new()
+	_quote_label.name = "QuoteLabel"
+	_quote_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_quote_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_quote_label.custom_minimum_size = Vector2(900, 0)
+	_quote_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_quote_label.add_theme_font_size_override("font_size", 40)
+	_quote_label.add_theme_color_override("font_color", Color(0.95, 0.95, 1.0))
+	_quote_label.add_theme_constant_override("outline_size", 10)
+	_quote_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	sub_label.add_sibling(_quote_label)
+
+
+## A line in quotation marks under the announcement (pre-fight intro, match win), faded
+## in; "" clears it.
+func show_quote(text: String) -> void:
+	if _quote_tween:
+		_quote_tween.kill()
+	_quote_label.text = "“%s”" % text if text != "" else ""
+	_quote_label.visible = text != ""
+	if text != "":
+		_quote_label.modulate.a = 0.0
+		_quote_tween = create_tween()
+		_quote_tween.tween_property(_quote_label, "modulate:a", 1.0, 0.25)
+
+
+func quote_text() -> String:
+	return _quote_label.text
 
 
 # --- Menus -----------------------------------------------------------------------

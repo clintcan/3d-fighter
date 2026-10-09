@@ -352,6 +352,7 @@ func _initialize() -> void:
 	await mira_tests()
 	await lian_tests()
 	presentation_tests()
+	intro_tests()
 	await beach_tests()
 	await market_tests()
 	await train_tests()
@@ -1856,6 +1857,102 @@ func lian_tests() -> void:
 
 ## Super cut-ins, limb trails, and the thrown / reversed reactions. Runs in the fight
 ## lian_tests() left (Lian vs Kenji).
+## Pre-fight intros and win quotes, on presentation_tests' fight (Lian vs Kenji).
+func intro_tests() -> void:
+	var gs = root.get_node("GameState")
+	var library: AnimationLibrary = load("res://assets/animations/fight_anims.res")
+	var ids: Array = gs.roster.map(func(c: CharacterData) -> String: return String(c.id))
+	var problems := []
+	for c: CharacterData in gs.roster:
+		var clip := String(c.intro_animation).trim_prefix("fight/")
+		if c.intro_animation == &"" or not library.has_animation(clip):
+			problems.append("%s: no intro clip" % c.id)
+		elif library.get_animation(clip).length > FightIntro.SHOT_SECONDS:
+			problems.append("%s: intro clip longer than its shot" % c.id)
+		if not FighterModel.EXPRESSIONS.has(c.intro_expression):
+			problems.append("%s: unknown expression" % c.id)
+		if c.intro_lines.size() < 2 or c.win_quotes.size() < 2:
+			problems.append("%s: too few lines" % c.id)
+		for rival: String in c.rival_lines:
+			if not ids.has(rival) or rival == String(c.id) or (c.rival_lines[rival] as Array).size() != 2:
+				problems.append("%s: bad rival %s" % [c.id, rival])
+	check("Every fighter has an intro clip (no longer than its shot), an expression, lines, win quotes and valid rivals",
+		problems.is_empty(), str(problems))
+	var by_id := {}
+	for c: CharacterData in gs.roster:
+		by_id[c.id] = c
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	check("Lines: the rival line in a rivalry, the mirror line against yourself, else one of the fighter's own",
+		FightIntro.intro_line(by_id[&"kenji"], by_id[&"jin"], rng) == by_id[&"kenji"].rival_lines["jin"][0]
+		and FightIntro.win_quote(by_id[&"kenji"], by_id[&"kenji"], rng) == FightIntro.MIRROR_LINES[1]
+		and by_id[&"kenji"].intro_lines.has(FightIntro.intro_line(by_id[&"kenji"], by_id[&"brutus"], rng))
+		and by_id[&"brutus"].win_quotes.has(FightIntro.win_quote(by_id[&"brutus"], by_id[&"mira"], rng)))
+
+	var settings = root.get_node("Settings")
+	check("Intro: none without a window (tests and smoke tests)", m.intro == null and not m._waiting_for_screen)
+	var wanted: bool = m.wants_intro()
+	settings.fight_intros = false
+	var off: bool = m.wants_intro()
+	settings.fight_intros = true
+	gs.mode = gs.Mode.TRAINING
+	var training: bool = m.wants_intro()
+	gs.mode = gs.Mode.ONLINE
+	var online: bool = m.wants_intro()
+	gs.mode = gs.Mode.VS_CPU
+	check("Intro: offline matches only, and only with the option on", wanted and not off and not training and not online)
+
+	# Drive an intro by hand: Lian (P1) first, then Kenji.
+	m.start_match()
+	m._waiting_for_screen = true
+	var intro := FightIntro.new()
+	m.intro = intro
+	m.add_child(intro)
+	intro.setup(m)
+	check("Intro: P1's shot first: intro clip, eyes on the camera, letterbox, no HUD text yet",
+		p1.intro_clip == p1.data.intro_animation and p1.intro_on_camera and not p2.intro_on_camera
+		and m.camera.intro_target == p1 and m.hud._letterbox[0].visible and m.hud.center_label.text == "")
+	intro.advance(0.5)
+	check("Intro: the name and the rival line appear, with the intro face and clip",
+		m.hud.center_label.text == "LIAN" and m.hud.quote_text().contains(p1.data.rival_lines["kenji"][0])
+		and p1.face_expression() == p1.data.intro_expression and p1._animation_request(false)[0] == p1.data.intro_animation,
+		"'%s' %s" % [m.hud.center_label.text, m.hud.quote_text()])
+	var ticks: int = m.phase_ticks
+	step(10)
+	check("Intro: the round doesn't tick while it plays", m.phase_ticks == ticks and m.phase == m.Phase.INTRO)
+	intro.advance(FightIntro.SHOT_SECONDS)
+	check("Intro: then P2's shot; P1 back to the guard",
+		intro.current_shot() == 1 and p1.intro_clip == &"" and not p1.intro_on_camera
+		and p2.intro_on_camera and p2.intro_clip == p2.data.intro_animation and m.camera.intro_target == p2)
+	var done := [false]
+	intro.finished.connect(func() -> void: done[0] = true)
+	intro.advance(FightIntro.SHOT_SECONDS)
+	check("Intro: ends with both fighters in the guard, the fight camera and HUD back",
+		done[0] and p1.intro_clip == &"" and p2.intro_clip == &"" and m.camera.intro_target == null
+		and not m.hud._letterbox[0].visible and m.hud.quote_text() == "")
+	var skipped := FightIntro.new()
+	m.add_child(skipped)
+	skipped.setup(m)
+	var skip_done := [false]
+	skipped.finished.connect(func() -> void: skip_done[0] = true)
+	skipped.skip()
+	check("Intro: a button press skips it", skip_done[0] and p1.intro_clip == &"" and m.camera.intro_target == null)
+	m.intro = null
+	m._waiting_for_screen = false
+
+	# Win quote: Lian beats Kenji, so her rival quote for him.
+	m.start_match()
+	m.start_fight_immediately()
+	m.round_wins[0] = 2
+	m._after_round()
+	step(m.VICTORY_TITLE_TICKS + 1)
+	check("Match win: the winner's quote under the title (rival quote here)",
+		m.hud.center_label.text == "LIAN WINS" and m.hud.quote_text().contains(p1.data.rival_lines["kenji"][1]),
+		m.hud.quote_text())
+	m.start_match()
+	check("Match win: the quote clears on a rematch", m.hud.quote_text() == "")
+
+
 func presentation_tests() -> void:
 	var gs = root.get_node("GameState")
 	var missing := []

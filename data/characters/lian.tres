@@ -54,6 +54,13 @@ detailed_textures = true
 realistic_shading = true
 victory_animations = Array[StringName]([&"fight/victory_bow", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.2, 0.65, 0.5, 1)
+intro_animation = &"fight/intro_wing_chun"
+intro_lines = PackedStringArray("Strike first. I\'ll answer.", "Water takes the shape of your attack.", "Be patient. I will be.")
+win_quotes = PackedStringArray("Your strength became my strength.", "Force met nothing. Then everything.", "Breathe. Then try again.")
+rival_lines = {
+"kenji": ["Your fists are honest. That makes them easy.", "Discipline is good. Patience is better."],
+"valka": ["A grip is a promise. Let me break it.", "You held on. I let go."]
+}
 max_health = 980
 back_walk_speed = 1.7
 dash_speed = 6.2

@@ -50,6 +50,14 @@ detailed_textures = true
 realistic_shading = true
 victory_animations = Array[StringName]([&"fight/victory_bow", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.2, 0.45, 0.9, 1)
+intro_animation = &"fight/intro_salute"
+intro_expression = &"guard"
+intro_lines = PackedStringArray("Show me what your training is worth.", "Let our fists do the talking.", "A clean fight. No holding back.")
+win_quotes = PackedStringArray("Discipline beats fury. Every time.", "Train harder. Then come find me again.", "You fought well. Not well enough.")
+rival_lines = {
+"jin": ["Your kicks against my fists. Again.", "Fists one, kicks nothing."],
+"lian": ["They say you can't be hit. Let's find out.", "Even still water can be stirred."]
+}
 power_rating = 0.55
 speed_rating = 0.55
 moves = Array[ExtResource("1_qdmbc")]([ExtResource("5_5a4ip"), ExtResource("6_e40xy"), ExtResource("7_bthns"), ExtResource("8_ynpm3"), ExtResource("9_yj4mt"), ExtResource("10_65oi5"), ExtResource("11_jc7cg"), ExtResource("12_hp42r"), ExtResource("13_26eyd"), ExtResource("14_xn3v5"), ExtResource("15_ffpqg"), ExtResource("16_h8qr8"), ExtResource("17_p7x8d"), ExtResource("18_eengp"), ExtResource("20_jc7cg"), ExtResource("21_hp42r"), ExtResource("22_26eyd"), ExtResource("23_xn3v5")])

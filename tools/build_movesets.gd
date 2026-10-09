@@ -248,6 +248,59 @@ const CHARACTERS := {
 }
 
 
+## Pre-fight intros and match-win quotes (FightIntro, FightManager). `rivals`: opponent
+## id -> [intro line, win quote], used instead of a random line for that matchup.
+const INTROS := {
+	"kenji": {
+		animation = &"fight/intro_salute", expression = &"guard",
+		lines = ["Show me what your training is worth.", "Let our fists do the talking.", "A clean fight. No holding back."],
+		quotes = ["Discipline beats fury. Every time.", "Train harder. Then come find me again.", "You fought well. Not well enough."],
+		rivals = {"jin": ["Your kicks against my fists. Again.", "Fists one, kicks nothing."],
+			"lian": ["They say you can't be hit. Let's find out.", "Even still water can be stirred."]},
+	},
+	"rhea": {
+		animation = &"fight/intro_shadowbox", expression = &"smirk",
+		lines = ["Try to keep up.", "Blink and you'll miss it.", "Let's make this quick."],
+		quotes = ["Too slow. Way too slow.", "Was that your best? Cute.", "I barely broke a sweat."],
+		rivals = {"brutus": ["Big guy. Slow guy.", "The bigger they are..."],
+			"mira": ["Market girl, huh? Let's dance.", "Fast beats feisty."]},
+	},
+	"brutus": {
+		animation = &"fight/intro_knuckles", expression = &"grin",
+		lines = ["I'm gonna fold you in half.", "Step closer. I dare you.", "Hope you brought a mouthguard."],
+		quotes = ["Stay down. It's easier.", "That's what happens when you stand in front of me.", "Next!"],
+		rivals = {"rhea": ["Stand still, you gnat!", "Caught you. Finally."],
+			"valka": ["Let's see who's really the strongest.", "Nobody throws me around."]},
+	},
+	"valka": {
+		animation = &"fight/intro_beckon", expression = &"smirk",
+		lines = ["Come closer. I won't bite... much.", "Every fight ends on the mat.", "I'll show you the floor. Up close."],
+		quotes = ["You and the floor are well acquainted now.", "Tap out sooner next time.", "Strong arms. Weak grip."],
+		rivals = {"lian": ["Counter this: I'm already holding you.", "You can't redirect what's already holding you."],
+			"brutus": ["Big man. Bigger fall.", "Timber!"]},
+	},
+	"jin": {
+		animation = &"fight/intro_kick", expression = &"guard",
+		lines = ["Stay at my range. If you can.", "One kick is all it takes.", "Measure twice. Strike once."],
+		quotes = ["You never found the distance.", "My legs reach further than your plans.", "Precision beats power."],
+		rivals = {"kenji": ["Still hiding behind fireballs, Kenji?", "Keep your distance next time. Oh, wait."]},
+	},
+	"mira": {
+		animation = &"fight/intro_power", expression = &"grin",
+		lines = ["Tara na! Let's go!", "Don't blink, pare.", "Last one standing eats for free."],
+		quotes = ["Salamat! Good fight.", "Street-tested. Lola-approved.", "Want another round? Same price."],
+		rivals = {"rhea": ["Speed's nice. Heart's better.", "Next time, merienda's on you."]},
+	},
+	"lian": {
+		animation = &"fight/intro_wing_chun", expression = &"neutral",
+		lines = ["Strike first. I'll answer.", "Water takes the shape of your attack.", "Be patient. I will be."],
+		quotes = ["Your strength became my strength.", "Force met nothing. Then everything.", "Breathe. Then try again."],
+		rivals = {"valka": ["A grip is a promise. Let me break it.", "You held on. I let go."],
+			"kenji": ["Your fists are honest. That makes them easy.", "Discipline is good. Patience is better."]},
+	},
+}
+
+
 func _initialize() -> void:
 	for id: String in CHARACTERS:
 		var spec: Dictionary = CHARACTERS[id]
@@ -282,6 +335,12 @@ func _initialize() -> void:
 				character.alt_body_albedo = load(spec.stats[stat])
 			else:
 				character.set(stat, spec.stats[stat])
+		var intro: Dictionary = INTROS.get(id, {})
+		character.intro_animation = intro.get("animation", &"")
+		character.intro_expression = intro.get("expression", &"neutral")
+		character.intro_lines = PackedStringArray(intro.get("lines", []))
+		character.win_quotes = PackedStringArray(intro.get("quotes", []))
+		character.rival_lines = intro.get("rivals", {}).duplicate(true)
 		var portrait := "res://assets/ui/portraits/%s.png" % id # from tools/render_portraits.gd
 		if ResourceLoader.exists(portrait):
 			character.portrait = load(portrait)

@@ -51,6 +51,14 @@ detailed_textures = true
 realistic_shading = true
 victory_animations = Array[StringName]([&"fight/victory_flex", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.95, 0.6, 0.15, 1)
+intro_animation = &"fight/intro_knuckles"
+intro_expression = &"grin"
+intro_lines = PackedStringArray("I\'m gonna fold you in half.", "Step closer. I dare you.", "Hope you brought a mouthguard.")
+win_quotes = PackedStringArray("Stay down. It\'s easier.", "That\'s what happens when you stand in front of me.", "Next!")
+rival_lines = {
+"rhea": ["Stand still, you gnat!", "Caught you. Finally."],
+"valka": ["Let's see who's really the strongest.", "Nobody throws me around."]
+}
 max_health = 1100
 walk_speed = 1.5
 back_walk_speed = 1.2

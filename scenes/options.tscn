@@ -143,6 +143,16 @@ custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 
+[node name="IntrosLabel" type="Label" parent="Center/Panel/VBox/Grid"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Fight Intros"
+
+[node name="IntrosCheck" type="CheckButton" parent="Center/Panel/VBox/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+
 [node name="DisplayLabel" type="Label" parent="Center/Panel/VBox/Grid"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 28

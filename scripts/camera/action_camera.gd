@@ -102,6 +102,9 @@ var _victory_side := 1.0
 var _victory_cut := false
 var _super_fighter: Fighter
 var _super_time := 0.0
+## Fighter featured by the pre-fight intro (FightIntro), or null.
+var intro_target: Fighter
+var _intro_time := 0.0
 
 
 func setup(fight_manager: Node) -> void:
@@ -124,6 +127,7 @@ func snap() -> void:
 	_fov_punch = 0.0
 	focus = null
 	victory_target = null
+	intro_target = null
 	_super_time = 0.0
 	Engine.time_scale = 1.0
 	var targets := _compute_targets(0.0)
@@ -149,6 +153,9 @@ func _process(scaled_delta: float) -> void:
 	var delta := scaled_delta / maxf(Engine.time_scale, 0.01)
 	if victory_target:
 		_process_victory(delta)
+		return
+	if intro_target:
+		_process_intro(delta)
 		return
 	_update_intensity(delta)
 	var strength := _fit_strength(_strength)
@@ -191,6 +198,47 @@ func _super_targets() -> Dictionary:
 		position = chest + dir * super_distance + Vector3.UP * 0.15,
 		look = chest + _super_fighter.forward * 0.35,
 		fov = super_fov,
+	}
+
+
+# --- Pre-fight intro ----------------------------------------------------------------
+
+## Cuts to a 3/4 front shot of `fighter` that pushes in toward a close-up (FightIntro).
+## snap() ends it.
+func start_intro(fighter: Fighter) -> void:
+	intro_target = fighter
+	_intro_time = 0.0
+	var shot := _intro_shot(0.0)
+	_base_position = shot.position
+	_look_target = shot.look
+	_base_fov = shot.fov
+
+
+func _process_intro(delta: float) -> void:
+	_intro_time += delta
+	var shot := _intro_shot(_intro_time)
+	var t := 1.0 - exp(-6.0 * delta)
+	_base_position = _base_position.lerp(shot.position, t)
+	_look_target = _look_target.lerp(shot.look, t)
+	_base_fov = lerpf(_base_fov, shot.fov, t)
+	fov = _base_fov
+	_apply_transform(0.0, 0.0)
+	if manager.stage:
+		manager.stage.update_camera_occlusion(global_position)
+
+
+## From the camera's side of the fight, in front of the fighter: a medium shot easing in
+## to head and shoulders over 2 s.
+func _intro_shot(time: float) -> Dictionary:
+	var origin := intro_target.get_global_transform_interpolated().origin
+	var side: Vector3 = manager.view_dir
+	var e: float = smoothstep(0.0, 1.0, minf(time / 2.0, 1.0))
+	var rad := deg_to_rad(lerpf(58.0, 46.0, e))
+	var dir := (intro_target.forward * cos(rad) + side * sin(rad)).normalized()
+	return {
+		position = origin + dir * lerpf(3.0, 2.1, e) + Vector3.UP * lerpf(1.25, 1.5, e),
+		look = origin + Vector3.UP * lerpf(1.25, 1.45, e),
+		fov = lerpf(40.0, 33.0, e),
 	}
 
 

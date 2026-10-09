@@ -175,6 +175,11 @@ var victory := false
 ## Match-win animation (played once, final pose held); empty = round-win folded arms.
 var victory_clip: StringName
 var _victory_time := 0.0
+## Pre-fight intro (FightIntro; cosmetic, not simulation state): the clip playing, and
+## whether this fighter is the one on camera (then it looks into the lens).
+var intro_clip: StringName
+var intro_on_camera := false
+var _intro_time := 0.0
 var last_hit_level: MoveData.HitLevel = MoveData.HitLevel.MID
 ## Skinned character model, or null for a graybox capsule.
 var model: FighterModel
@@ -827,6 +832,17 @@ func start_victory(clip: StringName) -> void:
 	_victory_time = 0.0
 
 
+## Pre-fight intro: play `clip` from the start (cosmetic; the fighter stays idle).
+func start_intro(clip: StringName) -> void:
+	intro_clip = clip
+	_intro_time = 0.0
+
+
+func end_intro() -> void:
+	intro_clip = &""
+	intro_on_camera = false
+
+
 ## True while this fighter's attack (or projectile) could connect with `target` soon.
 func is_threatening(target: Fighter) -> bool:
 	return threat_move(target) != null
@@ -1092,6 +1108,8 @@ func _update_limb() -> void:
 func _update_model(delta: float) -> void:
 	if victory_clip != &"":
 		_victory_time += delta
+	if intro_clip != &"":
+		_intro_time += delta
 	var frozen := hitstop > 0 or self.frozen
 	var request := _animation_request(frozen)
 	# Hitstop freezes the pose outright; the super freeze holds the clip time but lets a
@@ -1134,6 +1152,8 @@ func face_expression() -> StringName:
 			return &"out"
 		State.TECH:
 			return &"surprise"
+	if intro_clip != &"":
+		return data.intro_expression
 	if victory:
 		return &"grin" if victory_clip != &"" else &"smirk"
 	return &"neutral"
@@ -1148,7 +1168,7 @@ const GAZE_DROP := 0.3 # metres below the opponent's eyes
 func gaze_target() -> Vector3:
 	if state in [State.KNOCKDOWN, State.KO]:
 		return Vector3.INF
-	if victory:
+	if victory or intro_on_camera:
 		var camera := get_viewport().get_camera_3d() if is_inside_tree() else null
 		return camera.global_position if camera else Vector3.INF
 	if opponent and opponent.model:
@@ -1203,6 +1223,8 @@ func _animation_request(frozen: bool) -> Array:
 			return [&"fight/thrown", t, 1.0]
 		State.TECH:
 			return [&"fight/block_stand", 0.0, 1.0]
+	if intro_clip != &"":
+		return [intro_clip, _intro_time, 1.0]
 	if victory and victory_clip != &"":
 		return [victory_clip, _victory_time, 1.0]
 	if victory:

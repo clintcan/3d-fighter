@@ -77,11 +77,13 @@ var resimulating := false
 ## The online match driver (ONLINE mode only): a NetplayMatch, or a SpectatorMatch when
 ## watching an internet match.
 var netplay: Node
-## True until the fight's first frames are on screen (offline, with a window). Drawing the
-## first frame takes a few hundred ms (the stage's pipelines compile then) while the
-## loading screen stays up, so the intro's ticks, the round call and the music wait for
-## it instead of starting behind the loading screen.
+## True until the fight's first frames are on screen and the pre-fight intro has played
+## (offline, with a window). Drawing the first frame takes a few hundred ms (the stage's
+## pipelines compile then) while the loading screen stays up, so the round's ticks, the
+## round call and the music wait for it instead of starting behind the loading screen.
 var _waiting_for_screen := false
+## The pre-fight intro while it plays (FightIntro), else null.
+var intro: FightIntro
 
 @onready var camera: ActionCamera = $ActionCamera
 @onready var hud: FightHud = $HUD
@@ -152,10 +154,23 @@ func _ready() -> void:
 		netplay = SpectatorMatch.new() if Net.spectating else NetplayMatch.new()
 		add_child(netplay)
 		netplay.setup(self)
+	if _waiting_for_screen and wants_intro():
+		intro = FightIntro.new()
+		intro.name = "FightIntro"
+		intro.hold = true
+		add_child(intro)
+		intro.setup(self)
 	_update_debug_text()
 	if "--smoke-test" in OS.get_cmdline_user_args():
 		print("SMOKE TEST: fight ready (%s vs %s, %d moves loaded)" % [p1.data.display_name, p2.data.display_name, p1.data.moves.size()])
 		round_ended.connect(func(_w: Fighter, reason: String) -> void: print("SMOKE TEST: round ended (%s)" % reason))
+
+
+## Pre-fight intros: offline matches (not training), if the player hasn't turned them off.
+func wants_intro() -> bool:
+	if not Settings.fight_intros or is_online() or is_training():
+		return false
+	return fighters.any(func(f: Fighter) -> bool: return f.data.intro_animation != &"")
 
 
 ## Two humans (local Versus or online).
@@ -201,6 +216,8 @@ func start_match() -> void:
 		GameState.arcade.restart_stage(false) # a restarted stage starts from its own score
 		hud.set_score(GameState.arcade.score)
 	_start_round()
+	if intro:
+		intro.skip() # restarted from the pause menu mid-intro; the round call follows it
 	if is_training():
 		for fighter in fighters:
 			fighter.immortal = true
@@ -273,6 +290,7 @@ func _tick_round() -> void:
 						hud.announce("PLAYER %d WINS" % (fighters.find(match_winner) + 1), match_winner.data.display_name.to_upper(), true)
 					else:
 						hud.announce("%s WINS" % match_winner.data.display_name.to_upper(), "", true)
+					hud.show_quote(FightIntro.win_quote(match_winner.data, match_winner.opponent.data, _cosmetic_rng))
 				elif phase_ticks == VICTORY_RESULT_TICKS:
 					hud.show_result()
 	_knocked_out.clear()
@@ -438,8 +456,12 @@ func _physics_process(_delta: float) -> void:
 func _start_when_on_screen() -> void:
 	for i in 2:
 		await RenderingServer.frame_post_draw
-	_waiting_for_screen = false
 	Audio.music(stage.music)
+	if intro and not intro.is_done(): # set up at the end of _ready: the first frame is its shot
+		intro.hold = false
+		await intro.finished
+	intro = null
+	_waiting_for_screen = false
 	if phase == Phase.INTRO and phase_ticks == 0 and not is_training():
 		_announce_round()
 

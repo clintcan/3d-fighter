@@ -10,6 +10,8 @@ var voice_volume := 1.0
 var ambience_volume := 1.0
 var camera_mode: ActionCamera.Mode = ActionCamera.Mode.FULL
 var ai_difficulty: AIController.Difficulty = AIController.Difficulty.NORMAL
+## Pre-fight intros (FightIntro) before round 1 of an offline match.
+var fight_intros := true
 ## Display: a window, a borderless window covering the screen, or exclusive fullscreen
 ## (Windows can hand the screen to the game: slightly lower latency, slower Alt-Tab).
 ## Fullscreen always runs at the desktop resolution; Godot never changes display modes.
@@ -68,6 +70,7 @@ func load_settings() -> void:
 	ambience_volume = cfg.get_value("audio", "ambience", ambience_volume)
 	camera_mode = cfg.get_value("game", "camera_mode", camera_mode)
 	ai_difficulty = cfg.get_value("game", "ai_difficulty", ai_difficulty)
+	fight_intros = cfg.get_value("game", "fight_intros", fight_intros)
 	# Settings from before the display choice had only a fullscreen switch.
 	var legacy_mode := DisplayMode.BORDERLESS if cfg.get_value("video", "fullscreen", false) else DisplayMode.WINDOWED
 	display_mode = clampi(cfg.get_value("video", "display_mode", legacy_mode), DisplayMode.WINDOWED, DisplayMode.EXCLUSIVE) as DisplayMode
@@ -91,6 +94,7 @@ func save_settings() -> void:
 	cfg.set_value("audio", "ambience", ambience_volume)
 	cfg.set_value("game", "camera_mode", camera_mode)
 	cfg.set_value("game", "ai_difficulty", ai_difficulty)
+	cfg.set_value("game", "fight_intros", fight_intros)
 	cfg.set_value("video", "display_mode", display_mode)
 	cfg.set_value("video", "window_size", window_size)
 	cfg.set_value("video", "resolution", resolution)

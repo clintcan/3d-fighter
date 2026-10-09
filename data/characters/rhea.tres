@@ -50,6 +50,14 @@ detailed_textures = true
 realistic_shading = true
 victory_animations = Array[StringName]([&"fight/victory_point", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.9, 0.25, 0.4, 1)
+intro_animation = &"fight/intro_shadowbox"
+intro_expression = &"smirk"
+intro_lines = PackedStringArray("Try to keep up.", "Blink and you\'ll miss it.", "Let\'s make this quick.")
+win_quotes = PackedStringArray("Too slow. Way too slow.", "Was that your best? Cute.", "I barely broke a sweat.")
+rival_lines = {
+"brutus": ["Big guy. Slow guy.", "The bigger they are..."],
+"mira": ["Market girl, huh? Let's dance.", "Fast beats feisty."]
+}
 max_health = 960
 walk_speed = 2.6
 back_walk_speed = 2.0

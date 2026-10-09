@@ -1,5 +1,5 @@
 extends Control
-## Options: volumes (music, effects, announcer, stage ambience), action camera mode, CPU difficulty, display, resolution, graphics. Changes apply and
+## Options: volumes (music, effects, announcer, stage ambience), action camera mode, CPU difficulty, fight intros, display, resolution, graphics. Changes apply and
 ## save immediately (Settings autoload).
 
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
@@ -15,6 +15,7 @@ const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 @onready var resolution_option: OptionButton = %ResolutionOption
 @onready var graphics_option: OptionButton = %GraphicsOption
 @onready var swap_pads_check: CheckButton = %SwapPadsCheck
+@onready var intros_check: CheckButton = %IntrosCheck
 
 
 func _ready() -> void:
@@ -45,6 +46,7 @@ func _ready() -> void:
 	resolution_option.selected = Settings.resolution
 	graphics_option.selected = Settings.graphics
 	swap_pads_check.button_pressed = Settings.swap_pads
+	intros_check.button_pressed = Settings.fight_intros
 
 	music_slider.value_changed.connect(func(v: float) -> void: _change(&"music_volume", v))
 	sfx_slider.value_changed.connect(func(v: float) -> void:
@@ -61,6 +63,7 @@ func _ready() -> void:
 	resolution_option.item_selected.connect(func(i: int) -> void: _change(&"resolution", i))
 	graphics_option.item_selected.connect(func(i: int) -> void: _change(&"graphics", i))
 	swap_pads_check.toggled.connect(func(on: bool) -> void: _change(&"swap_pads", on))
+	intros_check.toggled.connect(func(on: bool) -> void: _change(&"fight_intros", on))
 	%BackButton.pressed.connect(_back)
 	%ControlsButton.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/controls.tscn"))
 	music_slider.grab_focus()

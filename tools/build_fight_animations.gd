@@ -63,6 +63,14 @@ func _initialize() -> void:
 	lib.add_animation("victory_fist_pump", build_victory_fist_pump())
 	lib.add_animation("victory_flex", build_victory_flex())
 	lib.add_animation("victory_point", build_victory_point())
+	# Pre-fight intros (one per fighter, ~2 s, ending in the guard)
+	lib.add_animation("intro_salute", build_intro_salute())
+	lib.add_animation("intro_shadowbox", build_intro_shadowbox())
+	lib.add_animation("intro_knuckles", build_intro_knuckles())
+	lib.add_animation("intro_beckon", build_intro_beckon())
+	lib.add_animation("intro_kick", build_intro_kick())
+	lib.add_animation("intro_power", build_intro_power())
+	lib.add_animation("intro_wing_chun", build_intro_wing_chun())
 	lib.add_animation("rushing_hook", build_in_place([ual2.get_animation("Melee_Hook"), ual2.get_animation("Melee_Hook_Rec")]))
 	# Specials and supers
 	lib.add_animation("palm_blast", build_palm_blast())
@@ -635,6 +643,123 @@ func build_victory_point() -> Animation:
 	var sway := duplicate_pose(pose)
 	move_bone(sway, "pelvis", Vector3(s * -0.02, 0, 0))
 	return make_animation([[0.0, guard], [0.35, stand], [0.7, pose], [1.8, sway], [3.0, pose]], false)
+
+
+# --- Pre-fight intros --------------------------------------------------------------
+# Each starts upright (or from the guard), shows the fighter's character and settles into
+# the guard by ~2 s, so the fight's guard loop picks up without a jump.
+
+## Kenji: fist-in-palm salute, a short bow over it, then up into the guard. ~2.1 s.
+func build_intro_salute() -> Animation:
+	var stand := _victory_stance(0.12, 0.05)
+	var salute := duplicate_pose(stand)
+	_salute_hands(salute)
+	var bow := duplicate_pose(stand)
+	lean(bow, -16.0, 0.0)
+	rotate_bone(bow, "neck_01", Vector3.RIGHT, 8.0)
+	_salute_hands(bow)
+	return make_animation([[0.0, stand], [0.35, salute], [0.85, salute], [1.15, bow], [1.45, bow],
+		[1.7, salute], [2.1, guard]], false)
+
+
+## Rhea: bouncing on her toes, jab, jab, cross, then a bounce into the guard. ~1.9 s.
+func build_intro_shadowbox() -> Animation:
+	var lead_foot := global_origin(guard, "foot_" + lead)
+	var rear_foot := global_origin(guard, "foot_" + rear)
+	var up := duplicate_pose(guard)
+	move_bone(up, "pelvis", Vector3(0, 0.035, 0))
+	plant_both(up, lead_foot + Vector3(0, 0.03, 0), rear_foot + Vector3(0, 0.04, 0))
+	var down := duplicate_pose(guard)
+	move_bone(down, "pelvis", Vector3(0, -0.02, 0))
+	plant_both(down, lead_foot, rear_foot)
+	var jab := duplicate_pose(up)
+	var shoulder := global_origin(jab, "upperarm_" + lead)
+	hip_turn(jab, -6.0)
+	punch_arm(jab, lead, Vector3(shoulder.x * 0.3, shoulder.y + 0.02, shoulder.z + 0.55))
+	var cross := duplicate_pose(down)
+	hip_turn(cross, 22.0)
+	plant_both(cross, lead_foot, rear_foot)
+	shoulder = global_origin(cross, "upperarm_" + rear)
+	punch_arm(cross, rear, Vector3(shoulder.x * 0.2, shoulder.y + 0.02, shoulder.z + 0.6))
+	return make_animation([[0.0, down], [0.15, up], [0.3, jab], [0.42, up], [0.55, jab], [0.68, down],
+		[0.82, cross], [1.0, down], [1.18, up], [1.36, down], [1.54, up], [1.9, guard]], false)
+
+
+## Brutus: smacks his fist into his open palm twice, rolls his neck, then the guard. ~2.2 s.
+func build_intro_knuckles() -> Animation:
+	var stand := _victory_stance(0.26, -0.03)
+	var chest := global_origin(stand, "spine_03")
+	var palm := chest + Vector3(0.0, -0.02, 0.32)
+	var ready := duplicate_pose(stand)
+	reach_arm(ready, lead, palm + Vector3(-rear_sign() * 0.02, 0, 0))
+	reach_arm(ready, rear, palm + Vector3(rear_sign() * 0.18, 0.1, -0.08)) # fist drawn back
+	var smack := duplicate_pose(stand)
+	lean(smack, -4.0, 0.0)
+	reach_arm(smack, lead, palm + Vector3(-rear_sign() * 0.02, 0, 0))
+	reach_arm(smack, rear, palm + Vector3(rear_sign() * 0.03, 0.01, 0.0))
+	var tilt_a := duplicate_pose(smack)
+	rotate_bone(tilt_a, "neck_01", Vector3(0, 0, 1), 22.0)
+	var tilt_b := duplicate_pose(smack)
+	rotate_bone(tilt_b, "neck_01", Vector3(0, 0, 1), -22.0)
+	return make_animation([[0.0, stand], [0.3, ready], [0.45, smack], [0.65, ready], [0.8, smack],
+		[1.15, tilt_a], [1.5, tilt_b], [1.75, smack], [2.2, guard]], false)
+
+
+## Valka: lead hand held out palm up, flicking "come on" twice, chin raised. ~2.0 s.
+func build_intro_beckon() -> Animation:
+	var stand := _victory_stance(0.16, 0.02)
+	rotate_bone(stand, "neck_01", Vector3.RIGHT, -8.0)
+	var offer := duplicate_pose(stand)
+	var shoulder := global_origin(offer, "upperarm_" + lead)
+	reach_arm(offer, lead, Vector3(shoulder.x * 0.5, shoulder.y - 0.12, shoulder.z + 0.5))
+	rotate_bone(offer, "hand_" + lead, Vector3(0, 0, 1), rear_sign() * 80.0) # palm up
+	var hip := global_origin(offer, "thigh_" + rear)
+	reach_arm(offer, rear, hip + Vector3(rear_sign() * 0.17, 0.04, -0.02)) # hand on hip
+	var flick := duplicate_pose(offer)
+	rotate_bone(flick, "hand_" + lead, Vector3.RIGHT, -45.0)
+	return make_animation([[0.0, stand], [0.4, offer], [0.6, flick], [0.8, offer], [1.0, flick],
+		[1.25, offer], [1.95, guard]], false)
+
+
+## Jin: a high kick that hangs at the top, recoils, and lands back in a bouncing guard.
+func build_intro_kick() -> Animation:
+	var kick := build_high_kick() # impact at 0.26 s
+	var lead_foot := global_origin(guard, "foot_" + lead)
+	var rear_foot := global_origin(guard, "foot_" + rear)
+	var bounce := duplicate_pose(guard)
+	move_bone(bounce, "pelvis", Vector3(0, 0.03, 0))
+	plant_both(bounce, lead_foot + Vector3(0, 0.03, 0), rear_foot + Vector3(0, 0.03, 0))
+	return make_animation([[0.0, guard], [0.2, sample(kick, 0.07)], [0.4, sample(kick, 0.15)],
+		[0.62, sample(kick, 0.26)], [0.95, sample(kick, 0.27)], [1.2, sample(kick, 0.15)],
+		[1.45, guard], [1.65, bounce], [1.85, guard]], false)
+
+
+## Mira: wrists crossed, then the power stance held with the chin up, then the guard.
+func build_intro_power() -> Animation:
+	var stance := build_focus_stance()
+	var cross := sample(stance, 0.10)
+	var power := sample(stance, 0.25)
+	var breathe := duplicate_pose(power)
+	move_bone(breathe, "pelvis", Vector3(0, -0.015, 0))
+	return make_animation([[0.0, guard], [0.3, cross], [0.7, power], [1.1, breathe], [1.4, power],
+		[1.9, guard]], false)
+
+
+## Lian: the Wing Chun salute (open palm over the fist, arms forward), fists drawn back to
+## the ribs, then the Still Water stance and the guard. ~2.2 s.
+func build_intro_wing_chun() -> Animation:
+	var stand := _victory_stance(0.12, 0.04)
+	var salute := duplicate_pose(stand)
+	var target := global_origin(salute, "neck_01") + Vector3(0, -0.3, 0.36)
+	reach_arm(salute, "l", target + Vector3(0.025, 0.01, 0))
+	reach_arm(salute, "r", target + Vector3(-0.025, -0.01, 0))
+	var chamber := duplicate_pose(stand)
+	for side in ["l", "r"]:
+		var hip := global_origin(chamber, "thigh_" + side)
+		reach_arm(chamber, side, hip + Vector3(0.1 if side == "l" else -0.1, 0.22, -0.02))
+	var still := _counter_pose(global_origin(guard, "foot_" + lead), global_origin(guard, "foot_" + rear))
+	return make_animation([[0.0, stand], [0.35, salute], [0.9, salute], [1.15, chamber], [1.35, chamber],
+		[1.6, still], [1.85, still], [2.2, guard]], false)
 
 
 ## Upright stance with feet `half_width` apart and the pelvis raised `rise`.

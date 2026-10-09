@@ -54,6 +54,13 @@ detailed_textures = true
 realistic_shading = true
 victory_animations = Array[StringName]([&"fight/victory_fist_pump", &"fight/victory_point"])
 placeholder_color = Color(0.86, 0.62, 0.12, 1)
+intro_animation = &"fight/intro_power"
+intro_expression = &"grin"
+intro_lines = PackedStringArray("Tara na! Let\'s go!", "Don\'t blink, pare.", "Last one standing eats for free.")
+win_quotes = PackedStringArray("Salamat! Good fight.", "Street-tested. Lola-approved.", "Want another round? Same price.")
+rival_lines = {
+"rhea": ["Speed's nice. Heart's better.", "Next time, merienda's on you."]
+}
 walk_speed = 2.3
 back_walk_speed = 1.8
 dash_speed = 7.0

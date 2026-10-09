@@ -52,6 +52,14 @@ detailed_textures = true
 realistic_shading = true
 victory_animations = Array[StringName]([&"fight/victory_flex", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.85, 0.75, 0.3, 1)
+intro_animation = &"fight/intro_beckon"
+intro_expression = &"smirk"
+intro_lines = PackedStringArray("Come closer. I won\'t bite... much.", "Every fight ends on the mat.", "I\'ll show you the floor. Up close.")
+win_quotes = PackedStringArray("You and the floor are well acquainted now.", "Tap out sooner next time.", "Strong arms. Weak grip.")
+rival_lines = {
+"brutus": ["Big man. Bigger fall.", "Timber!"],
+"lian": ["Counter this: I'm already holding you.", "You can't redirect what's already holding you."]
+}
 max_health = 1050
 walk_speed = 1.8
 back_walk_speed = 1.4

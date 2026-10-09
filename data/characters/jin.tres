@@ -53,6 +53,13 @@ detailed_textures = true
 realistic_shading = true
 victory_animations = Array[StringName]([&"fight/victory_point", &"fight/victory_fist_pump"])
 placeholder_color = Color(0.2, 0.7, 0.55, 1)
+intro_animation = &"fight/intro_kick"
+intro_expression = &"guard"
+intro_lines = PackedStringArray("Stay at my range. If you can.", "One kick is all it takes.", "Measure twice. Strike once.")
+win_quotes = PackedStringArray("You never found the distance.", "My legs reach further than your plans.", "Precision beats power.")
+rival_lines = {
+"kenji": ["Still hiding behind fireballs, Kenji?", "Keep your distance next time. Oh, wait."]
+}
 max_health = 980
 walk_speed = 2.2
 back_walk_speed = 1.8
