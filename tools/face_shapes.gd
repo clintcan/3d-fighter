@@ -589,6 +589,74 @@ static func mouth_material() -> StandardMaterial3D:
 
 # --- Mesh assembly ---------------------------------------------------------------------
 
+## A copy of the Eyes mesh (both eyeballs) with the gaze shapes (FighterModel.GAZE_SHAPES):
+## each eyeball turns about its own centre by FighterModel.GAZE_LIMITS, so the sphere stays
+## where it is and only the iris moves. Turns that small blend linearly well enough.
+static func build_eyes(mesh: ArrayMesh) -> ArrayMesh:
+	var limits := FighterModel.GAZE_LIMITS
+	var turns: Array[Basis] = [
+		Basis(Vector3.UP, limits.x), # look_left: the face's +Z toward the character's left (+X)
+		Basis(Vector3.UP, -limits.x), # look_right
+		Basis(Vector3.RIGHT, -limits.y), # look_up
+		Basis(Vector3.RIGHT, limits.z), # look_down
+	]
+	var out := ArrayMesh.new()
+	out.blend_shape_mode = Mesh.BLEND_SHAPE_MODE_NORMALIZED
+	for shape in FighterModel.GAZE_SHAPES:
+		out.add_blend_shape(shape)
+	for s in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(s)
+		for channel in [Mesh.ARRAY_CUSTOM0, Mesh.ARRAY_CUSTOM1, Mesh.ARRAY_CUSTOM2, Mesh.ARRAY_CUSTOM3]:
+			arrays[channel] = null
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		var tangents = arrays[Mesh.ARRAY_TANGENT]
+		var centres := eyeball_centres(verts)
+		var shapes: Array[Array] = []
+		for turn in turns:
+			var moved := PackedVector3Array()
+			var turned := PackedVector3Array()
+			moved.resize(verts.size())
+			turned.resize(verts.size())
+			var turned_tangents := PackedFloat32Array()
+			if tangents != null:
+				turned_tangents = (tangents as PackedFloat32Array).duplicate()
+			for i in verts.size():
+				var centre: Vector3 = centres[0] if verts[i].x >= 0.0 else centres[1]
+				moved[i] = centre + turn * (verts[i] - centre)
+				turned[i] = turn * normals[i]
+				if tangents != null:
+					var t := turn * Vector3(tangents[i * 4], tangents[i * 4 + 1], tangents[i * 4 + 2])
+					turned_tangents[i * 4] = t.x
+					turned_tangents[i * 4 + 1] = t.y
+					turned_tangents[i * 4 + 2] = t.z
+			var shape_arrays := []
+			shape_arrays.resize(Mesh.ARRAY_MAX)
+			shape_arrays[Mesh.ARRAY_VERTEX] = moved
+			shape_arrays[Mesh.ARRAY_NORMAL] = turned
+			if tangents != null:
+				shape_arrays[Mesh.ARRAY_TANGENT] = turned_tangents
+			shapes.append(shape_arrays)
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, shapes)
+		out.surface_set_material(s, mesh.surface_get_material(s))
+		out.surface_set_name(s, mesh.surface_get_name(s))
+	return out
+
+
+## The centres of the right (x > 0) and left eyeballs: the middle of each sphere's bounds.
+static func eyeball_centres(verts: PackedVector3Array) -> Array[Vector3]:
+	var result: Array[Vector3] = []
+	for side in [1.0, -1.0]:
+		var lo := Vector3.INF
+		var hi := -Vector3.INF
+		for p in verts:
+			if p.x * side > 0.0:
+				lo = lo.min(p)
+				hi = hi.max(p)
+		result.append((lo + hi) * 0.5)
+	return result
+
+
 ## A copy of `mesh` (any skinned mesh on the head) with every shape as a blend shape.
 ## `body` = true for the head mesh itself: cuts the mouth open and adds the interior.
 static func build(mesh: ArrayMesh, L: Dictionary, openings: Array, body: bool) -> ArrayMesh:

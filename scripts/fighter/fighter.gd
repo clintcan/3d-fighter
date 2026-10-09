@@ -1084,6 +1084,7 @@ func _update_model(delta: float) -> void:
 	model.show_clip(request[0], request[1], request[2], 0.0 if hitstop > 0 else delta)
 	# The face keeps moving through hitstop, so the reaction lands with the impact.
 	model.set_face(face_expression(), delta)
+	model.set_gaze(gaze_target(), delta)
 	var shake := Vector3.ZERO
 	if frozen and state in [State.HITSTUN, State.BLOCKSTUN, State.AIR_HIT, State.KO]:
 		shake.x = randf_range(-0.03, 0.03)
@@ -1118,6 +1119,23 @@ func face_expression() -> StringName:
 	if victory:
 		return &"grin" if victory_clip != &"" else &"smirk"
 	return &"neutral"
+
+
+## Where the eyes look (world space, Vector3.INF = straight ahead). Cosmetic: the
+## opponent's upper chest (fighters watch the shoulders, not the eyes), the camera in a
+## win, nowhere in particular when down.
+const GAZE_DROP := 0.3 # metres below the opponent's eyes
+
+
+func gaze_target() -> Vector3:
+	if state in [State.KNOCKDOWN, State.KO]:
+		return Vector3.INF
+	if victory:
+		var camera := get_viewport().get_camera_3d() if is_inside_tree() else null
+		return camera.global_position if camera else Vector3.INF
+	if opponent and opponent.model:
+		return opponent.model.eye_position() + Vector3.DOWN * GAZE_DROP
+	return Vector3.INF
 
 
 ## Logic → animation: [clip, time (s, or -1 to free-run), speed].

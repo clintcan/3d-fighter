@@ -1,8 +1,9 @@
 extends SceneTree
 ## Bakes the facial expression blend shapes (tools/face_shapes.gd) into the pieces that sit
 ## on a fighter's face: the eyebrow and lash meshes of the base models and the eyebrow
-## and beard pieces in CharacterData.hair_scenes. FighterModel swaps these copies in by
-## path (FighterModel.face_piece_path). The bodies get theirs from build_outfits.gd.
+## and beard pieces in CharacterData.hair_scenes, and the gaze shapes into the eyeballs
+## (FaceShapes.build_eyes). FighterModel swaps these copies in by path
+## (FighterModel.face_piece_path). The bodies get theirs from build_outfits.gd.
 ## Run: godot_console --headless --path . -s res://tools/build_face_shapes.gd
 
 const CHARACTER_DIR := "res://data/characters/"
@@ -28,16 +29,24 @@ func _initialize() -> void:
 			var scene := base if source == data.model_scene else source.instantiate()
 			for mi: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
 				var path := FighterModel.face_piece_path(base_path, source.resource_path, mi.name)
-				if done.has(path) or not _on_face(mi.mesh, face):
+				var eyes := _is_eyes(mi.mesh)
+				if done.has(path) or not (eyes or _on_face(mi.mesh, face)):
 					continue
 				done[path] = true
-				var mesh := FaceShapes.build(mi.mesh as ArrayMesh, face, openings, false)
+				var mesh := FaceShapes.build_eyes(mi.mesh as ArrayMesh) if eyes \
+					else FaceShapes.build(mi.mesh as ArrayMesh, face, openings, false)
 				ResourceSaver.save(mesh, path)
 				print("%-7s %s" % [data.id, path])
 			if scene != base:
 				scene.free()
 		base.free()
 	quit()
+
+
+## The eyeballs get the gaze shapes instead.
+static func _is_eyes(mesh: Mesh) -> bool:
+	var material := mesh.surface_get_material(0)
+	return material != null and material.resource_name.begins_with("MI_Eyes")
 
 
 ## Hair pieces close around the eyes and mouth: eyebrows, lashes, beards. Not the scalp hair.

@@ -104,8 +104,9 @@ func sfx(sound: StringName, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 
 
 ## A fighter's shout: a random take of assets/audio/voice/fighters/<id>_<kind>_N.ogg
-## (kinds: "special", "super", "ko"). Silently does nothing if there are none.
-func shout(fighter_id: StringName, kind: String, volume_db: float = 0.0) -> void:
+## (kinds: "special", "super", "ko"). Silently does nothing if there are none. Returns the
+## player it started (FighterModel.speak moves the mouth with it), or null.
+func shout(fighter_id: StringName, kind: String, volume_db: float = 0.0) -> AudioStreamPlayer:
 	var key := "%s_%s" % [fighter_id, kind]
 	if not _shouts.has(key):
 		var takes: Array[AudioStream] = []
@@ -116,13 +117,14 @@ func shout(fighter_id: StringName, kind: String, volume_db: float = 0.0) -> void
 		_shouts[key] = takes
 	var streams: Array = _shouts[key]
 	if streams.is_empty():
-		return
+		return null
 	var player := _pool[_next_player]
 	_next_player = (_next_player + 1) % _pool.size()
 	player.stream = streams[_rng.randi() % streams.size()]
 	player.volume_db = volume_db
 	player.pitch_scale = _rng.randf_range(0.97, 1.03)
 	player.play()
+	return player
 
 
 ## Announcer line from assets/audio/voice/<line>.ogg. A new line cuts off the old one

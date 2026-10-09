@@ -334,7 +334,7 @@ func _initialize() -> void:
 	round_tests()
 	character_tests()
 	fx_tests()
-	face_tests()
+	await face_tests()
 	specials_tests()
 	await character_specials_tests()
 	await versus_tests()
@@ -1944,6 +1944,66 @@ func face_tests() -> void:
 			at_rest += 1
 	check("The lips are cut apart (no triangle seals the mouth)", at_rest == 0, "%d" % at_rest)
 
+	# Gaze: the eyeballs turn about their centres; only the iris moves.
+	var eyes_mesh := load(FighterModel.face_piece_path(kenji.model_scene.resource_path,
+		kenji.model_scene.resource_path, "Eyes")) as ArrayMesh
+	var eye_rest: PackedVector3Array = eyes_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var centres := FaceShapes.eyeball_centres(eye_rest)
+	var look_left: PackedVector3Array = eyes_mesh.surface_get_blend_shape_arrays(0)[0][Mesh.ARRAY_VERTEX]
+	var off_sphere := 0.0
+	var front := 0
+	for i in eye_rest.size():
+		var c: Vector3 = centres[0] if eye_rest[i].x >= 0.0 else centres[1]
+		off_sphere = maxf(off_sphere, absf(look_left[i].distance_to(c) - eye_rest[i].distance_to(c)))
+		if eye_rest[i].x > 0.0 and eye_rest[i].z > eye_rest[front].z:
+			front = i
+	check("The eyes have the gaze shapes, in FighterModel's order",
+		range(eyes_mesh.get_blend_shape_count()).map(func(i): return eyes_mesh.get_blend_shape_name(i)) == Array(FighterModel.GAZE_SHAPES))
+	check("Looking left turns the eyeball in place (the pupil moves, the sphere doesn't)",
+		off_sphere < 0.0001 and look_left[front].x - eye_rest[front].x > 0.004,
+		"off sphere %.5f, pupil %.4f" % [off_sphere, look_left[front].x - eye_rest[front].x])
+	var watcher := FighterModel.new()
+	root.add_child(watcher)
+	watcher.build(kenji)
+	check("Fighters' eyes can turn", watcher.has_gaze())
+	var head := watcher.skeleton.global_transform * watcher.skeleton.get_bone_global_pose(watcher._head_bone)
+	var face_axis := func(v: Vector3) -> Vector3: return (head.basis * (watcher._head_rest.inverse() * v)).normalized()
+	var eye_point := watcher.eye_position()
+	for i in 30:
+		watcher.set_gaze(eye_point + face_axis.call(Vector3(0.6, 0, 1)), 1.0 / 60.0)
+	check("The eyes follow a target to the side", watcher.gaze.x > 0.15 and absf(watcher.gaze.y) < 0.05, "%s" % watcher.gaze)
+	for i in 30:
+		watcher.set_gaze(eye_point + face_axis.call(Vector3(0, 0.3, 1)), 1.0 / 60.0)
+	check("... and one above", watcher.gaze.y > 0.15 and absf(watcher.gaze.x) < 0.05, "%s" % watcher.gaze)
+	for i in 30:
+		watcher.set_gaze(eye_point + face_axis.call(Vector3(0, 0, -1)), 1.0 / 60.0)
+	check("A target behind the head is ignored", watcher.gaze.length() < 0.01, "%s" % watcher.gaze)
+
+	# The voice moves the mouth.
+	var envelopes := (load(FighterModel.VOICE_ENVELOPES) as JSON).data as Dictionary
+	var clips := Array(ResourceLoader.list_directory("res://assets/audio/voice/fighters/")).filter(
+		func(f: String) -> bool: return f.ends_with(".ogg")).map(func(f: String) -> String: return f.get_basename())
+	check("Every fighter voice clip has a mouth envelope", clips.all(func(c): return envelopes.has(c)) and clips.size() == envelopes.size(),
+		"%d clips, %d envelopes" % [clips.size(), envelopes.size()])
+	var voice := AudioStreamPlayer.new()
+	root.add_child(voice)
+	voice.stream = load("res://assets/audio/voice/fighters/kenji_special_1.ogg")
+	voice.play()
+	watcher.speak(voice)
+	var widest := 0.0
+	for i in 30:
+		await process_frame
+		watcher.set_face(&"neutral", 1.0 / 60.0)
+		widest = maxf(widest, watcher._face_meshes[0].get_blend_shape_value(watcher._face_indices[0][4]))
+	check("A shout opens the jaw", widest > 0.5, "%.2f" % widest)
+	voice.stop()
+	for i in 30:
+		watcher.set_face(&"neutral", 1.0 / 60.0)
+	check("... and it closes again when the shout ends",
+		watcher._face_meshes[0].get_blend_shape_value(watcher._face_indices[0][4]) < 0.01)
+	voice.free()
+	watcher.free()
+
 	# Expressions follow the fight.
 	var D := DummyController.Mode
 	reset(D.STAND)
@@ -1957,8 +2017,13 @@ func face_tests() -> void:
 		p2.model.set_face(p2.face_expression(), 1.0 / 60.0)
 	check("The face eases toward the expression", p2.model.face_weights[&"grimace"] > 0.5 and p2.model.face_weights[&"grimace"] <= 0.8,
 		"%.2f" % p2.model.face_weights[&"grimace"])
+	var watched := p1.gaze_target()
+	check("Fighters watch the opponent's upper body", watched.is_finite()
+		and Vector2(watched.x - p2.global_position.x, watched.z - p2.global_position.z).length() < 0.4
+		and watched.y > p2.global_position.y + 0.9, "%s vs %s" % [watched, p2.global_position])
 	p2._set_state(Fighter.State.KO)
 	check("A K.O. shuts the eyes", p2.face_expression() == &"out")
+	check("... and the K.O.'d fighter looks at nothing", not p2.gaze_target().is_finite())
 	reset(D.STAND)
 
 

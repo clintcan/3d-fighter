@@ -49,7 +49,7 @@ func setup(fight_manager: Node) -> void:
 	for fighter: Fighter in manager.fighters:
 		fighter.attack_started.connect(manager.cosmetic(_on_attack_started.bind(fighter)))
 		fighter.move_active.connect(manager.cosmetic(_on_move_active))
-		fighter.knocked_out.connect(manager.cosmetic(func(f: Fighter) -> void: Audio.shout(f.data.id, "ko")))
+		fighter.knocked_out.connect(manager.cosmetic(func(f: Fighter) -> void: _shout(f, "ko")))
 		fighter.combo_changed.connect(manager.cosmetic(func(hits: int) -> void:
 			if hits == 5:
 				Audio.voice("combo")))
@@ -94,7 +94,7 @@ func _on_attack_started(move: MoveData, fighter: Fighter) -> void:
 	elif not move.super_move: # the super flash has its own sound
 		Audio.sfx(&"swing_heavy" if move.hitstop >= HEAVY_HITSTOP else &"swing_light", -8.0)
 	if move.is_special() and not move.super_move:
-		Audio.shout(fighter.data.id, "special")
+		_shout(fighter, "special")
 
 
 ## First active frame: launch flash, rising burst, ground-pound shockwave, or a focus
@@ -136,11 +136,18 @@ func _process(_delta: float) -> void:
 			(sparks.process_material as ParticleProcessMaterial).color = SUPER_COLOR if move.super_move or move.input.begins_with("~") else HIT_COLOR
 
 
+## A fighter's shout, with their mouth moving to it.
+func _shout(fighter: Fighter, kind: String, volume_db := 0.0) -> void:
+	var player := Audio.shout(fighter.data.id, kind, volume_db)
+	if fighter.model:
+		fighter.model.speak(player)
+
+
 ## Super start: a burst of golden sparks and a glow on the fighter, plus the flash sound.
 func _on_super_flash(fighter: Fighter, _move: MoveData) -> void:
 	spark(fighter.global_position + Vector3.UP * 1.1, SUPER_COLOR, 2.2)
 	Audio.sfx(&"super", 0.0)
-	Audio.shout(fighter.data.id, "super", 2.0)
+	_shout(fighter, "super", 2.0)
 	if fighter.model:
 		fighter.model.flash(SUPER_COLOR, 0.6)
 

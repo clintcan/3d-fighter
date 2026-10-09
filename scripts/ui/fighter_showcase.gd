@@ -105,6 +105,9 @@ func process(delta: float) -> void:
 				face = _move_face(move)
 			_process_move(move, delta)
 	model.set_face(face, delta)
+	# Eyes on the viewer between moves, on the imaginary opponent during them.
+	var camera := model.get_viewport().get_camera_3d() if model.is_inside_tree() else null
+	model.set_gaze(camera.global_position if camera and step[0] != "move" else Vector3.INF, delta)
 	pivot.rotation.y = lerp_angle(pivot.rotation.y, target_angle, 1.0 - exp(-TURN_SPEED * delta))
 	# Gravity for rising moves; glide back to the center once a travelling move is over.
 	if _offset.y > 0.0 or _y_velocity > 0.0:

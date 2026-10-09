@@ -93,6 +93,20 @@ const FACE_RISE := 14.0 # weight per second toward a stronger expression
 const FACE_FALL := 5.0 # ... and back
 const BLINK_TIME := 0.16
 const BLINK_INTERVAL := Vector2(1.8, 5.0)
+## Gaze: blend shapes on the Eyes mesh (tools/build_face_shapes.gd) that turn each eyeball
+## about its centre. GAZE_LIMITS = how far (radians) at weight 1: x = left/right, y = up,
+## z = down. set_gaze() aims them at a point.
+const GAZE_SHAPES: Array[StringName] = [&"look_left", &"look_right", &"look_up", &"look_down"]
+const GAZE_LIMITS := Vector3(0.35, 0.2, 0.25) # further and the white shows past the lids
+const GAZE_LIDS := Vector2(0.25, 0.3) # blink weight: lids open looking up (x), drop looking down (y)
+const GAZE_SPEED := 18.0 # eyes snap to a new target quickly, like a saccade
+const GAZE_BEHIND := 1.4 # radians off the face's axis: a target further round is ignored
+## Voice-driven mouth: loudness envelopes of the fighter voice clips (60 values a second,
+## 0-100) from tools/build_voice_envelopes.py. While a clip plays, its loudness opens the jaw.
+const VOICE_ENVELOPES := "res://assets/audio/voice/fighters/mouth.json"
+const VOICE_JAW := 1.0 # jaw_open at the loudest point of a clip
+const VOICE_FOLLOW := 30.0 # how fast the jaw follows the envelope
+const VOICE_BLEND := 10.0 # how fast the voice takes over the jaw from the expression and back
 
 const CONTACT_BONES := [&"foot_l", &"foot_r", &"ball_l", &"ball_r"]
 const SOLE_BELOW_ORIGIN := 0.01
@@ -111,6 +125,18 @@ var _face_target: Dictionary = EXPRESSIONS[&"neutral"]
 var _blink_rng := RandomNumberGenerator.new() # cosmetic: never the match RNG
 var _blink_in := 2.0
 var _blink_time := -1.0
+var gaze := Vector2.ZERO # current eye turn: x = yaw (+ = the character's left), y = pitch (+ = up)
+var _gaze_meshes: Array[MeshInstance3D] = []
+var _gaze_indices: Array[PackedInt32Array] = []
+var _head_bone := -1
+var _head_rest := Basis.IDENTITY # head bone rest orientation in skeleton space
+var _eye_in_head := Vector3(0.0, 0.1, 0.08) # midpoint between the eyes, head bone space
+var _voice_player: AudioStreamPlayer
+var _voice_stream: AudioStream
+var _voice_envelope := PackedByteArray()
+var _voice_level := 0.0 # smoothed envelope, 0-1
+var _voice_mix := 0.0 # 1 while a clip drives the jaw
+static var _envelopes: Dictionary # clip file name -> PackedByteArray, loaded on first use
 
 
 ## `alt` uses the character's alternate skin texture and hair colour (mirror matches).
@@ -373,6 +399,19 @@ func _find_face() -> void:
 			for shape in FACE_SHAPES:
 				indices.append(mesh.find_blend_shape_by_name(shape))
 			_face_indices.append(indices)
+		if mesh.mesh and mesh.find_blend_shape_by_name(&"look_left") >= 0:
+			_gaze_meshes.append(mesh)
+			var indices := PackedInt32Array()
+			for shape in GAZE_SHAPES:
+				indices.append(mesh.find_blend_shape_by_name(shape))
+			_gaze_indices.append(indices)
+	_head_bone = skeleton.find_bone("Head")
+	if _head_bone >= 0:
+		var rest := skeleton.get_bone_global_rest(_head_bone)
+		_head_rest = rest.basis
+		if not _gaze_meshes.is_empty():
+			var eyes := _gaze_meshes[0]
+			_eye_in_head = rest.affine_inverse() * (eyes.transform * eyes.mesh.get_aabb().get_center())
 	for shape in FACE_SHAPES:
 		face_weights[shape] = 0.0
 	_blink_rng.randomize()
@@ -407,13 +446,91 @@ func set_face(expression: StringName, delta: float) -> void:
 			_blink_in = _blink_rng.randf_range(BLINK_INTERVAL.x, BLINK_INTERVAL.y)
 			if face_weights[&"blink"] < 0.4:
 				_blink_time = 0.0
+	# A voice clip playing: its loudness drives the jaw.
+	var speaking := _voice_level_now()
+	if speaking >= 0.0:
+		_voice_level = move_toward(_voice_level, speaking, VOICE_FOLLOW * delta)
+	_voice_mix = move_toward(_voice_mix, 1.0 if speaking >= 0.0 else 0.0, VOICE_BLEND * delta)
+	var jaw := lerpf(face_weights[&"jaw_open"], _voice_level * VOICE_JAW, _voice_mix)
 	for m in _face_meshes.size():
 		for i in FACE_SHAPES.size():
 			var weight: float = face_weights[FACE_SHAPES[i]]
 			if i == 0: # blink
 				weight = maxf(weight, blink)
+				weight -= GAZE_LIDS.x * clampf(gaze.y / GAZE_LIMITS.y, 0.0, 1.0)
+				weight += GAZE_LIDS.y * clampf(-gaze.y / GAZE_LIMITS.z, 0.0, 1.0) * (1.0 - weight)
+			elif i == 4: # jaw_open
+				weight = jaw
 			if _face_indices[m][i] >= 0:
 				_face_meshes[m].set_blend_shape_value(_face_indices[m][i], weight)
+
+
+## Moves the mouth with the voice clip `player` has just started (Audio.shout). Clips
+## without an envelope, or a null player, change nothing.
+func speak(player: AudioStreamPlayer) -> void:
+	if player == null or player.stream == null:
+		return
+	if _envelopes.is_empty():
+		var json := load(VOICE_ENVELOPES) as JSON if ResourceLoader.exists(VOICE_ENVELOPES) else null
+		if json == null or not json.data is Dictionary:
+			return
+		for clip: String in json.data:
+			_envelopes[clip] = PackedByteArray(json.data[clip])
+	var envelope: PackedByteArray = _envelopes.get(player.stream.resource_path.get_file().get_basename(), PackedByteArray())
+	if envelope.is_empty():
+		return
+	_voice_player = player
+	_voice_stream = player.stream
+	_voice_envelope = envelope
+
+
+## The loudness (0-1) of the voice clip this fighter is speaking, or -1 when silent.
+## Read from the player's position, so it stays in sync with the sound (pitch, pauses).
+func _voice_level_now() -> float:
+	if _voice_player == null:
+		return -1.0
+	if not is_instance_valid(_voice_player) or not _voice_player.playing or _voice_player.stream != _voice_stream:
+		_voice_player = null # finished, or the pooled player moved on to another sound
+		return -1.0
+	var frame := int(_voice_player.get_playback_position() * 60.0)
+	return _voice_envelope[mini(frame, _voice_envelope.size() - 1)] / 100.0
+
+
+## True when this model's eyes can turn.
+func has_gaze() -> bool:
+	return not _gaze_meshes.is_empty()
+
+
+## The point between the eyes, in world space.
+func eye_position() -> Vector3:
+	if _head_bone < 0:
+		return global_position + Vector3.UP * 1.6
+	return skeleton.global_transform * skeleton.get_bone_global_pose(_head_bone) * _eye_in_head
+
+
+## Turns the eyes toward `target` (world space) over real time `delta`; Vector3.INF looks
+## straight ahead. Targets beyond the eyes' reach are followed as far as they turn, ones
+## behind the head are ignored. Purely cosmetic.
+func set_gaze(target: Vector3, delta: float) -> void:
+	if _gaze_meshes.is_empty():
+		return
+	var aim := Vector2.ZERO
+	if target.is_finite():
+		var head := skeleton.global_transform * skeleton.get_bone_global_pose(_head_bone)
+		# Into the rest-pose frame of the mesh, where the face looks along +Z.
+		var d := (_head_rest * (head.basis.inverse() * (target - head * _eye_in_head))).normalized()
+		var yaw := atan2(d.x, d.z)
+		if absf(yaw) < GAZE_BEHIND:
+			aim = Vector2(yaw, atan2(d.y, Vector2(d.x, d.z).length()))
+	gaze = gaze.lerp(aim, 1.0 - exp(-GAZE_SPEED * delta))
+	var weights := [
+		clampf(gaze.x / GAZE_LIMITS.x, 0.0, 1.0), clampf(-gaze.x / GAZE_LIMITS.x, 0.0, 1.0),
+		clampf(gaze.y / GAZE_LIMITS.y, 0.0, 1.0), clampf(-gaze.y / GAZE_LIMITS.z, 0.0, 1.0),
+	]
+	for m in _gaze_meshes.size():
+		for i in GAZE_SHAPES.size():
+			if _gaze_indices[m][i] >= 0:
+				_gaze_meshes[m].set_blend_shape_value(_gaze_indices[m][i], weights[i])
 
 
 ## The Low graphics preset skips realistic shading. Looked up at runtime: tool scripts

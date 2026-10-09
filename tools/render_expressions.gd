@@ -1,6 +1,7 @@
 extends SceneTree
 ## Renders a face close-up of each fighter for every FighterModel.EXPRESSIONS preset, in
-## the dojo, into <out dir>/p_<id>_<preset>.png.
+## the dojo, into <out dir>/p_<id>_<preset>.png, then the eyes looking at the camera,
+## ahead and toward each side into <out dir>/g_<id>_<direction>.png.
 ##
 ## Run WINDOWED: godot --path . -s res://tools/render_expressions.gd -- <out dir> <id> ...
 func _initialize() -> void:
@@ -43,6 +44,18 @@ func _initialize() -> void:
 				await process_frame
 			for i in 3: await process_frame
 			vp.get_texture().get_image().save_png(out + "/p_%s_%s.png" % [id, preset])
+		var eye := model.eye_position()
+		var side := fwd.cross(Vector3.UP) # screen right
+		var targets := {camera = cam.global_position, ahead = Vector3.INF,
+			screen_left = eye + fwd + side * -1.2, screen_right = eye + fwd + side * 1.2,
+			up = eye + fwd + Vector3.UP * 0.6, down = eye + fwd + Vector3.DOWN * 0.7,
+			chest = eye + fwd * 1.5 + Vector3.DOWN * Fighter.GAZE_DROP}
+		for direction: String in targets:
+			for i in 3:
+				model.set_face(&"neutral", 1.0)
+				model.set_gaze(targets[direction], 1.0)
+				await process_frame
+			vp.get_texture().get_image().save_png(out + "/g_%s_%s.png" % [id, direction])
 		vp.queue_free()
 		await process_frame
 	quit()
