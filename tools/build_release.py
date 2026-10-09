@@ -14,6 +14,9 @@ Outputs (version from project.godot):
                                          Apple notarization; --no-sign leaves it unsigned)
     dist/3DFighter-v<ver>-linux.tar.gz   x86_64 binary + README.txt (smoke-tested in WSL if present)
 
+After a successful build, older versions' archives for the platforms just built are deleted
+from dist/ (every release is also on GitHub); --keep-old leaves them.
+
 Godot is found as `godot_console` on PATH, or set GODOT=path\\to\\godot_console.exe.
 Signing uses tools/macos_sign_notarize.py and the secrets in %USERPROFILE%\\AppleDeveloper
 (never copied into the project).
@@ -32,6 +35,7 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 BUILD = os.path.join(ROOT, "build")
 DIST = os.path.join(ROOT, "dist")
 PLATFORMS = ["windows", "macos", "linux"]
+ARCHIVE_SUFFIX = {"windows": "-windows.zip", "macos": "-macos.zip", "linux": "-linux.tar.gz"}
 
 
 # --- Helpers ---------------------------------------------------------------------
@@ -253,6 +257,23 @@ def smoke_linux(tarball: str) -> None:
 
 # --- Main ------------------------------------------------------------------------
 
+def remove_old_archives(version: str, targets: list) -> None:
+    """Deletes dist/ archives of other versions for `targets` (the ones just built)."""
+    removed = []
+    for target in targets:
+        suffix = re.escape(ARCHIVE_SUFFIX[target])
+        pattern = re.compile(r"3DFighter-v(\d+\.\d+\.\d+)" + suffix + "$")
+        for name in sorted(os.listdir(DIST)):
+            match = pattern.match(name)
+            if match and match.group(1) != version:
+                os.remove(os.path.join(DIST, name))
+                removed.append(name)
+    if removed:
+        step("Removed older archives from dist/")
+        for name in removed:
+            print(f"  {name}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("targets", nargs="*", choices=PLATFORMS + ["all"], help="platforms to build")
@@ -260,6 +281,7 @@ def main() -> None:
     parser.add_argument("--test", action="store_true", help="run tests/sim_test.gd before building; stop on failure")
     parser.add_argument("--notarize", action="store_true", help="macOS: submit to Apple's notary service and staple")
     parser.add_argument("--no-sign", action="store_true", help="macOS: skip code signing (local testing only)")
+    parser.add_argument("--keep-old", action="store_true", help="keep older versions' archives in dist/")
     args = parser.parse_args()
 
     if args.version:
@@ -283,6 +305,8 @@ def main() -> None:
             outputs.append(build_macos(version, sign=not args.no_sign, notarize=args.notarize))
         elif target == "linux":
             outputs.append(build_linux(version))
+    if not args.keep_old:
+        remove_old_archives(version, targets)
     step(f"Done in {int(time.time() - start)} s")
     for out in outputs:
         print(f"  {os.path.relpath(out, ROOT)}")
