@@ -564,7 +564,8 @@ func _start_move(move: MoveData, airborne: bool, carried_focus := -1) -> void:
 	hits_landed = 0
 	next_hit_frame = 0
 	air_attack_used = air_attack_used or airborne
-	_set_state(State.ATTACK, move.input.begins_with("2") or move.low_profile)
+	# Crouching normals (2LP...) crouch; specials whose motion starts with 2 (236, 214) don't.
+	_set_state(State.ATTACK, (move.input.begins_with("2") and not move.is_special()) or move.low_profile)
 	if move.lunge > 0.0 and not airborne:
 		velocity = forward * move.lunge
 	if move.super_move:
@@ -854,6 +855,11 @@ func is_throw_grab_frame() -> bool:
 func is_command_grab_frame() -> bool:
 	return state == State.ATTACK and current_move != null and current_move.command_grab \
 			and state_frame == current_move.startup + 1
+
+
+## True if this fighter's reversal stance catches `move` (a body strike) right now.
+func reverses(move: MoveData) -> bool:
+	return state == State.ATTACK and current_move != null and current_move.reversal 			and state_frame > current_move.startup and state_frame <= current_move.startup + current_move.active 			and move.hit_level != MoveData.HitLevel.LOW
 
 
 func is_projectile_immune() -> bool:
@@ -1176,6 +1182,8 @@ func _animation_request(frozen: bool) -> Array:
 			return [&"ual2/LayToIdle", lerpf(0.35, model.clip_length(&"ual2/LayToIdle"), f / GETUP_FRAMES), 1.0]
 		State.THROW:
 			# Grab connected: play through the heave. Whiffed: hold the reach.
+			if grab_move and grab_move.reversal:
+				return [&"fight/reversal_throw", t, 1.0]
 			return [&"fight/throw", t if throw_grab_frame >= 0 else minf(t, 0.25), 1.0]
 		State.THROWN:
 			return [&"fight/thrown", 0.0, 1.0]

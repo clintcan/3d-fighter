@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_hkgva"]
+
+[resource]
+script = ExtResource("1_hkgva")
+name = "Still Water"
+input = "214P"
+animation = &"fight/counter_stance"
+animation_impact = 0.05
+animation_end = 0.62
+startup = 3
+active = 14
+recovery = 20
+damage = 120
+hitstun = 0
+blockstun = 0
+hitstop = 12
+knockback = Vector2(0, 0)
+reversal = true
+hitbox_radius = 0.0
+hitbox_offset = Vector3(0, 1, 0)
+camera_intensity = 0.4

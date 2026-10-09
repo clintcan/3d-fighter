@@ -20,7 +20,8 @@ extends SceneTree
 ## Tae Kwon Do dobok (closed V-neck pullover, black collar for black belts), kickboxing
 ## gear, pro-wrestling singlet with knee pads and boots, brawler tank top and work pants,
 ## street gear (sleeveless zip-up, track pants with side stripes, fingerless gloves,
-## sneakers).
+## sneakers), Wing Chun uniform (short-sleeved kung fu jacket with a standing collar and a
+## contrast placket, loose pants, cloth shoes with white soles).
 ## Detailed outfits (`detailed = true`) also carry vertex colours: the cloth darkens a
 ## little toward every hem and opening, and a stitch line runs along each hem (the
 ## polygons are cut along it, so it stays a crisp line). Their body gets a second UV set
@@ -200,6 +201,29 @@ func _specs() -> Dictionary:
 			colors = [Color(0.13, 0.13, 0.14), Color(0.86, 0.62, 0.12), Color(0.05, 0.05, 0.06), Color(0.82, 0.81, 0.78)],
 			alt_colors = [Color(0.8, 0.8, 0.78), Color(0.75, 0.08, 0.08), Color(0.11, 0.11, 0.12), Color(0.72, 0.08, 0.08)],
 			fabrics = [&"cotton", &"stretch", &"stretch", &"leather"],
+		},
+		"lian": {
+			detailed = true,
+			pieces = func(L: Dictionary) -> Array:
+				var hem: float = L.hip - 0.05
+				var sleeve: float = L.shoulder + (L.elbow - L.shoulder) * 0.55
+				return [
+					# Kung fu jacket: to the hips, short sleeves, the collar standing at the neck;
+					# contrast trim on the collar, the front placket, the hem and the cuffs.
+					{slot = Slot.MAIN, offset = 0.015, trim_slot = Slot.TRIM,
+						region = func(p, n): return _top(p, L, hem, sleeve),
+						trim = func(p, n): return maxf(maxf(_zip(p, n, 0.009), p.y - (L.neck - 0.012)),
+							maxf((hem + 0.02) - p.y, absf(p.x) - (sleeve - 0.02)))},
+					# Loose pants to the ankle.
+					{slot = Slot.ACCENT, offset = 0.017, region = func(p, n): return _legs(p, L.ankle + 0.04, L.waist - 0.02)},
+					# Cloth shoes with white soles, flat on the floor.
+					{slot = Slot.EXTRA, offset = 0.01, flat_soles = true, trim_slot = Slot.TRIM,
+						region = func(p, n): return _legs(p, -1.0, L.ankle + 0.03),
+						trim = func(p, n): return 0.022 - p.y},
+				],
+			colors = [Color(0.1, 0.36, 0.29), Color(0.84, 0.75, 0.52), Color(0.06, 0.06, 0.07), Color(0.07, 0.07, 0.08)],
+			alt_colors = [Color(0.8, 0.79, 0.75), Color(0.08, 0.08, 0.09), Color(0.5, 0.06, 0.06), Color(0.08, 0.08, 0.09)],
+			fabrics = [&"cotton", &"cotton", &"cotton", &"cotton"],
 		},
 	}
 

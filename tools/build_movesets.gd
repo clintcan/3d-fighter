@@ -16,7 +16,7 @@ const H := MoveData.HitLevel
 ##         chip_damage, hits, hit_interval, travel, rise, landing_recovery, invuln_frames,
 ##         low_profile, super_move, followup, projectile_speed, projectile_lifetime,
 ##         projectile_color, dive, focus_gain, focus_hits, focus_damage, focus_rise,
-##         focus_consume, focus_followup (see MoveData)
+##         focus_consume, focus_followup, reversal (see MoveData)
 const BASE := {
 	"jab": ["Jab", "LP", &"ual1/Punch_Jab", 0.20, 0.62, 4, 2, 8, 30, H.HIGH, 14, 10, 5, Vector2(1.2, 0), Vector3(0, 1.40, -0.78), 0.15, {cancel_into = ["LP", "HP", "2LP"]}],
 	"straight": ["Straight", "HP", &"ual1/Punch_Cross", 0.28, 0.85, 9, 3, 18, 80, H.HIGH, 20, 14, 8, Vector2(2.5, 0), Vector3(0.1, 1.36, -0.70), 0.18, {camera_intensity = 0.1}],
@@ -207,6 +207,44 @@ const CHARACTERS := {
 				{knockdown = true, chip_damage = 16, camera_intensity = 0.8, impact_fx = &"shockwave"}],
 		},
 	},
+	"lian": {
+		startup = 0, damage = 1.0, knockback = 1.0, hitstop = 0,
+		create = {display_name = "Lian", archetype = "Counter", select_order = 6,
+			description = "Wing Chun master. Holds the centre line, rattles off chain punches, and turns any careless strike into a throw.",
+			model_scene = "res://assets/characters/base/Superhero_Female_FullBody.gltf",
+			hair_scenes = ["res://assets/characters/hair/Hair_Bun.tscn", "res://assets/characters/hair/Eyebrows_Female.gltf"], # from tools/build_hair.gd
+			body_albedo = "res://assets/characters/base/T_Superhero_Female_Light_BaseColor.png",
+			model_scale = 0.98, hair_color = Color(0.045, 0.035, 0.035), placeholder_color = Color(0.2, 0.65, 0.5)},
+		stats = {max_health = 980, walk_speed = 2.0, back_walk_speed = 1.7, dash_speed = 6.2,
+			jump_velocity = 6.0, weight = 0.95, throw_damage = 115, power_rating = 0.5, speed_rating = 0.6,
+			realistic_shading = true,
+			victory_animations = [&"fight/victory_bow", &"fight/victory_fist_pump"],
+			alt_body_albedo = "res://assets/characters/base/T_Superhero_Female_Dark_BaseColor.png", alt_hair_color = Color(0.3, 0.16, 0.08)},
+		signatures = {
+			# Three straight punches down the centre line; chains into the straight or the palm.
+			"chain_punch": ["Chain Punch", "6LP", &"fight/chain_punch_short", 0.08, 0.36, 5, 7, 12, 14, H.HIGH, 14, 10, 3, Vector2(0.9, 0), Vector3(0, 1.3, -0.62), 0.17,
+				{hits = 3, hit_interval = 3, cancel_into = ["HP", "6HP"]}],
+			# Double palm with a step: big pushback, safe at range.
+			"double_palm": ["Double Palm", "6HP", &"fight/palm_blast", 0.20, 0.65, 11, 3, 18, 85, H.MID, 21, 15, 9, Vector2(3.2, 0), Vector3(0, 1.2, -0.62), 0.2,
+				{lunge = 3.0, camera_intensity = 0.15}],
+		},
+		specials = {
+			# Reversal stance: catches high, mid and overhead strikes (jump-ins too) and
+			# throws the attacker. Lows, throws and fireballs beat it; a miss is punishable.
+			"still_water": ["Still Water", "214P", &"fight/counter_stance", 0.05, 0.62, 3, 14, 20, 120, H.MID, 0, 0, 12, Vector2.ZERO, Vector3(0, 1.0, 0), 0.0,
+				{reversal = true, camera_intensity = 0.4}],
+			# Glides forward in the stance, through fireballs (no hitbox).
+			"willow_step": ["Willow Step", "214K", &"fight/counter_stance", 0.05, 0.62, 4, 14, 8, 0, H.MID, 0, 0, 0, Vector2.ZERO, Vector3(0, 1.0, 0), 0.0,
+				{travel = 5.0, projectile_immune = true}],
+			# Short-range power palm: knocks down, punishable on block.
+			"inch_palm": ["Inch Palm", "236P", &"fight/palm_blast", 0.20, 0.65, 13, 3, 20, 110, H.MID, 0, 18, 12, Vector2(5.0, 1.5), Vector3(0, 1.15, -0.58), 0.26,
+				{knockdown = true, chip_damage = 10, camera_intensity = 0.3}],
+			"thousand_hands": ["Thousand Hands", "236236P", &"fight/chain_punch", 0.08, 0.80, 5, 30, 20, 22, H.MID, 22, 16, 4, Vector2(0.6, 0), Vector3(0, 1.3, -0.62), 0.32,
+				{super_move = true, hits = 10, hit_interval = 3, travel = 2.2, invuln_frames = 10, chip_damage = 4, followup = "~thousand_finish", camera_intensity = 0.15}],
+			"thousand_finish": ["Thousand Hands", "~thousand_finish", &"fight/palm_blast", 0.20, 0.65, 4, 4, 24, 150, H.MID, 0, 20, 16, Vector2(5.0, 2.5), Vector3(0, 1.15, -0.58), 0.42,
+				{knockdown = true, chip_damage = 14, camera_intensity = 0.6, impact_fx = &"shockwave"}],
+		},
+	},
 }
 
 
@@ -298,7 +336,7 @@ func _make(row: Array) -> MoveData:
 	for key in ["chip_damage", "hits", "hit_interval", "travel", "rise", "landing_recovery", "invuln_frames",
 			"low_profile", "super_move", "followup", "projectile_speed", "projectile_lifetime", "projectile_color", "impact_fx",
 			"command_grab", "grab_range", "projectile_immune", "dive", "focus_gain", "focus_hits", "focus_damage",
-			"focus_rise", "focus_consume", "focus_followup"]:
+			"focus_rise", "focus_consume", "focus_followup", "reversal"]:
 		if extras.has(key):
 			m.set(key, extras[key])
 	return m

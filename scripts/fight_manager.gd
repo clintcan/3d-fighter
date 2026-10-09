@@ -8,6 +8,8 @@ extends Node3D
 
 signal hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult)
 signal throw_landed(attacker: Fighter, defender: Fighter)
+## A reversal stance caught `attacker`'s strike (it also counts as a throw by `reverser`).
+signal reversal_landed(reverser: Fighter, attacker: Fighter)
 signal round_ended(winner: Fighter, reason: String)
 ## Emitted at the end of every simulation tick (training tools measure frame data here).
 signal ticked
@@ -558,6 +560,9 @@ func _resolve_hits() -> void:
 	for attacker in fighters:
 		var hitbox := attacker.get_active_hitbox()
 		if not hitbox.is_empty() and attacker.opponent.overlaps_hurtbox(hitbox.center, hitbox.radius):
+			if attacker.opponent.reverses(attacker.current_move):
+				_reverse(attacker.opponent, attacker, hitbox.center)
+				return
 			connecting.append([attacker, attacker.current_move, hitbox.center, attacker.is_final_hit()])
 		var p := attacker.projectile
 		if p and not attacker.opponent.is_projectile_immune() and attacker.opponent.overlaps_hurtbox(p.position, p.radius):
@@ -584,6 +589,18 @@ func _resolve_hits() -> void:
 			hud.note(fighters.find(attacker), "COUNTER")
 		last_hit_point = hit[2]
 		hit_landed.emit(attacker, defender, move, result)
+
+
+## `reverser`'s stance caught `attacker`'s strike: the strike never lands and the reverser
+## throws the attacker, like a command grab.
+func _reverse(reverser: Fighter, attacker: Fighter, point: Vector3) -> void:
+	reverser.on_command_grab()
+	attacker.on_grabbed_by(reverser, false)
+	last_hit_point = point
+	if not resimulating:
+		hud.note(fighters.find(reverser), "REVERSAL")
+	reversal_landed.emit(reverser, attacker)
+	throw_landed.emit(reverser, attacker)
 
 
 ## Both sides build meter from an exchange; supers don't refund meter.

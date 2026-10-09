@@ -15,6 +15,7 @@ const COUNTER_COLOR := Color(1.0, 0.35, 0.15)
 const BLOCK_COLOR := Color(0.45, 0.75, 1.0)
 const SUPER_COLOR := Color(1.0, 0.82, 0.3)
 const FOCUS_COLOR := Color(1.0, 0.55, 0.15) # a focus power-up (Mira's Lakas Stance)
+const REVERSAL_COLOR := Color(0.55, 1.0, 0.8) # a reversal stance catching a strike (Lian)
 const TRAIL_COLOR := Color(0.8, 0.9, 1.0)
 const DEBRIS_COLOR := Color(0.55, 0.45, 0.35)
 
@@ -42,6 +43,7 @@ func setup(fight_manager: Node) -> void:
 	# All effects are cosmetic: manager.cosmetic() skips them during rollback re-simulation.
 	manager.hit_landed.connect(manager.cosmetic(_on_hit_landed))
 	manager.super_flash.connect(manager.cosmetic(_on_super_flash))
+	manager.reversal_landed.connect(manager.cosmetic(_on_reversal))
 	manager.projectile_clashed.connect(manager.cosmetic(func(point: Vector3) -> void:
 		spark(point, SUPER_COLOR, 1.4)
 		Audio.sfx(&"hit_heavy", 0.0, 1.2)))
@@ -134,6 +136,17 @@ func _process(_delta: float) -> void:
 		if sparks.emitting:
 			sparks.global_position = fighter.global_transform * move.hitbox_offset
 			(sparks.process_material as ParticleProcessMaterial).color = SUPER_COLOR if move.super_move or move.input.begins_with("~") else HIT_COLOR
+
+
+## A reversal: a bright catch at the struck point, a ring, a sharp clap, the catcher's flash.
+func _on_reversal(reverser: Fighter, _attacker: Fighter) -> void:
+	var point: Vector3 = manager.last_hit_point
+	spark(point, REVERSAL_COLOR, 1.3)
+	_ring(point, REVERSAL_COLOR, 0.8, false)
+	Audio.sfx(&"block", 0.0, 1.35)
+	Audio.sfx(&"hit_heavy", -6.0, 0.8)
+	if reverser.model:
+		reverser.model.flash(REVERSAL_COLOR, 0.25)
 
 
 ## A fighter's shout, with their mouth moving to it.

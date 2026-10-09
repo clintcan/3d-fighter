@@ -16,6 +16,7 @@ const FACES := {
 	&"valka": {&"smile": 0.5, &"brow_down": 0.8, &"squint": 0.4}, # predatory
 	&"jin": {&"brow_down": 1.0, &"squint": 0.6}, # cold focus
 	&"mira": {&"smile": 1.0, &"squint": 0.3, &"brow_up": 0.25}, # grinning
+	&"lian": {&"smile": 0.3, &"brow_down": 0.45, &"squint": 0.3}, # calm, a little amused
 }
 
 

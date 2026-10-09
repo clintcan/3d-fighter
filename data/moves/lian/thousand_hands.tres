@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_iy05j"]
+
+[resource]
+script = ExtResource("1_iy05j")
+name = "Thousand Hands"
+input = "236236P"
+animation = &"fight/chain_punch"
+animation_impact = 0.08
+animation_end = 0.8
+active = 30
+recovery = 20
+damage = 22
+hitstun = 22
+blockstun = 16
+hitstop = 4
+knockback = Vector2(0.6, 0)
+chip_damage = 4
+hits = 10
+hit_interval = 3
+travel = 2.2
+invuln_frames = 10
+super_move = true
+followup = "~thousand_finish"
+hitbox_radius = 0.32
+hitbox_offset = Vector3(0, 1.3, -0.62)
+camera_intensity = 0.15

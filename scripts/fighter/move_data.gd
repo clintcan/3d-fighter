@@ -70,6 +70,11 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 ## move's recovery.
 @export var command_grab: bool = false
 @export var grab_range: float = 1.0
+## Reversal stance: during its active frames, a high, mid or overhead strike that touches
+## the fighter is caught instead of landing, and the fighter throws the attacker
+## (unblockable, can't be teched; damage = this move's damage). Lows, throws and
+## projectiles beat it, and a stance that catches nothing plays out its recovery.
+@export var reversal: bool = false
 ## Projectiles pass through the fighter during this move's startup and active frames.
 @export var projectile_immune: bool = false
 ## Air move: on its first active frame the attacker dives along (forward, down) m/s

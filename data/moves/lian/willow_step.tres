@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_d4md4"]
+
+[resource]
+script = ExtResource("1_d4md4")
+name = "Willow Step"
+input = "214K"
+animation = &"fight/counter_stance"
+animation_impact = 0.05
+animation_end = 0.62
+startup = 4
+active = 14
+recovery = 8
+damage = 0
+hitstun = 0
+blockstun = 0
+hitstop = 0
+knockback = Vector2(0, 0)
+travel = 5.0
+projectile_immune = true
+hitbox_radius = 0.0
+hitbox_offset = Vector3(0, 1, 0)

@@ -81,6 +81,10 @@ func _initialize() -> void:
 	lib.add_animation("flip_kick", build_flip_kick())
 	lib.add_animation("dive_kick", build_dive_kick())
 	lib.add_animation("focus_stance", build_focus_stance())
+	lib.add_animation("counter_stance", build_counter_stance())
+	lib.add_animation("chain_punch", build_chain_punch(12))
+	lib.add_animation("chain_punch_short", build_chain_punch(3))
+	lib.add_animation("reversal_throw", build_reversal_throw())
 	lib.add_animation("slide_kick",build_in_place_ranges([[ual2.get_animation("Slide_Start"), 0.2, 0.83], [ual2.get_animation("Slide_Exit"), 0.0, 0.3]], crouch, 0.25))
 	lib.add_animation("shoulder_charge", build_in_place_ranges([[ual2.get_animation("Shield_Dash"), 0.0, 0.5]], guard, 0.3))
 	var err := ResourceSaver.save(lib, OUTPUT)
@@ -1165,6 +1169,97 @@ func build_focus_stance() -> Animation:
 	rotate_bone(power, "neck_01", Vector3.RIGHT, -12.0) # chin up
 
 	return make_animation([[0.0, guard], [0.10, cross], [0.25, power], [0.45, power], [0.60, guard]], false)
+
+
+## Reversal stance (Lian's Still Water): the weight sinks onto the rear leg, the lead arm
+## floats forward at chest height with the palm turned out to meet a strike (tan sau), the
+## rear palm guards beside the lead elbow (wu sau). In place by 0.05 s, held, then back
+## to the guard.
+func build_counter_stance() -> Animation:
+	var lead_foot := global_origin(guard, "foot_" + lead)
+	var rear_foot := global_origin(guard, "foot_" + rear)
+	var stance := _counter_pose(lead_foot, rear_foot)
+	var settle := duplicate_pose(stance)
+	move_bone(settle, "pelvis", Vector3(0, -0.01, -0.01))
+	return make_animation([[0.0, guard], [0.05, stance], [0.38, settle], [0.62, guard]], false)
+
+
+func _counter_pose(lead_foot: Vector3, rear_foot: Vector3) -> Dictionary:
+	var s := rear_sign()
+	var pose := duplicate_pose(guard)
+	move_bone(pose, "pelvis", Vector3(0, -0.07, -0.06)) # sit back
+	hip_turn(pose, -12.0)
+	lean(pose, 3.0, 0.0)
+	plant_both(pose, lead_foot, rear_foot)
+	var chest := global_origin(pose, "spine_03")
+	punch_arm(pose, lead, Vector3(-s * 0.04, chest.y + 0.12, chest.z + 0.38)) # elbow down, forearm rising
+	rotate_bone(pose, "hand_" + lead, Vector3(0, 0, 1), s * 60.0) # palm turned out
+	punch_arm(pose, rear, Vector3(-s * 0.01, chest.y + 0.06, chest.z + 0.2))
+	rotate_bone(pose, "hand_" + rear, Vector3.RIGHT, -40.0) # palm forward
+	return pose
+
+
+## Chain punches (Wing Chun): upright, square to the opponent, fists thrown straight down
+## the centre line one after another, knuckles vertical, each arm retracting under the
+## next. A punch every 0.06 s from 0.08 s (`count` of them: 12 for the super, 3 for
+## the normal); ends back in the guard.
+func build_chain_punch(count: int) -> Animation:
+	var lead_foot := global_origin(guard, "foot_" + lead)
+	var rear_foot := global_origin(guard, "foot_" + rear)
+	var base := duplicate_pose(guard)
+	move_bone(base, "pelvis", Vector3(0, -0.04, 0.03))
+	hip_turn(base, 20.0) # square up
+	plant_both(base, lead_foot, rear_foot)
+	var chest := global_origin(base, "spine_03")
+	var keys := [[0.0, guard], [0.04, base]]
+	var t := 0.08
+	for i in count:
+		var side := lead if i % 2 == 0 else rear
+		var other := rear if side == lead else lead
+		var strike := duplicate_pose(base)
+		move_bone(strike, "pelvis", Vector3(0, 0, 0.015))
+		plant_both(strike, lead_foot, rear_foot)
+		punch_arm(strike, side, Vector3(0, chest.y - 0.04 + 0.02 * (i % 2), chest.z + 0.55))
+		rotate_bone(strike, "hand_" + side, Vector3(0, 0, 1), 80.0 if side == "l" else -80.0) # vertical fist
+		punch_arm(strike, other, Vector3(0, chest.y - 0.1, chest.z + 0.2)) # retracting, under the punch
+		keys.append([t, strike])
+		t += 0.06
+	keys.append([t + 0.08, base])
+	keys.append([t + 0.2, guard])
+	return make_animation(keys, false)
+
+
+## Reversal throw: the lead hand traps the caught limb and draws it past (0-0.2 s) as the
+## hips turn away, then the rear palm drives into the chest (0.42 s, when the opponent is
+## released) and the stance recovers.
+func build_reversal_throw() -> Animation:
+	var s := rear_sign()
+	var lead_foot := global_origin(guard, "foot_" + lead)
+	var rear_foot := global_origin(guard, "foot_" + rear)
+	var catch := _counter_pose(lead_foot, rear_foot)
+	var chest := global_origin(catch, "spine_03")
+	punch_arm(catch, lead, Vector3(-s * 0.05, chest.y + 0.12, chest.z + 0.45))
+
+	var draw := duplicate_pose(guard)
+	move_bone(draw, "pelvis", Vector3(0, -0.09, -0.04))
+	hip_turn(draw, -35.0)
+	plant_both(draw, lead_foot, rear_foot)
+	chest = global_origin(draw, "spine_03")
+	reach_arm(draw, lead, Vector3(-s * 0.35, chest.y - 0.15, chest.z + 0.2)) # drawn past the hip
+	reach_arm(draw, rear, Vector3(s * 0.05, chest.y - 0.05, chest.z + 0.15)) # chambered palm
+
+	var strike := duplicate_pose(guard)
+	move_bone(strike, "pelvis", Vector3(0, -0.08, 0.1))
+	hip_turn(strike, 25.0)
+	lean(strike, -6.0, 0.0)
+	plant_both(strike, lead_foot, rear_foot)
+	chest = global_origin(strike, "spine_03")
+	punch_arm(strike, rear, Vector3(0, chest.y - 0.04, chest.z + 0.6))
+	rotate_bone(strike, "hand_" + rear, Vector3.RIGHT, -55.0) # palm forward
+	reach_arm(strike, lead, Vector3(-s * 0.25, chest.y - 0.18, chest.z + 0.12))
+
+	return make_animation([[0.0, catch], [0.2, draw], [0.32, draw], [0.42, strike], [0.62, strike],
+		[0.85, guard]], false)
 
 
 ## Resamples `source` keeping its `keep_bones`, with the rest of the body from the guard.

@@ -1,0 +1,63 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/characters/base/T_Superhero_Female_Dark_BaseColor.png" id="1_2leu8"]
+[ext_resource type="Texture2D" path="res://assets/characters/base/T_Superhero_Female_Light_BaseColor.png" id="2_sktwq"]
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Hair_Bun.tscn" id="3_r65gl"]
+[ext_resource type="PackedScene" path="res://assets/characters/hair/Eyebrows_Female.gltf" id="4_1smuh"]
+[ext_resource type="PackedScene" path="res://assets/characters/base/Superhero_Female_FullBody.gltf" id="5_fhypt"]
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="6_tobrv"]
+[ext_resource type="Resource" path="res://data/moves/lian/jab.tres" id="7_ckwaw"]
+[ext_resource type="Resource" path="res://data/moves/lian/straight.tres" id="8_hx2fa"]
+[ext_resource type="Resource" path="res://data/moves/lian/mid_kick.tres" id="9_7liwh"]
+[ext_resource type="Resource" path="res://data/moves/lian/roundhouse.tres" id="10_nixl1"]
+[ext_resource type="Resource" path="res://data/moves/lian/crouch_jab.tres" id="11_xadh3"]
+[ext_resource type="Resource" path="res://data/moves/lian/low_kick.tres" id="12_ebk7w"]
+[ext_resource type="Resource" path="res://data/moves/lian/uppercut.tres" id="13_3n05h"]
+[ext_resource type="Resource" path="res://data/moves/lian/sweep.tres" id="14_pl4jn"]
+[ext_resource type="Resource" path="res://data/moves/lian/jump_jab.tres" id="15_vxe4d"]
+[ext_resource type="Resource" path="res://data/moves/lian/jump_hammer.tres" id="16_0mnrf"]
+[ext_resource type="Resource" path="res://data/moves/lian/jump_kick.tres" id="17_7qnqu"]
+[ext_resource type="Resource" path="res://data/moves/lian/flying_kick.tres" id="18_w8pxm"]
+[ext_resource type="Resource" path="res://data/moves/lian/chain_punch.tres" id="19_3uodx"]
+[ext_resource type="Resource" path="res://data/moves/lian/double_palm.tres" id="20_5fa6t"]
+[ext_resource type="Resource" path="res://data/moves/lian/still_water.tres" id="21_ucp4r"]
+[ext_resource type="Resource" path="res://data/moves/lian/willow_step.tres" id="22_2mjg6"]
+[ext_resource type="Resource" path="res://data/moves/lian/inch_palm.tres" id="23_gk75r"]
+[ext_resource type="Resource" path="res://data/moves/lian/thousand_hands.tres" id="24_eujh8"]
+[ext_resource type="Resource" path="res://data/moves/lian/thousand_finish.tres" id="25_2lx58"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/lian_body.res" id="26_r65gl"]
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="26_tp6pj"]
+[ext_resource type="ArrayMesh" path="res://assets/characters/outfits/lian_outfit.res" id="27_1smuh"]
+[ext_resource type="Texture2D" path="res://assets/ui/portraits/lian.png" id="28_1smuh"]
+
+[resource]
+script = ExtResource("26_tp6pj")
+id = &"lian"
+display_name = "Lian"
+archetype = "Counter"
+description = "Wing Chun master. Holds the centre line, rattles off chain punches, and turns any careless strike into a throw."
+select_order = 6
+portrait = ExtResource("28_1smuh")
+model_scene = ExtResource("5_fhypt")
+hair_scenes = Array[PackedScene]([ExtResource("3_r65gl"), ExtResource("4_1smuh")])
+body_albedo = ExtResource("2_sktwq")
+model_scale = 0.98
+hair_color = Color(0.045, 0.035, 0.035, 1)
+alt_body_albedo = ExtResource("1_2leu8")
+alt_hair_color = Color(0.3, 0.16, 0.08, 1)
+outfit_mesh = ExtResource("27_1smuh")
+outfit_body_mesh = ExtResource("26_r65gl")
+outfit_colors = PackedColorArray(0.1, 0.36, 0.29, 1, 0.84, 0.75, 0.52, 1, 0.06, 0.06, 0.07, 1, 0.07, 0.07, 0.08, 1)
+outfit_fabrics = Array[StringName]([&"cotton", &"cotton", &"cotton", &"cotton"])
+alt_outfit_colors = PackedColorArray(0.8, 0.79, 0.75, 1, 0.08, 0.08, 0.09, 1, 0.5, 0.06, 0.06, 1, 0.08, 0.08, 0.09, 1)
+detailed_textures = true
+realistic_shading = true
+victory_animations = Array[StringName]([&"fight/victory_bow", &"fight/victory_fist_pump"])
+placeholder_color = Color(0.2, 0.65, 0.5, 1)
+max_health = 980
+back_walk_speed = 1.7
+dash_speed = 6.2
+weight = 0.95
+throw_damage = 115
+speed_rating = 0.6
+moves = Array[ExtResource("6_tobrv")]([ExtResource("7_ckwaw"), ExtResource("8_hx2fa"), ExtResource("9_7liwh"), ExtResource("10_nixl1"), ExtResource("11_xadh3"), ExtResource("12_ebk7w"), ExtResource("13_3n05h"), ExtResource("14_pl4jn"), ExtResource("15_vxe4d"), ExtResource("16_0mnrf"), ExtResource("17_7qnqu"), ExtResource("18_w8pxm"), ExtResource("19_3uodx"), ExtResource("20_5fa6t"), ExtResource("21_ucp4r"), ExtResource("22_2mjg6"), ExtResource("23_gk75r"), ExtResource("24_eujh8"), ExtResource("25_2lx58")])

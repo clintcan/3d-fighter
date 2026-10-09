@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_qjov6"]
+
+[resource]
+script = ExtResource("1_qjov6")
+name = "Chain Punch"
+input = "6LP"
+animation = &"fight/chain_punch_short"
+animation_impact = 0.08
+animation_end = 0.36
+active = 7
+recovery = 12
+damage = 14
+hit_level = 0
+hitstun = 14
+hitstop = 3
+knockback = Vector2(0.9, 0)
+hits = 3
+hit_interval = 3
+hitbox_radius = 0.17
+hitbox_offset = Vector3(0, 1.3, -0.62)
+cancel_into = Array[String](["HP", "6HP"])

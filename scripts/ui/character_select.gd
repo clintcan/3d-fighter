@@ -17,7 +17,7 @@ const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const ONLINE_MENU_SCENE := "res://scenes/online_menu.tscn"
 const HEALTH_SCALE := 1200.0 # max_health shown as a full bar
 
-@onready var roster_box: VBoxContainer = %Roster
+@onready var roster_box: GridContainer = %Roster
 @onready var viewport: SubViewport = %Viewport
 @onready var name_label: Label = %NameLabel
 @onready var archetype_label: Label = %ArchetypeLabel
@@ -49,6 +49,7 @@ func _ready() -> void:
 	Audio.music(&"menu")
 	Audio.voice("choose_your_character")
 	_build_preview_stage()
+	roster_box.columns = _columns()
 	for character in GameState.roster:
 		roster_box.add_child(_make_portrait_button(character))
 		var model := FighterModel.new()
@@ -113,8 +114,12 @@ func _versus_input(event: InputEvent) -> void:
 	var prefix := "p%d_" % (_picking + 1)
 	var count := roster_box.get_child_count()
 	if event.is_action_pressed(prefix + "up"):
-		_move_cursor(-1, count)
+		_move_cursor(-roster_box.columns, count)
 	elif event.is_action_pressed(prefix + "down"):
+		_move_cursor(roster_box.columns, count)
+	elif roster_box.columns > 1 and event.is_action_pressed(prefix + "left"):
+		_move_cursor(-1, count)
+	elif roster_box.columns > 1 and event.is_action_pressed(prefix + "right"):
 		_move_cursor(1, count)
 	elif event.is_action_pressed(prefix + "lp"):
 		_confirm_versus(_cursor)
@@ -135,6 +140,11 @@ func _versus_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		else:
 			_back_to_menu()
+
+
+## Portraits per row: one column up to five fighters, then two.
+func _columns() -> int:
+	return 1 if GameState.roster.size() <= 5 else 2
 
 
 func _move_cursor(step: int, count: int) -> void:
@@ -161,7 +171,8 @@ func _refresh_versus() -> void:
 	var player := _picking + 1
 	($Margin/VBox/Title as Label).text = "PLAYER %d  -  SELECT YOUR FIGHTER" % player
 	($Margin/VBox/Hint as Label).text = "PLAYER %d:  %s  ·  Light Punch to select  ·  Heavy Punch to go back" % [
-		player, "W / S or stick" if player == 1 else "Up / Down arrows or stick"]
+		player, ("WASD or stick" if player == 1 else "Arrows or stick") if roster_box.columns > 1
+			else ("W / S or stick" if player == 1 else "Up / Down arrows or stick")]
 	for i in roster_box.get_child_count():
 		var button := roster_box.get_child(i) as Button
 		var character: CharacterData = GameState.roster[i]
@@ -227,9 +238,11 @@ func _build_preview_stage() -> void:
 
 func _make_portrait_button(character: CharacterData) -> Button:
 	var button := Button.new()
-	# Portraits shrink so the whole roster fits the column (240 px for three fighters).
+	# Portraits shrink so the whole roster fits the column (240 px for three fighters);
+	# past five fighters they go two to a row.
 	var count := maxi(GameState.roster.size(), 1)
-	var side := clampf((760.0 - 18.0 * (count - 1)) / count, 140.0, 240.0)
+	var rows := ceili(float(count) / _columns())
+	var side := clampf((760.0 - 18.0 * (rows - 1)) / rows, 140.0, 240.0)
 	button.custom_minimum_size = Vector2(side, side)
 	button.icon = character.portrait
 	button.expand_icon = true

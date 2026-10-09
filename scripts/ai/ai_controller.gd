@@ -13,6 +13,9 @@ extends FighterController
 ## A power-up stance (a special with focus_gain, Mira's Lakas Stance) is never picked as
 ## an attack: the CPU uses it on purpose, at range and while the opponent is knocked
 ## down, weighted by the personality's `stance`.
+## A reversal stance (Lian's Still Water) is never an attack either: the CPU uses it
+## against attacks it sees coming early enough, against jump-ins and as a read up close
+## (the personality's `reversal`), and every CPU throws, goes low or waits against one.
 
 enum Difficulty { EASY, NORMAL, HARD }
 
@@ -85,6 +88,13 @@ const PERSONALITIES := {
 		weights = {stance = 2.0, rush = 1.6, string = 1.6, dash = 1.4, jump = 1.0, approach = 1.5,
 			poke = 1.0, wait = 0.4, retreat = 0.4},
 	},
+	&"lian": {
+		name = "Counter", blurb = "waits for you to swing, then turns it into a throw", preferred_range = 1.3,
+		aggression = -0.15, block = 0.1, punish = 0.1, anti_air = 0.15,
+		rising_anti_air = 0.0, pressure = 0.35, far_punish = 0.2, reversal = 0.35,
+		weights = {reversal = 1.0, glide = 1.5, poke = 1.2, string = 1.4, wait = 1.8, approach = 1.0,
+			retreat = 0.6, jump = 0.4, dash = 0.6, throw = 1.0},
+	},
 	&"brutus": {
 		name = "Punisher", blurb = "waits patiently, then punishes every mistake", preferred_range = 1.6,
 		aggression = -0.2, block = 0.15, punish = 0.2, anti_air = 0.0,
@@ -100,6 +110,10 @@ const DEFAULT_PERSONALITY := {
 }
 ## Distance at which an incoming projectile may be jumped over instead of blocked.
 const PROJECTILE_JUMP_RANGE := 2.6
+## Ticks from deciding on a reversal until its stance catches (the 214 motion plus the
+## stance's startup), and the latest an attack may land for the stance to still be up.
+const REVERSAL_LEAD := 6
+const REVERSAL_LATEST := 18
 ## A power-up stance is only used from at least this far away.
 const STANCE_MIN_DISTANCE := 2.4
 
@@ -126,6 +140,7 @@ var _step_ticks_left := 0
 ## Attack instance (move + start tick) already rolled for blocking, and the outcome.
 var _rolled_attack := ""
 var _rolled_punish := ""
+var _rolled_reversal := ""
 var _blocking := false
 var _block_dir := 4
 var _block_level: MoveData.HitLevel = MoveData.HitLevel.MID
@@ -139,6 +154,8 @@ var _rolled_pressure := ""
 var _recent_dirs: Array[int] = []
 ## True while the current plan step is part of an intended dash / backdash.
 var _dashing := false
+var _wary_of: CharacterData # the opponent _opponent_has_reversal was looked up for
+var _opponent_has_reversal := false
 
 
 func _init(level: Difficulty = Difficulty.NORMAL, seed_value: int = 1) -> void:
@@ -181,6 +198,7 @@ func reset() -> void:
 	_step_ticks_left = 0
 	_rolled_attack = ""
 	_rolled_punish = ""
+	_rolled_reversal = ""
 	_blocking = false
 	_rolled_projectile = 0
 	_rolled_pressure = ""
@@ -202,6 +220,8 @@ func _choose_input(fighter: Fighter) -> int:
 	var seen_for_block := _perceived(block_reaction_frames)
 
 	# Reactive defense overrides any plan.
+	if _try_reversal(fighter, seen, dist):
+		return _next_plan_input()
 	if _wants_block_projectile(fighter):
 		_plan.clear()
 		_step_ticks_left = 0
@@ -305,7 +325,7 @@ func _wants_block_projectile(fighter: Fighter) -> bool:
 	var id := p.get_instance_id()
 	if id != _rolled_projectile:
 		_rolled_projectile = id
-		var immune := _special_with(func(m: MoveData) -> bool: return m.projectile_immune and not m.super_move)
+		var immune := _special_any(func(m: MoveData) -> bool: return m.projectile_immune and not m.super_move)
 		if immune and to_me.length() < reach(immune) + 2.0 and fighter.is_actionable() and _rng.randf() < 0.5:
 			_blocking = false
 			_plan.clear()
@@ -371,7 +391,10 @@ func _react(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 					_queue_pressure(dist)
 		Fighter.State.JUMP:
 			var approaching: bool = (seen.velocity as Vector3).dot(fighter.position - seen.position) > 0.0
-			if approaching and dist < 2.0 and _rng.randf() < anti_air_chance * 0.15:
+			var reversal := _reversal_move()
+			if reversal and approaching and dist < 1.8 and (seen.velocity as Vector3).y < 0.0 					and _rng.randf() < anti_air_chance * 0.3 * personality.get("reversal", 0.0):
+				_queue_special(reversal) # catch the jump-in
+			elif approaching and dist < 2.0 and _rng.randf() < anti_air_chance * 0.15:
 				var rising := _special_with(func(m: MoveData) -> bool: return (m.rise > 0.0 or m.projectile_immune) and not m.super_move)
 				if rising and _rng.randf() < personality.rising_anti_air:
 					_queue_special(rising) # invincible rising anti-air
@@ -424,6 +447,15 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 		Fighter.State.AIR_HIT:
 			_react(fighter, seen, dist)
 			return
+	if _attack_phase(seen) == "threat" and (seen.move as MoveData).reversal:
+		# Never strike into a reversal stance: throw it, go low, or wait it out.
+		if dist < THROW_RANGE:
+			_queue_throw()
+		elif dist <= reach(_move("2LK")):
+			_queue_press(LK, 2)
+		else:
+			_plan.append([5, 0, 10])
+		return
 
 	var options: Array = []
 	var projectile_move := _special_with(func(m: MoveData) -> bool: return m.projectile_speed > 0.0)
@@ -432,12 +464,15 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 	var grab := _special_with(func(m: MoveData) -> bool: return m.command_grab and not m.super_move)
 	var can_fireball := projectile_move != null and fighter.projectile == null
 	var stance := _stance(fighter)
+	var reversal := _reversal_move()
+	var glide := _special_any(func(m: MoveData) -> bool: return m.projectile_immune and m.travel > 0.0 and not _is_attack(m))
 	if dist > FAR_RANGE:
 		options = [
 			[2.5 * _w("fireball") if can_fireball else 0.0, func() -> void: _queue_special(projectile_move)],
 			[1.0 * _w("stance") if stance else 0.0, func() -> void: _queue_special(stance)],
 			[1.0 * aggression * _w("rush") if rush and dist <= reach(rush) else 0.0, func() -> void: _queue_special(rush)],
 			[4.0 * _w("approach"), func() -> void: _plan.append([6, 0, _rng.randi_range(12, 28)])],
+			[1.0 * _w("glide") if glide else 0.0, func() -> void: _queue_special(glide)],
 			[2.0 * aggression * _w("dash"), func() -> void: _queue_dash()],
 			[1.0 * aggression * _w("jump"), func() -> void: _queue_jump_in()],
 			[1.0 * (1.0 - aggression) * _w("wait"), func() -> void: _plan.append([5, 0, _rng.randi_range(8, 20)])],
@@ -455,17 +490,20 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 			[1.0 * (1.0 - aggression) * _w("wait"), func() -> void: _plan.append([4, 0, _rng.randi_range(6, 14)])],
 		]
 	else:
+		# Against a fighter with a reversal stance: more lows and throws, fewer big swings.
+		var wary := 1.0 if _opponent_reverses(fighter) else 0.0
 		options = [
-			[3.0 * aggression * _w("string"), func() -> void: _queue_string()],
-			[1.5, func() -> void: _queue_press(LK, 2)],
-			[1.0 * aggression, func() -> void: _queue_press(HK, 2)],
-			[1.0, func() -> void: _queue_press(HP, 2)],
-			[0.8 * aggression * _w("ground_special") if ground_special and dist <= reach(ground_special) else 0.0, func() -> void: _queue_special(ground_special)],
-			[1.2 * aggression * _w("throw") if dist < THROW_RANGE else 0.0, func() -> void: _queue_throw()],
+			[3.0 * aggression * _w("string") * (1.0 - 0.4 * wary), func() -> void: _queue_string()],
+			[1.5 * (1.0 + wary), func() -> void: _queue_press(LK, 2)],
+			[1.0 * aggression * (1.0 + 0.5 * wary), func() -> void: _queue_press(HK, 2)],
+			[1.0 * (1.0 - 0.5 * wary), func() -> void: _queue_press(HP, 2)],
+			[0.8 * aggression * _w("ground_special") * (1.0 + wary) if ground_special and dist <= reach(ground_special) else 0.0, func() -> void: _queue_special(ground_special)],
+			[1.2 * aggression * _w("throw") * (1.0 + wary) if dist < THROW_RANGE else 0.0, func() -> void: _queue_throw()],
 			[1.0 * aggression * _w("grab") if grab and dist < grab.grab_range - 0.05 else 0.0, func() -> void: _queue_special(grab)],
 			[1.5 * (1.0 - aggression) * _w("wait"), func() -> void: _plan.append([4 if _rng.randf() < 0.5 else 1, 0, _rng.randi_range(8, 18)])],
 			[0.6 * _w("retreat"), func() -> void: _queue_backdash()],
 			[0.5 * _w("sidestep"), func() -> void: _queue_sidestep()],
+			[1.0 * _w("reversal") * personality.get("reversal", 0.0) if reversal else 0.0, func() -> void: _queue_special(reversal)],
 		]
 	# Steer toward the personality's preferred range (unless backed into the ropes).
 	var preferred: float = personality.preferred_range
@@ -521,12 +559,64 @@ func _queue_special(move: MoveData, recover := true) -> void:
 		_plan.append([5, 0, 3])
 
 
-## First special (motion input) of this character matching `test`, or null.
+## First attacking special (motion input) of this character matching `test`, or null.
+## Stances (power-up, reversal) and moves without a hitbox aren't attacks.
 func _special_with(test: Callable) -> MoveData:
 	for move: MoveData in _moves.values():
-		if move.is_special() and move.focus_gain == 0 and test.call(move):
+		if move.is_special() and _is_attack(move) and test.call(move):
 			return move
 	return null
+
+
+## First special of any kind matching `test`, or null.
+func _special_any(test: Callable) -> MoveData:
+	for move: MoveData in _moves.values():
+		if move.is_special() and test.call(move):
+			return move
+	return null
+
+
+static func _is_attack(move: MoveData) -> bool:
+	return move.focus_gain == 0 and not move.reversal 			and (move.hitbox_radius > 0.0 or move.projectile_speed > 0.0 or move.command_grab)
+
+
+## True if the opponent has a reversal stance (looked up once per opponent).
+func _opponent_reverses(fighter: Fighter) -> bool:
+	var data := fighter.opponent.data
+	if data != _wary_of:
+		_wary_of = data
+		_opponent_has_reversal = data.moves.any(func(m: MoveData) -> bool: return m.reversal)
+	return _opponent_has_reversal
+
+
+## This character's reversal stance (not a super), or null.
+func _reversal_move() -> MoveData:
+	return _special_any(func(m: MoveData) -> bool: return m.reversal and not m.super_move)
+
+
+## Against an attack seen early enough (and not a low), sometimes answer with the
+## reversal stance instead of blocking. Seen with the general reaction delay, not the
+## quicker blocking one: entering a motion on reaction is slower than holding back, so
+## only slow attacks can be reversed on sight (the rest takes a read). Rolled once per
+## attack. True if it was queued.
+func _try_reversal(fighter: Fighter, seen: Dictionary, dist: float) -> bool:
+	var reversal := _reversal_move()
+	if reversal == null or not fighter.is_actionable() or _attack_phase(seen) != "threat":
+		return false
+	var move: MoveData = seen.move
+	if move.hit_level == MoveData.HitLevel.LOW or move.reversal or dist > reach(move) + 0.4:
+		return false
+	var attack_id := _attack_id(seen)
+	if attack_id == _rolled_reversal:
+		return false
+	_rolled_reversal = attack_id
+	var lands_in: int = move.startup + 1 - (seen.state_frame + reaction_frames)
+	if lands_in < REVERSAL_LEAD or lands_in > REVERSAL_LATEST or _rng.randf() >= personality.get("reversal", 0.0):
+		return false
+	_plan.clear()
+	_step_ticks_left = 0
+	_queue_special(reversal)
+	return true
 
 
 ## The fighter's power-up stance while it can still gain focus and it's safe to take the

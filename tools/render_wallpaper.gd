@@ -16,6 +16,7 @@ const LOGO := "res://assets/ui/logo.png"
 const PLATE_COLORS := {
 	&"kenji": Color(0.3, 0.6, 1.0), &"rhea": Color(1.0, 0.3, 0.45), &"brutus": Color(1.0, 0.5, 0.12),
 	&"valka": Color(0.72, 0.4, 1.0), &"jin": Color(0.2, 0.88, 1.0), &"mira": Color(1.0, 0.84, 0.25),
+	&"lian": Color(0.3, 0.95, 0.65),
 }
 const Portraits := preload("res://tools/render_portraits.gd")
 const PLATE_Y := 1004.0 # baseline row of the name plates (1080p)

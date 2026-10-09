@@ -350,6 +350,7 @@ func _initialize() -> void:
 	await temple_tests()
 	await jin_tests()
 	await mira_tests()
+	await lian_tests()
 	await beach_tests()
 	await market_tests()
 	await train_tests()
@@ -1719,10 +1720,126 @@ func jin_tests() -> void:
 ## Bagyo Rush and picks the super's finisher, knockdowns take it away, it survives a
 ## rollback snapshot, the dive kick changes the jump arc, and the detailed textures
 ## (hers first, now every fighter's).
+## Lian, the counter fighter: the reversal stance catches high, mid and overhead strikes
+## and throws the attacker; lows, throws and projectiles beat it; a miss is punishable;
+## Willow Step glides through fireballs; the CPU uses the stance only on purpose and
+## never strikes into one.
+func lian_tests() -> void:
+	var gs = root.get_node("GameState")
+	var lian: CharacterData = gs.roster.filter(func(c): return c.id == &"lian").front()
+	check("Lian: in the roster as the seventh fighter", lian != null and gs.roster.size() >= 7 and gs.roster[6] == lian)
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = lian; gs.p2_character = gs.roster[0]
+	gs.stage_path = gs.DEFAULT_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	var cpu := AIController.new()
+	cpu.attach(p1)
+	check("Lian: Counter CPU personality", cpu.personality_name() == "Counter")
+	check("Lian: the CPU never picks a stance as an attack",
+		cpu._special_with(func(mv: MoveData) -> bool: return mv.motion() == "214") == null and cpu._reversal_move() != null)
+
+	# p2 (Kenji) is scripted for these: `p2_move` presses its button on the tick Lian's
+	# stance starts.
+	var stance_vs := func(button: int, d: int, distance: float) -> Dictionary:
+		reset(DummyController.Mode.STAND)
+		p2.controller = ctl2
+		approach(distance); step(10)
+		var hp1 := p1.health
+		var hp2 := p2.health
+		ctl.dir = 2; step(1); ctl.dir = 1; step(1)
+		ctl.dir = 4; ctl.buttons = InputBuffer.LP; ctl2.dir = d; ctl2.buttons = button; step(1)
+		ctl.dir = 5; ctl2.dir = 5
+		var caught := false
+		var lian_thrown := false
+		for t in 50:
+			step()
+			caught = caught or (p1.state == Fighter.State.THROW and p2.state == Fighter.State.THROWN)
+			lian_thrown = lian_thrown or p1.state == Fighter.State.THROWN
+		step(60)
+		return {caught = caught, lian_thrown = lian_thrown, lian_lost = hp1 - p1.health, kenji_lost = hp2 - p2.health}
+	var high: Dictionary = stance_vs.call(InputBuffer.HP, 5, 1.0)
+	check("Lian: Still Water catches a straight and throws for its damage",
+		high.caught and high.lian_lost == 0 and high.kenji_lost == dmg(p1, "214P"), "%s" % high)
+	var low: Dictionary = stance_vs.call(InputBuffer.LK, 2, 1.0)
+	check("Lian: a low kick goes under the stance", not low.caught and low.lian_lost > 0, "%s" % low)
+	var thrown: Dictionary = stance_vs.call(InputBuffer.LP | InputBuffer.LK, 5, 0.7)
+	check("Lian: a throw beats the stance", not thrown.caught and thrown.lian_thrown and thrown.lian_lost > 0, "%s" % thrown)
+	var still_water := p1._move_for_input("214P")
+	check("Lian: the stance catches overheads, not lows",
+		still_water.reversal and _reverses_at(p1, still_water, p2._move_for_input("j.HK"))
+		and not _reverses_at(p1, still_water, p2._move_for_input("2LK")))
+
+	# A stance that catches nothing leaves her open.
+	reset(DummyController.Mode.STAND); step(4)
+	motion("214", InputBuffer.LP)
+	step(still_water.startup + still_water.active + 4)
+	check("Lian: a missed stance plays out its recovery", p1.state == Fighter.State.ATTACK and not p1.is_actionable(), state_name(p1))
+
+	# Fireballs: the stance doesn't catch them, Willow Step glides through.
+	for glide in [false, true]:
+		reset(DummyController.Mode.STAND)
+		p2.controller = ctl2
+		step(10)
+		var hp := p1.health
+		ctl2.dir = 2; step(1); ctl2.dir = 3; step(1); ctl2.dir = 6; ctl2.buttons = InputBuffer.LP; step(1); ctl2.dir = 5
+		wait_until(func() -> bool: return p2.projectile != null 			and Vector2(p2.projectile.position.x - p1.position.x, p2.projectile.position.z - p1.position.z).length() < 1.4, 120)
+		var start_gap := dist()
+		motion("214", InputBuffer.LK if glide else InputBuffer.LP)
+		var caught := false
+		var moves := {}
+		var hit_at := -1
+		for t in 40:
+			step()
+			caught = caught or p1.state == Fighter.State.THROW
+			if p1.current_move:
+				moves[p1.current_move.name] = true
+			if hit_at < 0 and p1.health < hp:
+				hit_at = t
+		var hit := p1.health < hp
+		if glide:
+			check("Lian: Willow Step glides through a fireball", not hit and dist() < start_gap,
+				"hp %d -> %d at tick %d, moves %s" % [hp, p1.health, hit_at, moves.keys()])
+		else:
+			check("Lian: Still Water doesn't catch a fireball", hit and not caught, "hp %d -> %d" % [hp, p1.health])
+		step(60)
+
+	# Any CPU facing a reversal stance throws, goes low or waits, never strikes into it.
+	var kenji_cpu := AIController.new()
+	kenji_cpu.attach(p2)
+	var striking := 0
+	for t in 40:
+		kenji_cpu._plan.clear()
+		var seen := {state = Fighter.State.ATTACK, state_frame = 6, move = still_water, position = p1.position,
+			velocity = Vector3.ZERO, crouching = false, start_tick = 0}
+		kenji_cpu._decide(p2, seen, [0.7, 1.1, 2.0][t % 3])
+		for planned: Array in kenji_cpu._plan:
+			var buttons: int = planned[1]
+			if buttons != 0 and buttons != (InputBuffer.LP | InputBuffer.LK) and not (buttons == InputBuffer.LK and planned[0] == 2):
+				striking += 1
+	check("Lian: CPUs don't strike into the reversal stance", striking == 0, "%d" % striking)
+	p2.controller = m.dummy
+
+
+## True if `fighter` in `stance` (on its first active frame) would catch `move`.
+func _reverses_at(fighter: Fighter, stance: MoveData, move: MoveData) -> bool:
+	var saved := fighter.save_state()
+	fighter.current_move = stance
+	fighter._set_state(Fighter.State.ATTACK)
+	fighter.state_frame = stance.startup + 1
+	var result := fighter.reverses(move)
+	fighter.load_state(saved)
+	return result
+
+
 func mira_tests() -> void:
 	var gs = root.get_node("GameState")
 	var mira: CharacterData = gs.roster.filter(func(c): return c.id == &"mira").front()
-	check("Mira: in the roster as the sixth fighter", mira != null and gs.roster.size() == 6 and gs.roster[5] == mira)
+	check("Mira: in the roster as the sixth fighter", mira != null and gs.roster.size() >= 6 and gs.roster[5] == mira)
 	gs.mode = gs.Mode.VS_CPU
 	gs.player_character = mira; gs.p2_character = gs.roster[0]
 	gs.stage_path = gs.DEFAULT_STAGE

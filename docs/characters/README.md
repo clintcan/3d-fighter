@@ -12,6 +12,7 @@ the page here.
 | [Valka](valka.md) | Grappler | 1050 | Grappler | Command grabs |
 | [Jin](jin.md) | Kicker | 980 | Footsies | Longest reach, overhead axe kick |
 | [Mira](mira.md) | Brawler | 1000 | Brawler | Focus: powers up with Lakas Stance |
+| [Lian](lian.md) | Counter | 980 | Counter | Reversal stance: catches strikes and throws |
 
 ## Shared base moves
 

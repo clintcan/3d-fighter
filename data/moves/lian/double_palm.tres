@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_ier0j"]
+
+[resource]
+script = ExtResource("1_ier0j")
+name = "Double Palm"
+input = "6HP"
+animation = &"fight/palm_blast"
+animation_end = 0.65
+startup = 11
+recovery = 18
+damage = 85
+hitstun = 21
+blockstun = 15
+hitstop = 9
+knockback = Vector2(3.2, 0)
+lunge = 3.0
+hitbox_radius = 0.2
+hitbox_offset = Vector3(0, 1.2, -0.62)
+camera_intensity = 0.15

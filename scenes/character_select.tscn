@@ -77,12 +77,13 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 30
 
-[node name="Roster" type="VBoxContainer" parent="Margin/VBox/Main"]
+[node name="Roster" type="GridContainer" parent="Margin/VBox/Main"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(250, 0)
 layout_mode = 2
-theme_override_constants/separation = 18
-alignment = 1
+size_flags_vertical = 4
+theme_override_constants/h_separation = 18
+theme_override_constants/v_separation = 18
 
 [node name="Preview" type="SubViewportContainer" parent="Margin/VBox/Main"]
 layout_mode = 2
@@ -196,5 +197,5 @@ theme_override_font_sizes/font_size = 22
 layout_mode = 2
 theme_override_colors/font_color = Color(0.5, 0.5, 0.55, 1)
 theme_override_font_sizes/font_size = 22
-text = "Up / Down to choose  ·  Enter / A to select  ·  Esc to go back"
+text = "Arrows / stick to choose  ·  Enter / A to select  ·  Esc to go back"
 horizontal_alignment = 1
