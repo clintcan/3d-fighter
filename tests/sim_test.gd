@@ -334,6 +334,7 @@ func _initialize() -> void:
 	round_tests()
 	character_tests()
 	fx_tests()
+	face_tests()
 	specials_tests()
 	await character_specials_tests()
 	await versus_tests()
@@ -1879,6 +1880,86 @@ func mira_tests() -> void:
 	check("Mira (female body, matte bob) gets it too", shading["mira_%d" % settings.Graphics.HIGH] == all_on, "%s" % [shading])
 	check("The Low preset skips realistic shading", shading["kenji_%d" % settings.Graphics.LOW] == all_off, "%s" % [shading])
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
+
+
+## Facial expressions (tools/face_shapes.gd): every body and face piece carries the blend
+## shapes, the mouth opens without moving the face above it, the eyelids close without
+## moving the brows, and fighters pull faces that match what is happening to them.
+func face_tests() -> void:
+	var gs = root.get_node("GameState")
+	check("FighterModel and the shape builder agree on the shapes", FighterModel.FACE_SHAPES == FaceShapes.SHAPES)
+	for character: CharacterData in gs.roster:
+		var id := String(character.id)
+		var body := character.outfit_body_mesh as ArrayMesh
+		var names := []
+		for i in body.get_blend_shape_count():
+			names.append(body.get_blend_shape_name(i))
+		var surfaces := []
+		for i in body.get_surface_count():
+			surfaces.append(body.surface_get_name(i))
+		check("%s: the body has every expression and a mouth" % id,
+			FighterModel.FACE_SHAPES.all(func(n): return n in names) and "mouth" in surfaces, "%s %s" % [names, surfaces])
+		var model := FighterModel.new()
+		root.add_child(model)
+		model.build(character)
+		var pieces := model._face_meshes.map(func(mi: MeshInstance3D) -> String: return mi.name)
+		check("%s: the face pieces (eyebrows, lashes%s) are expression-ready too" % [id, ", beard" if id == "brutus" else ""],
+			"Eyebrows" in pieces and pieces.size() >= 2 and (id != "brutus" or "Hair_Beard" in pieces), "%s" % [pieces])
+		model.free()
+	# The shapes themselves, on Kenji's body.
+	var kenji := gs.roster[0] as CharacterData
+	var base := kenji.model_scene.instantiate()
+	var face := FaceShapes.landmarks(base)
+	base.free()
+	var body := kenji.outfit_body_mesh as ArrayMesh
+	var rest: PackedVector3Array = body.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var shapes := body.surface_get_blend_shape_arrays(0)
+	var moved := func(shape: StringName, region: Callable) -> float:
+		var target: PackedVector3Array = shapes[FighterModel.FACE_SHAPES.find(shape)][Mesh.ARRAY_VERTEX]
+		var most := 0.0
+		for i in rest.size():
+			if region.call(rest[i]):
+				most = maxf(most, rest[i].distance_to(target[i]))
+		return most
+	var seam: float = face.seam
+	var eye: Vector3 = face.eye
+	var chin := func(p: Vector3) -> bool: return absf(p.x) < 0.02 and p.y < seam - 0.02 and p.y > seam - 0.05 and p.z > 0.04
+	var above_mouth := func(p: Vector3) -> bool: return p.y > seam + 0.012
+	var lids := func(p: Vector3) -> bool: return absf(absf(p.x) - eye.x) < 0.008 and p.y > eye.y and p.y < eye.y + 0.006 and p.z > eye.z
+	var far_from_eyes := func(p: Vector3) -> bool: return p.y > eye.y + 0.03 or p.y < eye.y - 0.05
+	check("jaw_open drops the chin; nothing above the mouth moves",
+		moved.call(&"jaw_open", chin) > 0.012 and moved.call(&"jaw_open", above_mouth) < 0.002,
+		"chin %.4f, above %.4f" % [moved.call(&"jaw_open", chin), moved.call(&"jaw_open", above_mouth)])
+	check("blink closes the lids and leaves the forehead and mouth alone",
+		moved.call(&"blink", lids) > 0.004 and moved.call(&"blink", far_from_eyes) < 0.0005,
+		"lids %.4f, elsewhere %.4f" % [moved.call(&"blink", lids), moved.call(&"blink", far_from_eyes)])
+	var at_rest := 0
+	var indices: PackedInt32Array = body.surface_get_arrays(0)[Mesh.ARRAY_INDEX]
+	for t in range(0, indices.size(), 3):
+		var spans_mouth := true
+		for c in 3:
+			var p := rest[indices[t + c]]
+			spans_mouth = spans_mouth and absf(p.x) < 0.01 and absf(p.y - seam) < 0.0008 and absf(p.z - face.inner_z) < 0.0008
+		if spans_mouth:
+			at_rest += 1
+	check("The lips are cut apart (no triangle seals the mouth)", at_rest == 0, "%d" % at_rest)
+
+	# Expressions follow the fight.
+	var D := DummyController.Mode
+	reset(D.STAND)
+	check("Fighters start the round with a focused face", p1.face_expression() == &"neutral")
+	approach(1.0)
+	press(InputBuffer.HP); step(4)
+	check("A heavy attack shouts or strains", p1.face_expression() in [&"shout", &"effort"], String(p1.face_expression()))
+	wait_until(func() -> bool: return p2.state == Fighter.State.HITSTUN, 20)
+	check("Getting hit hurts", p2.face_expression() == &"pain", String(p2.face_expression()))
+	for i in 10:
+		p2.model.set_face(p2.face_expression(), 1.0 / 60.0)
+	check("The face eases toward the expression", p2.model.face_weights[&"grimace"] > 0.5 and p2.model.face_weights[&"grimace"] <= 0.8,
+		"%.2f" % p2.model.face_weights[&"grimace"])
+	p2._set_state(Fighter.State.KO)
+	check("A K.O. shuts the eyes", p2.face_expression() == &"out")
+	reset(D.STAND)
 
 
 ## Generated clothing (tools/build_outfits.gd): every fighter is dressed, the outfit is

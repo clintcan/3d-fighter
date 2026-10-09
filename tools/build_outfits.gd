@@ -14,7 +14,8 @@ extends SceneTree
 ## collar, a singlet's gold edging along every opening. Belt knots and tails are small
 ## boxes bound to the pelvis.
 ## The body is saved again without the skin triangles a garment fully covers (1.5 cm
-## inset), so nothing pokes through and no gap opens at the hems.
+## inset), so nothing pokes through and no gap opens at the hems, and with the facial
+## expression blend shapes (tools/face_shapes.gd).
 ## Outfit references: karate gi (cross-over jacket with a V opening, belt, headband),
 ## Tae Kwon Do dobok (closed V-neck pullover, black collar for black belts), kickboxing
 ## gear, pro-wrestling singlet with knee pads and boots, brawler tank top and work pants,
@@ -360,6 +361,9 @@ func _build(model_scene: PackedScene, spec: Dictionary) -> Dictionary:
 	body.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, body_arrays)
 	body.surface_set_material(0, body_instance.mesh.surface_get_material(0).duplicate())
 	body.surface_set_name(0, body_instance.mesh.surface_get_name(0))
+	# Facial expressions (blend shapes, an opened mouth and its interior).
+	var face := FaceShapes.landmarks(scene)
+	body = FaceShapes.build(body, face, FaceShapes.eye_openings(verts, face), true)
 	scene.free()
 	return {outfit = outfit, body = body, outfit_triangles = triangles,
 		body_before = indices.size() / 3, body_after = kept.size() / 3}

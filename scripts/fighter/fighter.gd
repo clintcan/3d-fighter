@@ -1082,10 +1082,42 @@ func _update_model(delta: float) -> void:
 	# Hitstop freezes the pose outright; the super freeze holds the clip time but lets a
 	# cross-fade finish, so nobody is stuck mid-blend in the close-up.
 	model.show_clip(request[0], request[1], request[2], 0.0 if hitstop > 0 else delta)
+	# The face keeps moving through hitstop, so the reaction lands with the impact.
+	model.set_face(face_expression(), delta)
 	var shake := Vector3.ZERO
 	if frozen and state in [State.HITSTUN, State.BLOCKSTUN, State.AIR_HIT, State.KO]:
 		shake.x = randf_range(-0.03, 0.03)
 	model.position = shake
+
+
+## Logic → facial expression (a FighterModel.EXPRESSIONS key). Cosmetic.
+func face_expression() -> StringName:
+	match state:
+		State.ATTACK:
+			var move := current_move
+			var through_active := state_frame <= move.startup + move.active + 6
+			if move.super_move or move.name.begins_with("~"):
+				return &"roar"
+			if through_active and (move.is_special() or move.damage >= 80):
+				return &"shout" if state_frame > move.startup / 2 else &"effort"
+			return &"effort" if through_active else &"neutral"
+		State.THROW:
+			return &"shout" if throw_grab_frame >= 0 else &"effort"
+		State.HITSTUN, State.AIR_HIT, State.THROWN:
+			return &"pain"
+		State.BLOCKSTUN:
+			return &"guard"
+		State.KNOCKDOWN:
+			return &"dazed"
+		State.GETUP, State.JUMP_SQUAT, State.JUMP, State.DASH:
+			return &"effort"
+		State.KO:
+			return &"out"
+		State.TECH:
+			return &"surprise"
+	if victory:
+		return &"grin" if victory_clip != &"" else &"smirk"
+	return &"neutral"
 
 
 ## Logic → animation: [clip, time (s, or -1 to free-run), speed].

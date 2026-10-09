@@ -86,6 +86,7 @@ func process(delta: float) -> void:
 	var step: Array = _steps[_index]
 	_time += delta
 	var target_angle := REST_ANGLE
+	var face := &"neutral"
 	match step[0]:
 		"idle":
 			var clip: StringName = step[2] if step.size() > 2 else &"fight/guard"
@@ -93,12 +94,17 @@ func process(delta: float) -> void:
 			if _time >= step[1]:
 				_next()
 		"clip":
+			face = &"grin" if String(step[1]).contains("victory") else &"neutral"
 			model.show_clip(step[1], minf(_time, model.clip_length(step[1])), 1.0, delta)
 			if _time >= step[2]:
 				_next()
 		"move":
 			target_angle = ATTACK_ANGLE
-			_process_move(_moves.get(step[1]), delta)
+			var move: MoveData = _moves.get(step[1])
+			if move:
+				face = _move_face(move)
+			_process_move(move, delta)
+	model.set_face(face, delta)
 	pivot.rotation.y = lerp_angle(pivot.rotation.y, target_angle, 1.0 - exp(-TURN_SPEED * delta))
 	# Gravity for rising moves; glide back to the center once a travelling move is over.
 	if _offset.y > 0.0 or _y_velocity > 0.0:
@@ -109,6 +115,17 @@ func process(delta: float) -> void:
 	if step[0] != "move":
 		_offset.z = move_toward(_offset.z, 0.0, RETURN_SPEED * delta)
 	model.position = _offset
+
+
+## The same faces a fighter makes in a fight (Fighter.face_expression).
+func _move_face(move: MoveData) -> StringName:
+	if move.super_move or move.name.begins_with("~"):
+		return &"roar"
+	if _frame <= move.startup + move.active + 6:
+		if move.is_special() or move.damage >= 80:
+			return &"shout" if _frame > move.startup / 2.0 else &"effort"
+		return &"effort"
+	return &"neutral"
 
 
 func _process_move(move: MoveData, delta: float) -> void:

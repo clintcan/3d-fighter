@@ -71,6 +71,29 @@ const EYE_LIGHT_ENERGY := 0.18
 const EYE_LIGHT_SPECULAR := 10.0
 ## Bones whose lowest point must stay above the floor, with the distance from each bone
 ## to the sole measured in the rest pose (filled in build()).
+## Facial expressions: blend shapes baked into every body (tools/build_outfits.gd) and
+## into the eyebrow, lash and beard pieces (tools/build_face_shapes.gd, FACE_DIR) by
+## tools/face_shapes.gd. A preset is a weight per shape; set_face() eases toward one.
+const FACE_DIR := "res://assets/characters/face/"
+const FACE_SHAPES: Array[StringName] = [&"blink", &"squint", &"brow_down", &"brow_up", &"jaw_open", &"smile", &"grimace"]
+const EXPRESSIONS := {
+	&"neutral": {&"brow_down": 0.35, &"squint": 0.15},
+	&"effort": {&"brow_down": 0.85, &"squint": 0.35, &"grimace": 0.35},
+	&"shout": {&"brow_down": 1.0, &"squint": 0.4, &"jaw_open": 0.6},
+	&"roar": {&"brow_down": 1.0, &"squint": 0.5, &"jaw_open": 1.0, &"grimace": 0.3},
+	&"pain": {&"squint": 1.0, &"blink": 0.5, &"brow_down": 0.45, &"brow_up": 0.45, &"grimace": 0.8, &"jaw_open": 0.2},
+	&"guard": {&"brow_down": 1.0, &"squint": 0.6, &"grimace": 0.6},
+	&"dazed": {&"blink": 0.6, &"brow_up": 0.35, &"grimace": 0.35, &"jaw_open": 0.15},
+	&"out": {&"blink": 1.0, &"brow_up": 0.15, &"jaw_open": 0.3},
+	&"surprise": {&"brow_up": 0.9, &"jaw_open": 0.2},
+	&"grin": {&"smile": 0.9, &"squint": 0.25, &"brow_up": 0.15},
+	&"smirk": {&"smile": 0.5, &"brow_down": 0.2},
+}
+const FACE_RISE := 14.0 # weight per second toward a stronger expression
+const FACE_FALL := 5.0 # ... and back
+const BLINK_TIME := 0.16
+const BLINK_INTERVAL := Vector2(1.8, 5.0)
+
 const CONTACT_BONES := [&"foot_l", &"foot_r", &"ball_l", &"ball_r"]
 const SOLE_BELOW_ORIGIN := 0.01
 
@@ -81,6 +104,13 @@ var _clip: StringName
 var _contacts := {} # bone index -> rest height above the sole
 var _flash_material: StandardMaterial3D
 var _flash_tween: Tween
+var face_weights := {} # shape -> current weight (without the blink)
+var _face_meshes: Array[MeshInstance3D] = []
+var _face_indices: Array[PackedInt32Array] = [] # per face mesh, its blend shape index per FACE_SHAPES
+var _face_target: Dictionary = EXPRESSIONS[&"neutral"]
+var _blink_rng := RandomNumberGenerator.new() # cosmetic: never the match RNG
+var _blink_in := 2.0
+var _blink_time := -1.0
 
 
 ## `alt` uses the character's alternate skin texture and hair colour (mirror matches).
@@ -93,12 +123,14 @@ func build(data: CharacterData, alt: bool = false) -> void:
 	scale = Vector3.ONE * data.model_scale
 
 	skeleton = body.find_child("Skeleton3D") as Skeleton3D
+	for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
+		_use_face_piece(mesh, data.model_scene.resource_path, data.model_scene.resource_path)
 	for bone_name: StringName in CONTACT_BONES:
 		var bone := skeleton.find_bone(bone_name)
 		# The rest-pose sole sits ~1 cm below the origin.
 		_contacts[bone] = skeleton.get_bone_global_rest(bone).origin.y + SOLE_BELOW_ORIGIN
 	for hair_scene in data.hair_scenes:
-		_attach_skinned(hair_scene)
+		_attach_skinned(hair_scene, data.model_scene.resource_path)
 	var albedo := data.alt_body_albedo if alt and data.alt_body_albedo else data.body_albedo
 	var realistic := data.realistic_shading and not _low_graphics()
 	_customize_materials(albedo, data.alt_hair_color if alt else data.hair_color, data.detailed_textures, realistic)
@@ -106,6 +138,7 @@ func build(data: CharacterData, alt: bool = false) -> void:
 		_add_eye_light()
 	if data.outfit_mesh:
 		_dress(data, alt)
+	_find_face()
 
 	player = AnimationPlayer.new()
 	body.add_child(player)
@@ -268,7 +301,7 @@ func _add_skin_detail(skin: StandardMaterial3D) -> void:
 	skin.uv2_scale = Vector3.ONE * SKIN_DETAIL_SCALE
 
 
-func _attach_skinned(scene: PackedScene) -> void:
+func _attach_skinned(scene: PackedScene, base_path: String) -> void:
 	# Hair pieces are rigged to the same skeleton (Head bone). Move their meshes onto our
 	# skeleton; skins bind by bone name.
 	var piece := scene.instantiate()
@@ -277,6 +310,7 @@ func _attach_skinned(scene: PackedScene) -> void:
 		mesh.get_parent().remove_child(mesh)
 		skeleton.add_child(mesh)
 		mesh.skeleton = mesh.get_path_to(skeleton)
+		_use_face_piece(mesh, base_path, scene.resource_path)
 	piece.free()
 
 
@@ -314,6 +348,72 @@ func _customize_materials(body_albedo: Texture2D, hair_color: Color, detailed: b
 				eyes.clearcoat = 1.0
 				eyes.clearcoat_roughness = EYE_CLEARCOAT_ROUGHNESS
 				mesh.set_surface_override_material(surface, eyes)
+
+
+# --- Face ------------------------------------------------------------------------------
+
+## Where build_face_shapes.gd saves the expression-ready copy of a head piece: a mesh
+## node `node_name` from `piece_path`, fitted to the head of `base_path`.
+static func face_piece_path(base_path: String, piece_path: String, node_name: String) -> String:
+	return FACE_DIR + "%s__%s__%s.res" % [base_path.get_file().get_basename(),
+		piece_path.get_file().get_basename(), node_name.validate_filename().replace(".", "_")]
+
+
+func _use_face_piece(mesh: MeshInstance3D, base_path: String, piece_path: String) -> void:
+	var path := face_piece_path(base_path, piece_path, mesh.name)
+	if ResourceLoader.exists(path):
+		mesh.mesh = load(path)
+
+
+func _find_face() -> void:
+	for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
+		if mesh.mesh and mesh.mesh.get_blend_shape_count() > 0 and mesh.find_blend_shape_by_name(&"blink") >= 0:
+			_face_meshes.append(mesh)
+			var indices := PackedInt32Array()
+			for shape in FACE_SHAPES:
+				indices.append(mesh.find_blend_shape_by_name(shape))
+			_face_indices.append(indices)
+	for shape in FACE_SHAPES:
+		face_weights[shape] = 0.0
+	_blink_rng.randomize()
+	_blink_in = _blink_rng.randf_range(BLINK_INTERVAL.x, BLINK_INTERVAL.y)
+
+
+## True when this model can show expressions.
+func has_face() -> bool:
+	return not _face_meshes.is_empty()
+
+
+## Eases the face toward `expression` (a key of EXPRESSIONS) over real time `delta`, and
+## blinks now and then. Purely cosmetic.
+func set_face(expression: StringName, delta: float) -> void:
+	if _face_meshes.is_empty():
+		return
+	_face_target = EXPRESSIONS.get(expression, EXPRESSIONS[&"neutral"])
+	for shape in FACE_SHAPES:
+		var target: float = _face_target.get(shape, 0.0)
+		var current: float = face_weights[shape]
+		face_weights[shape] = move_toward(current, target, (FACE_RISE if target > current else FACE_FALL) * delta)
+	# Blinks (not while the eyes are already shut or squeezed).
+	var blink := 0.0
+	if _blink_time >= 0.0:
+		_blink_time += delta
+		blink = sin(clampf(_blink_time / BLINK_TIME, 0.0, 1.0) * PI)
+		if _blink_time >= BLINK_TIME:
+			_blink_time = -1.0
+	else:
+		_blink_in -= delta
+		if _blink_in <= 0.0:
+			_blink_in = _blink_rng.randf_range(BLINK_INTERVAL.x, BLINK_INTERVAL.y)
+			if face_weights[&"blink"] < 0.4:
+				_blink_time = 0.0
+	for m in _face_meshes.size():
+		for i in FACE_SHAPES.size():
+			var weight: float = face_weights[FACE_SHAPES[i]]
+			if i == 0: # blink
+				weight = maxf(weight, blink)
+			if _face_indices[m][i] >= 0:
+				_face_meshes[m].set_blend_shape_value(_face_indices[m][i], weight)
 
 
 ## The Low graphics preset skips realistic shading. Looked up at runtime: tool scripts
