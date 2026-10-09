@@ -113,12 +113,19 @@ func _ready() -> void:
 	ai.attach(p2)
 	p1.opponent = p2
 	p2.opponent = p1
+	if is_demo(): # both fighters are the CPU, on Hard
+		ai.set_difficulty(AIController.Difficulty.HARD)
+		var p1_ai := AIController.new(AIController.Difficulty.HARD, GameState.match_seed + 1)
+		p1.controller = p1_ai
+		p1_ai.attach(p1)
 	for fighter in fighters:
 		fighter.knocked_out.connect(_on_knocked_out)
 		fighter.throw_teched.connect(_on_throw_teched)
 		fighter.super_started.connect(_on_super_started)
 
 	hud.setup(p1, p2, GameState.ROUNDS_TO_WIN, "P2" if is_versus() else "Dummy" if is_training() else "CPU")
+	if is_demo():
+		hud.p1_name.text = "%s (CPU)" % p1.data.display_name
 	if is_arcade():
 		var stage_entry := GameState.arcade.current()
 		ai.set_difficulty(stage_entry.difficulty)
@@ -149,6 +156,11 @@ func _ready() -> void:
 		training.name = "TrainingMode"
 		add_child(training)
 		training.setup(self)
+	elif is_demo():
+		var demo := DemoMode.new()
+		demo.name = "DemoMode"
+		add_child(demo)
+		demo.setup(self)
 	start_match()
 	if is_online():
 		netplay = SpectatorMatch.new() if Net.spectating else NetplayMatch.new()
@@ -190,6 +202,16 @@ func is_arcade() -> bool:
 	return GameState.is_arcade()
 
 
+## Two CPU fighters with no end (main menu "Demo").
+func is_demo() -> bool:
+	return GameState.mode == GameState.Mode.DEMO
+
+
+## No timer and no K.O.: training and the demo.
+func is_endless() -> bool:
+	return is_training() or is_demo()
+
+
 func _spawn_fighter(character: CharacterData, controller: FighterController, alt_look: bool = false) -> Fighter:
 	var fighter := FIGHTER_SCENE.instantiate() as Fighter
 	fighter.setup(character, controller, alt_look)
@@ -218,11 +240,12 @@ func start_match() -> void:
 	_start_round()
 	if intro:
 		intro.skip() # restarted from the pause menu mid-intro; the round call follows it
-	if is_training():
+	if is_endless():
 		for fighter in fighters:
 			fighter.immortal = true
-		start_fight_immediately()
 		hud.set_timer_text("∞")
+	if is_training():
+		start_fight_immediately()
 
 
 func _start_round() -> void:
@@ -267,8 +290,8 @@ func _tick_round() -> void:
 					Audio.voice("fight")
 					Audio.sfx(&"bell", -6.0)
 		Phase.FIGHT:
-			if is_training():
-				pass # endless: no timer, no K.O.
+			if is_endless():
+				pass # training and the demo: no timer, no K.O.
 			elif not _knocked_out.is_empty():
 				_end_round_by_ko()
 			else:
@@ -710,7 +733,7 @@ func load_state(state: Dictionary) -> void:
 	for i in 2:
 		fighters[i].load_state(state.fighters[i])
 	hud.set_round_wins(round_wins)
-	if not is_training():
+	if not is_endless():
 		hud.set_timer(ceili(timer_ticks / float(TICKS_PER_SECOND)))
 
 
@@ -784,7 +807,7 @@ func _cycle_cpu_mode() -> void:
 
 
 func _update_debug_text() -> void:
-	if is_training() or is_arcade() or is_online():
+	if is_training() or is_arcade() or is_online() or is_demo():
 		hud.set_debug_text("") # training shows its own status line; arcade its score; online the connection
 		return
 	if not OS.is_debug_build():

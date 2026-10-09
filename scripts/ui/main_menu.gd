@@ -44,6 +44,13 @@ func _ready() -> void:
 	arcade_button.pressed.connect(_start.bind(GameState.Mode.ARCADE))
 	versus_button.pressed.connect(_start.bind(GameState.Mode.VERSUS))
 	training_button.pressed.connect(_start.bind(GameState.Mode.TRAINING))
+	# Demo: two CPU fighters on a random stage until a button is pressed.
+	var demo_button := training_button.duplicate(0) as Button
+	demo_button.name = "DemoButton"
+	demo_button.unique_name_in_owner = false
+	demo_button.text = "Demo"
+	training_button.add_sibling(demo_button)
+	demo_button.pressed.connect(func() -> void: GameState.start_demo(get_tree()))
 	# Online sits under Versus; built from it so it shares the menu's look.
 	var online_button := versus_button.duplicate(0) as Button # 0: without Versus's signal connections
 	online_button.name = "OnlineButton"
@@ -74,6 +81,9 @@ func _ready() -> void:
 			GameState.mode = GameState.Mode.VERSUS
 		elif "--training" in OS.get_cmdline_user_args():
 			GameState.mode = GameState.Mode.TRAINING
+		elif "--demo" in OS.get_cmdline_user_args():
+			GameState.start_demo.call_deferred(get_tree())
+			return
 		elif "--arcade" in OS.get_cmdline_user_args():
 			GameState.mode = GameState.Mode.ARCADE
 			GameState.ensure_selections()

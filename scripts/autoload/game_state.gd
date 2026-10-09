@@ -34,12 +34,12 @@ const STAGES := [
 const ROUNDS_TO_WIN := 2
 const ROUND_TIME_SECONDS := 99
 
-enum Mode { VS_CPU, VERSUS, TRAINING, ARCADE, ONLINE }
+enum Mode { VS_CPU, VERSUS, TRAINING, ARCADE, ONLINE, DEMO }
 
 var roster: Array[CharacterData] = []
 ## VS_CPU: P2 is the AI. VERSUS: P2 is a second local player. TRAINING: P2 is the
 ## training dummy (see scripts/training/training_mode.gd). ARCADE: a ladder of CPU
-## opponents (see `arcade`).
+## opponents (see `arcade`). DEMO: two CPU fighters with no end (start_demo).
 var mode: Mode = Mode.VS_CPU
 var player_character: CharacterData
 ## P2's character (the CPU in VS_CPU mode, the second player in VERSUS).
@@ -159,6 +159,17 @@ func pick_random_cpu() -> CharacterData:
 ## Goes to the fight through the loading screen (wallpaper + progress bar).
 func go_to_fight(tree: SceneTree) -> void:
 	tree.change_scene_to_file(LOADING_SCENE)
+
+
+## Demo mode: two random fighters (different ones when possible) on a random stage, both
+## played by the CPU, through the loading screen. DemoMode calls it again for the next one.
+func start_demo(tree: SceneTree) -> void:
+	mode = Mode.DEMO
+	player_character = roster.pick_random()
+	p2_character = pick_random_cpu()
+	stage_path = (STAGES.pick_random() as Dictionary).path
+	match_seed = randi()
+	go_to_fight(tree)
 
 
 ## Starts an Arcade run with `character` and sets up its first opponent.

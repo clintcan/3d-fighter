@@ -346,6 +346,7 @@ func _initialize() -> void:
 	await personality_tests()
 	await showcase_tests()
 	await loading_tests()
+	await demo_tests()
 	await valka_tests()
 	await temple_tests()
 	await jin_tests()
@@ -1424,6 +1425,63 @@ func loading_tests() -> void:
 	check("Loading: a preloaded stage for another path isn't handed over",
 		gs.take_stage_node(gs.ROOFTOP_STAGE) == null and not is_instance_valid(stray) and gs.preloaded_stage_node == null)
 	gs.stage_path = gs.DEFAULT_STAGE
+
+
+## Demo mode: two CPU fighters on a random stage, no end, back to the menu on any key.
+func demo_tests() -> void:
+	var gs = root.get_node("GameState")
+	change_scene_to_file("res://scenes/main_menu.tscn")
+	await process_frame; await process_frame
+	var demo_button := current_scene.find_child("DemoButton", true, false) as Button
+	check("Demo: the main menu has a Demo entry", demo_button != null and demo_button.text == "Demo")
+	gs.start_demo(self)
+	var frames := 0
+	while (current_scene == null or current_scene.scene_file_path != "res://scenes/fight.tscn") and frames < 1200:
+		await process_frame
+		frames += 1
+	var fight = current_scene
+	var demo = fight.get_node_or_null("DemoMode")
+	check("Demo: two different CPU fighters on a listed stage, endless, P1 tagged CPU",
+		gs.mode == gs.Mode.DEMO and demo != null and fight.fighters[0].controller is AIController and fight.fighters[1].controller is AIController
+		and fight.fighters[0].data != fight.fighters[1].data and gs.stage_paths().has(gs.stage_path)
+		and fight.hud.p1_name.text.ends_with("(CPU)") and fight.fighters.all(func(f: Fighter) -> bool: return f.immortal),
+		"%s vs %s on %s" % [fight.fighters[0].data.id, fight.fighters[1].data.id, gs.stage_path.get_file()])
+	fight.set_physics_process(false)
+	fight.start_fight_immediately()
+	var ended := [false]
+	fight.round_ended.connect(func(_w: Fighter, _r: String) -> void: ended[0] = true)
+	var lowest := 1.0
+	for i in 3600: # a minute of CPU against CPU
+		fight.step()
+		for f: Fighter in fight.fighters:
+			lowest = minf(lowest, f.health / float(f.data.max_health))
+	check("Demo: a minute of fighting, nobody is knocked out and the round never ends",
+		not ended[0] and fight.phase == fight.Phase.FIGHT and fight.fighters.all(func(f: Fighter) -> bool: return f.health > 0),
+		"lowest health %.0f%%" % (lowest * 100.0))
+	var low: Fighter = fight.fighters[1]
+	low.health = int(low.data.max_health * 0.2)
+	var refilled := false
+	for i in 600:
+		fight.step()
+		if low.health == low.data.max_health:
+			refilled = true
+			break
+	check("Demo: a fighter who's low gets refilled once they're free", refilled)
+	demo._time = demo.SWITCH_SECONDS
+	demo._process(0.0)
+	frames = 0
+	while (current_scene == null or current_scene == fight or current_scene.scene_file_path != "res://scenes/fight.tscn") and frames < 1200:
+		await process_frame
+		frames += 1
+	check("Demo: after a while it moves on to a new random matchup", current_scene != fight and current_scene.get_node_or_null("DemoMode") != null)
+	var key := InputEventKey.new()
+	key.keycode = KEY_SPACE
+	key.pressed = true
+	current_scene.get_node("DemoMode")._input(key)
+	await process_frame; await process_frame
+	check("Demo: any key goes back to the main menu", current_scene.scene_file_path == "res://scenes/main_menu.tscn" and gs.mode == gs.Mode.VS_CPU)
+	gs.stage_path = gs.DEFAULT_STAGE
+	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 
 
 class Masher extends FighterController:
