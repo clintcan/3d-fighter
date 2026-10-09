@@ -17,16 +17,19 @@ const PLATE_COLORS := {
 	&"kenji": Color(0.3, 0.6, 1.0), &"rhea": Color(1.0, 0.3, 0.45), &"brutus": Color(1.0, 0.5, 0.12),
 	&"valka": Color(0.72, 0.4, 1.0), &"jin": Color(0.2, 0.88, 1.0), &"mira": Color(1.0, 0.84, 0.25),
 }
+const Portraits := preload("res://tools/render_portraits.gd")
 const PLATE_Y := 1004.0 # baseline row of the name plates (1080p)
 const PLATE_SPACING := 250.0 # closest two plates may be
-## [character index, clip, clip time, position, yaw (radians; 0 = facing away from the camera)]
+## [character index, clip, clip time, position, yaw (radians; 0 = facing away from the camera),
+## expression (FighterModel.EXPRESSIONS), gaze (index into POSES whose eyes to look at, or
+## -1 for the camera), optional share of the way the head turns toward the camera]
 const POSES := [
-	[0, &"fight/palm_blast", 0.22, Vector3(-2.45, 0, 0.3), PI + 0.8], # Kenji: Ki Blast at Rhea
-	[1, &"fight/high_kick", 0.27, Vector3(-0.9, 0, -0.55), PI - 1.0], # Rhea: head kick at Kenji
-	[3, &"fight/lariat", 0.40, Vector3(1.75, 0, -0.25), PI + 0.3], # Valka: Spinning Lariat, arms out
-	[2, &"fight/victory_flex", 2.0, Vector3(3.0, 0, 0.5), PI + 0.45], # Brutus: double-biceps flex
-	[4, &"fight/axe_kick", 0.22, Vector3(3.2, 0, -1.9), PI - 1.0], # Jin: axe kick raised high, at the back
-	[5, &"fight/flip_kick", 0.14, Vector3(0.45, 0, 0.35), PI + 1.15], # Mira: Sipa Flip at Valka
+	[0, &"fight/palm_blast", 0.22, Vector3(-2.45, 0, 0.3), PI + 0.8, &"shout", 1], # Kenji: Ki Blast at Rhea
+	[1, &"fight/high_kick", 0.27, Vector3(-0.9, 0, -0.55), PI - 1.0, &"shout", 0], # Rhea: head kick at Kenji
+	[3, &"fight/lariat", 0.40, Vector3(1.75, 0, -0.25), PI + 0.3, &"roar", -1], # Valka: Spinning Lariat, arms out
+	[2, &"fight/victory_flex", 2.0, Vector3(3.0, 0, 0.5), PI + 0.45, &"grin", -1, 0.6], # Brutus: double-biceps flex
+	[4, &"fight/axe_kick", 0.22, Vector3(3.2, 0, -1.9), PI - 1.0, &"effort", -1], # Jin: axe kick raised high, at the back
+	[5, &"fight/flip_kick", 0.14, Vector3(0.45, 0, 0.35), PI + 1.15, &"shout", 2], # Mira: Sipa Flip at Valka
 ]
 
 
@@ -86,9 +89,17 @@ func _initialize() -> void:
 	camera.look_at_from_position(Vector3(0.2, 0.85, 5.0), Vector3(0.25, 1.35, 0.0))
 	camera.current = true
 
+	for model: FighterModel in models:
+		model._blink_in = INF # nobody blinks in the shot
 	for frame in 40:
 		for i in models.size():
-			(models[i] as FighterModel).show_clip(POSES[i][1], POSES[i][2], 1.0, 1.0 / 60.0)
+			var model: FighterModel = models[i]
+			model.show_clip(POSES[i][1], POSES[i][2], 1.0, 1.0 / 60.0)
+			if POSES[i].size() > 7:
+				Portraits.turn_head(model, camera.global_position, POSES[i][7])
+			model.set_face(POSES[i][5], 1.0 / 60.0)
+			var look: int = POSES[i][6]
+			model.set_gaze(camera.global_position if look < 0 else (models[look] as FighterModel).eye_position(), 1.0 / 60.0)
 		await process_frame
 	var kenji: FighterModel = models[0]
 	orb.global_position = kenji.global_transform * Vector3(0, 1.15, -0.95)
