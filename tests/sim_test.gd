@@ -1840,6 +1840,44 @@ func mira_tests() -> void:
 	check("Mira: detailed cloth (weave, hem shading) and skin detail", looks[&"mira"] == [true, true], "%s" % [looks])
 	check("Kenji gets the detailed materials too", looks[&"kenji"] == [true, true], "%s" % [looks])
 	check("Every fighter has detailed textures", gs.roster.all(func(c: CharacterData) -> bool: return c.detailed_textures))
+
+	# Realistic shading (pilot on Kenji): wrapped skin with a backlight (never screen-space
+	# scattering: it costs a third of the frame rate), wet eyes with their own eye light,
+	# anisotropic hair; off for other fighters and on the Low preset.
+	var settings: Node = root.get_node("Settings")
+	var kenji := gs.roster[0] as CharacterData
+	check("Kenji uses realistic shading, Mira doesn't", kenji.id == &"kenji" and kenji.realistic_shading and not mira.realistic_shading)
+	var shading := {}
+	for run: Array in [[kenji, settings.Graphics.HIGH], [mira, settings.Graphics.HIGH], [kenji, settings.Graphics.LOW]]:
+		settings.graphics = run[1]
+		var model := FighterModel.new()
+		root.add_child(model)
+		model.build(run[0])
+		var found := {"skin": false, "sss": false, "eyes": false, "hair": false, "eye_layer": false}
+		for mi: MeshInstance3D in model.skeleton.find_children("*", "MeshInstance3D", true, false):
+			for surface in mi.get_surface_override_material_count():
+				var m := mi.get_surface_override_material(surface) as StandardMaterial3D
+				if m == null:
+					continue
+				found.sss = found.sss or m.subsurf_scatter_enabled
+				if m.resource_name.begins_with("MI_Superhero"):
+					found.skin = m.diffuse_mode == BaseMaterial3D.DIFFUSE_LAMBERT_WRAP and m.backlight_enabled
+				elif m.resource_name.begins_with("MI_Eyes"):
+					found.eyes = m.clearcoat_enabled
+					found.eye_layer = mi.layers & FighterModel.EYE_LAYER != 0
+				elif m.resource_name.begins_with("MI_Hair"):
+					found.hair = found.hair or m.anisotropy_enabled
+		var light := model.skeleton.find_child("EyeLight", true, false) as OmniLight3D
+		found["eye_light"] = light != null and light.light_cull_mask == FighterModel.EYE_LAYER
+		shading["%s_%d" % [run[0].id, run[1]]] = found
+		model.free()
+	settings.graphics = settings.Graphics.HIGH
+	var all_on := {"skin": true, "sss": false, "eyes": true, "hair": true, "eye_layer": true, "eye_light": true}
+	var all_off := {"skin": false, "sss": false, "eyes": false, "hair": false, "eye_layer": false, "eye_light": false}
+	check("Kenji: wrapped skin, wet eyes with an eye light, anisotropic hair, no scattering pass",
+		shading["kenji_%d" % settings.Graphics.HIGH] == all_on, "%s" % [shading])
+	check("Mira keeps the standard shading", shading["mira_%d" % settings.Graphics.HIGH] == all_off, "%s" % [shading])
+	check("The Low preset skips realistic shading", shading["kenji_%d" % settings.Graphics.LOW] == all_off, "%s" % [shading])
 	gs.player_character = gs.roster[0]; gs.p2_character = gs.roster[2]
 
 

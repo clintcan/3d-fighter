@@ -36,6 +36,9 @@ extends Resource
 ## Higher-detail materials: fabric weave in the colour, 2K fabric maps, hem shading and
 ## stitch lines (vertex colours from build_outfits.gd), and skin pore detail.
 @export var detailed_textures: bool = false
+## Stylized-realism shading (pilot): subsurface-scattered skin with a soft rim, wet eyes
+## and an anisotropic hair highlight. Off on the Low graphics preset.
+@export var realistic_shading: bool = false
 ## Match-win animations ("library/clip"); one is picked at random.
 @export var victory_animations: Array[StringName] = []
 ## Tint used for graybox stand-ins and UI until real models/portraits exist.

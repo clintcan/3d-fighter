@@ -49,6 +49,26 @@ const SKIN_DETAIL_AMOUNT := 0.3
 ## Brightest fabric albedo: real white cloth reflects about 80%; brighter blooms under the
 ## stage lights.
 const MAX_FABRIC_ALBEDO := 0.72
+## Realistic shading (CharacterData.realistic_shading). Skin: wrapped diffuse and a faint
+## red backlight stand in for subsurface scattering (Godot's screen-space scattering cost
+## 45% of the frame rate on integrated graphics, a third even at quality 0, because any
+## material using it adds render buffers), real skin's specular (F0 about 0.028) and a faint
+## rim tinted by the skin colour. Eyes: a clear wet coat over the iris. Hair: a stretched highlight along
+## the strands.
+const SKIN_BACKLIGHT := Color(0.16, 0.05, 0.03)
+const SKIN_SPECULAR := 0.35
+const SKIN_RIM := 0.06
+const SKIN_RIM_TINT := 0.6
+const EYE_ROUGHNESS := 0.12
+const EYE_CLEARCOAT_ROUGHNESS := 0.02
+const HAIR_ANISOTROPY := 0.7
+const HAIR_RIM := 0.15
+## Eye light: a small light in front of the face that only the eyes see (their own render
+## layer), so the wet coat always has a catchlight, as in film and game close-ups.
+const EYE_LAYER := 1 << 19
+const EYE_LIGHT_OFFSET := Vector3(0.0, 0.02, 0.6) # from the head bone, skeleton space (+Z = face)
+const EYE_LIGHT_ENERGY := 0.18
+const EYE_LIGHT_SPECULAR := 10.0
 ## Bones whose lowest point must stay above the floor, with the distance from each bone
 ## to the sole measured in the rest pose (filled in build()).
 const CONTACT_BONES := [&"foot_l", &"foot_r", &"ball_l", &"ball_r"]
@@ -80,7 +100,10 @@ func build(data: CharacterData, alt: bool = false) -> void:
 	for hair_scene in data.hair_scenes:
 		_attach_skinned(hair_scene)
 	var albedo := data.alt_body_albedo if alt and data.alt_body_albedo else data.body_albedo
-	_customize_materials(albedo, data.alt_hair_color if alt else data.hair_color, data.detailed_textures)
+	var realistic := data.realistic_shading and not _low_graphics()
+	_customize_materials(albedo, data.alt_hair_color if alt else data.hair_color, data.detailed_textures, realistic)
+	if realistic:
+		_add_eye_light()
 	if data.outfit_mesh:
 		_dress(data, alt)
 
@@ -258,8 +281,9 @@ func _attach_skinned(scene: PackedScene) -> void:
 
 
 ## Swaps the body's skin texture and tints hair, working on per-instance material copies.
-## `detailed` adds the skin pore detail (the dressed body carries the second UV set).
-func _customize_materials(body_albedo: Texture2D, hair_color: Color, detailed: bool) -> void:
+## `detailed` adds the skin pore detail (the dressed body carries the second UV set);
+## `realistic` the realistic skin, eye and hair shading.
+func _customize_materials(body_albedo: Texture2D, hair_color: Color, detailed: bool, realistic: bool) -> void:
 	for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
 		for surface in mesh.get_surface_override_material_count():
 			var material := mesh.mesh.surface_get_material(surface) as StandardMaterial3D
@@ -270,8 +294,60 @@ func _customize_materials(body_albedo: Texture2D, hair_color: Color, detailed: b
 				skin.albedo_texture = body_albedo
 				if detailed:
 					_add_skin_detail(skin)
+				if realistic:
+					_realistic_skin(skin)
 				mesh.set_surface_override_material(surface, skin)
 			elif material.resource_name.begins_with("MI_Hair"):
 				var hair := material.duplicate() as StandardMaterial3D
 				hair.albedo_color = hair_color
+				if realistic:
+					hair.anisotropy_enabled = true
+					hair.anisotropy = HAIR_ANISOTROPY
+					hair.rim_enabled = true
+					hair.rim = HAIR_RIM
+					hair.rim_tint = 1.0
 				mesh.set_surface_override_material(surface, hair)
+			elif material.resource_name.begins_with("MI_Eyes") and realistic:
+				var eyes := material.duplicate() as StandardMaterial3D
+				eyes.roughness = EYE_ROUGHNESS
+				eyes.clearcoat_enabled = true
+				eyes.clearcoat = 1.0
+				eyes.clearcoat_roughness = EYE_CLEARCOAT_ROUGHNESS
+				mesh.set_surface_override_material(surface, eyes)
+
+
+## The Low graphics preset skips realistic shading. Looked up at runtime: tool scripts
+## compile this class without the autoloads.
+func _low_graphics() -> bool:
+	var settings := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Settings")
+	return settings != null and settings.graphics == 0 # Settings.Graphics.LOW
+
+
+func _add_eye_light() -> void:
+	for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
+		var material := mesh.mesh.surface_get_material(0)
+		if material and material.resource_name.begins_with("MI_Eyes"):
+			mesh.layers |= EYE_LAYER
+	var head := skeleton.find_bone("Head")
+	var attachment := BoneAttachment3D.new()
+	attachment.bone_name = "Head"
+	skeleton.add_child(attachment)
+	var rest := skeleton.get_bone_global_rest(head)
+	var light := OmniLight3D.new()
+	light.name = "EyeLight"
+	light.position = rest.affine_inverse() * (rest.origin + EYE_LIGHT_OFFSET)
+	light.light_cull_mask = EYE_LAYER
+	light.light_energy = EYE_LIGHT_ENERGY
+	light.light_specular = EYE_LIGHT_SPECULAR
+	light.omni_range = 1.2
+	attachment.add_child(light)
+
+
+func _realistic_skin(skin: StandardMaterial3D) -> void:
+	skin.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT_WRAP
+	skin.backlight_enabled = true
+	skin.backlight = SKIN_BACKLIGHT
+	skin.metallic_specular = SKIN_SPECULAR
+	skin.rim_enabled = true
+	skin.rim = SKIN_RIM
+	skin.rim_tint = SKIN_RIM_TINT
