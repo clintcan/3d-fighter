@@ -1,5 +1,5 @@
 extends SceneTree
-## Renders the key-art wallpaper: the six fighters posed mid-move on the rooftop stage
+## Renders the key-art wallpaper: the seven fighters posed mid-move on the rooftop stage
 ## with the skyline behind them. Saves res://assets/ui/wallpaper.png (no text; used by the
 ## loading screen and main menu) and res://assets/ui/splash.png (the title screen: the
 ## brush logo from tools/build_logo.py and a name plate under each fighter; used as the
@@ -25,12 +25,13 @@ const PLATE_SPACING := 250.0 # closest two plates may be
 ## expression (FighterModel.EXPRESSIONS), gaze (index into POSES whose eyes to look at, or
 ## -1 for the camera), optional share of the way the head turns toward the camera]
 const POSES := [
-	[0, &"fight/palm_blast", 0.22, Vector3(-2.45, 0, 0.3), PI + 0.8, &"shout", 1], # Kenji: Ki Blast at Rhea
-	[1, &"fight/high_kick", 0.27, Vector3(-0.9, 0, -0.55), PI - 1.0, &"shout", 0], # Rhea: head kick at Kenji
+	[0, &"fight/palm_blast", 0.22, Vector3(-2.75, 0, 0.3), PI + 0.8, &"shout", 1], # Kenji: Ki Blast at Rhea
+	[1, &"fight/high_kick", 0.27, Vector3(-1.3, 0, -0.55), PI - 1.0, &"shout", 0], # Rhea: head kick at Kenji
 	[3, &"fight/lariat", 0.40, Vector3(1.75, 0, -0.25), PI + 0.3, &"roar", -1], # Valka: Spinning Lariat, arms out
 	[2, &"fight/victory_flex", 2.0, Vector3(3.0, 0, 0.5), PI + 0.45, &"grin", -1, 0.6], # Brutus: double-biceps flex
 	[4, &"fight/axe_kick", 0.22, Vector3(3.2, 0, -1.9), PI - 1.0, &"effort", -1], # Jin: axe kick raised high, at the back
 	[5, &"fight/flip_kick", 0.14, Vector3(0.45, 0, 0.35), PI + 1.15, &"shout", 2], # Mira: Sipa Flip at Valka
+	[6, &"fight/counter_stance", 0.25, Vector3(-0.72, 0, -1.7), PI - 0.25, &"effort", -1, 0.4], # Lian: Still Water, calm, at the back
 ]
 
 
@@ -147,7 +148,7 @@ func _initialize() -> void:
 	plates.queue_free() # the cover's framing is different: logo only
 
 	# itch.io cover: 630×500 is much taller than 16:9, so pull the camera back to keep all
-	# six fighters in frame and shrink the title to fit the narrower width.
+	# seven fighters in frame and shrink the title to fit the narrower width.
 	root.size = Vector2i(1260, 1000)
 	DisplayServer.window_set_size(root.size)
 	camera.look_at_from_position(Vector3(0.25, 0.9, 7.2), Vector3(0.25, 1.85, 0.0))
