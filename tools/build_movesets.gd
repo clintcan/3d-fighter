@@ -35,7 +35,8 @@ const BASE := {
 ## Per-character tuning applied to the base set, plus stats, signature moves, and
 ## specials (motion inputs, not scaled by the tuning). Specials' hitboxes were measured
 ## from their clips at the impact time (fighter-local, -Z toward the opponent).
-## startup: frames added to every base move (min 3). damage / knockback: multipliers.
+## startup: frames added to every base move (min 3); base_startup: per-move exceptions
+## (base file -> frames added instead). damage / knockback: multipliers.
 const CHARACTERS := {
 	"kenji": {
 		startup = 0, damage = 1.05, knockback = 1.0, hitstop = 0,
@@ -84,6 +85,7 @@ const CHARACTERS := {
 	},
 	"brutus": {
 		startup = 2, damage = 1.25, knockback = 1.25, hitstop = 2,
+		base_startup = {jab = 1, crouch_jab = 1}, # the jabs only +1: he needs something quick (balance sim 26-35%)
 		stats = {max_health = 1100, walk_speed = 1.5, back_walk_speed = 1.2, dash_speed = 4.5,
 			jump_velocity = 5.6, weight = 1.3, throw_damage = 160, power_rating = 0.95, speed_rating = 0.25,
 			victory_animations = [&"fight/victory_flex", &"fight/victory_fist_pump"],
@@ -94,10 +96,10 @@ const CHARACTERS := {
 		},
 		specials = {
 			# Charges across the ring until it connects; huge pushback.
-			"bull_charge": ["Bull Charge", "236P", &"fight/shoulder_charge", 0.15, 0.83, 14, 16, 20, 120, H.MID, 24, 18, 12, Vector2(5.0, 0), Vector3(0, 1.0, -0.6), 0.38,
+			"bull_charge": ["Bull Charge", "236P", &"fight/shoulder_charge", 0.15, 0.83, 14, 16, 18, 120, H.MID, 24, 18, 12, Vector2(5.0, 0), Vector3(0, 1.0, -0.6), 0.38,
 				{travel = 8.0, chip_damage = 14, camera_intensity = 0.3}],
 			# Double-fist slam: a shockwave along the floor that must be blocked low.
-			"earthquake": ["Earthquake", "214P", &"fight/ground_pound", 0.33, 0.85, 18, 6, 24, 110, H.LOW, 0, 16, 12, Vector2(1.5, 0), Vector3(0, 0.2, -0.9), 0.55,
+			"earthquake": ["Earthquake", "214P", &"fight/ground_pound", 0.33, 0.85, 16, 6, 24, 110, H.LOW, 0, 16, 12, Vector2(1.5, 0), Vector3(0, 0.2, -0.9), 0.55,
 				{knockdown = true, chip_damage = 12, camera_intensity = 0.3, impact_fx = &"shockwave"}],
 			"titan_rush": ["Titan Rush", "236236P", &"fight/shoulder_charge", 0.15, 0.83, 6, 24, 26, 40, H.MID, 24, 16, 6, Vector2(0.6, 0), Vector3(0, 1.0, -0.6), 0.4,
 				{super_move = true, hits = 4, hit_interval = 6, travel = 5.0, invuln_frames = 10, chip_damage = 8, followup = "~titan_finish", camera_intensity = 0.2}],
@@ -106,7 +108,7 @@ const CHARACTERS := {
 		},
 	},
 	"valka": {
-		startup = 1, damage = 1.1, knockback = 1.1, hitstop = 1,
+		startup = 1, damage = 1.05, knockback = 1.1, hitstop = 1,
 		# New characters are created from these (existing ones keep their scene setup).
 		create = {display_name = "Valka", archetype = "Grappler", select_order = 3,
 			description = "Towering wrestler. Walks you down, spins through fireballs, and grabs anyone who just blocks.",
@@ -124,10 +126,10 @@ const CHARACTERS := {
 		},
 		specials = {
 			# Command grab: unblockable and untechable, but a whiff is very punishable.
-			"valkyrie_slam": ["Valkyrie Slam", "63214P", &"fight/throw", 0.08, 0.85, 8, 3, 36, 150, H.MID, 0, 0, 12, Vector2.ZERO, Vector3(0, 1.0, -0.6), 0.3,
+			"valkyrie_slam": ["Valkyrie Slam", "63214P", &"fight/throw", 0.08, 0.85, 8, 3, 36, 135, H.MID, 0, 0, 12, Vector2.ZERO, Vector3(0, 1.0, -0.6), 0.3,
 				{command_grab = true, grab_range = 0.95, camera_intensity = 0.4}],
 			# Spins through fireballs; three hits, the last one pops the opponent up.
-			"spinning_lariat": ["Spinning Lariat", "623P", &"fight/lariat", 0.12, 0.93, 7, 32, 16, 45, H.MID, 18, 14, 6, Vector2(2.0, 4.0), Vector3(0, 1.35, -0.35), 0.6,
+			"spinning_lariat": ["Spinning Lariat", "623P", &"fight/lariat", 0.12, 0.93, 7, 32, 20, 45, H.MID, 18, 14, 6, Vector2(2.0, 4.0), Vector3(0, 1.35, -0.35), 0.6,
 				{hits = 3, hit_interval = 8, travel = 1.2, projectile_immune = true, launches = true, chip_damage = 6, camera_intensity = 0.2}],
 			"thunder_valkyrie": ["Thunder Valkyrie", "236236P", &"fight/throw", 0.08, 0.85, 7, 4, 34, 240, H.MID, 0, 0, 16, Vector2.ZERO, Vector3(0, 1.0, -0.6), 0.3,
 				{super_move = true, command_grab = true, grab_range = 1.15, invuln_frames = 8, camera_intensity = 0.6, impact_fx = &"shockwave"}],
@@ -153,11 +155,11 @@ const CHARACTERS := {
 		},
 		specials = {
 			# Turns and drives the heel back: long-reaching, big pushback, slightly unsafe.
-			"spinning_back_kick": ["Spinning Back Kick", "236K", &"fight/spin_back_kick", 0.22, 0.66, 12, 3, 20, 90, H.MID, 22, 16, 11, Vector2(4.0, 0), Vector3(-0.05, 1.06, -0.92), 0.27,
+			"spinning_back_kick": ["Spinning Back Kick", "236K", &"fight/spin_back_kick", 0.22, 0.66, 14, 3, 20, 90, H.MID, 22, 16, 11, Vector2(4.0, 0), Vector3(-0.05, 1.06, -0.92), 0.27,
 				{lunge = 4.5, chip_damage = 10, camera_intensity = 0.25}], # steps in as it turns
 			# Rising spin kick anti-air: invincible start, two hits, launches.
 			"tornado_kick": ["Tornado Kick", "623K", &"fight/tornado_kick", 0.13, 0.71, 4, 14, 14, 50, H.MID, 0, 16, 8, Vector2(1.0, 6.5), Vector3(0, 1.4, -0.55), 0.42,
-				{hits = 2, hit_interval = 7, launches = true, rise = 6.5, travel = 1.0, invuln_frames = 6, landing_recovery = 14, chip_damage = 6, camera_intensity = 0.3}],
+				{hits = 2, hit_interval = 7, launches = true, rise = 6.5, travel = 1.0, invuln_frames = 6, landing_recovery = 18, chip_damage = 6, camera_intensity = 0.3}],
 			"hurricane_kicks": ["Hurricane Kicks", "236236K", &"fight/hurricane_kicks", 0.10, 0.775, 5, 30, 22, 24, H.MID, 22, 16, 4, Vector2(0.6, 0), Vector3(0.0, 1.3, -0.98), 0.32,
 				{super_move = true, hits = 7, hit_interval = 4, travel = 1.8, invuln_frames = 11, chip_damage = 5, followup = "~hurricane_finish", camera_intensity = 0.15}],
 			"hurricane_finish": ["Hurricane Kicks", "~hurricane_finish", &"fight/axe_kick", 0.30, 0.75, 6, 4, 22, 130, H.MID, 0, 20, 14, Vector2(1.5, 0), Vector3(0.04, 1.1, -1.0), 0.32,
@@ -366,7 +368,7 @@ func _initialize() -> void:
 		var moves: Array[MoveData] = []
 		for file: String in BASE:
 			var move := _make(BASE[file])
-			move.startup = maxi(3, move.startup + spec.startup)
+			move.startup = maxi(3, move.startup + spec.get("base_startup", {}).get(file, spec.startup))
 			move.damage = roundi(move.damage * spec.damage)
 			move.knockback *= spec.knockback
 			move.hitstop = maxi(3, move.hitstop + spec.hitstop)

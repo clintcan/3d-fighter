@@ -12,6 +12,7 @@ animation_end = 0.45
 startup = 6
 active = 8
 recovery = 6
+damage = 47
 hit_level = 3
 hitstop = 7
 knockback = Vector2(1.32, 0)

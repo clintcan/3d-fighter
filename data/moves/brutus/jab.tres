@@ -8,7 +8,6 @@ name = "Jab"
 input = "LP"
 animation = &"ual1/Punch_Jab"
 animation_end = 0.62
-startup = 6
 active = 2
 recovery = 8
 damage = 38

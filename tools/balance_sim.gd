@@ -5,7 +5,8 @@ extends SceneTree
 ## Run: godot_console --headless --path . -s res://tools/balance_sim.gd -- [matches] [difficulty] [id]
 ##   matches     per ordered pairing (default 6; mirrors get the same)
 ##   difficulty  0 easy, 1 normal, 2 hard (default 2)
-##   id          only the pairings that include this fighter (quicker re-checks)
+##   id          only the pairings that include this fighter (quicker re-checks; "all" for every one)
+##   stage       a stage scene name (default ring: rope bounces; e.g. dojo for wall splats)
 ## Prints a win-rate matrix, per-fighter stats, and moves that are very unsafe on block.
 ## The CPU personalities shape the results, so treat them as a guide to outliers.
 
@@ -23,7 +24,7 @@ func _initialize() -> void:
 	await process_frame
 	var gs = root.get_node("GameState")
 	gs.mode = gs.Mode.VS_CPU
-	gs.stage_path = gs.DEFAULT_STAGE
+	gs.stage_path = "res://scenes/stages/%s.tscn" % args[3] if args.size() > 3 else gs.DEFAULT_STAGE
 	var roster: Array = gs.roster
 	for c: CharacterData in roster:
 		_stats[c.id] = {name = c.display_name, matches = 0, wins = 0, rounds = 0, round_wins = 0,
@@ -31,7 +32,7 @@ func _initialize() -> void:
 			specials = 0, specials_hit = 0, specials_blocked = 0, supers = 0, supers_hit = 0,
 			throws = 0, grabs = 0, hits = 0, blocked = 0, counters = 0}
 	var start := Time.get_ticks_msec()
-	var only := args[2] if args.size() > 2 else ""
+	var only := args[2] if args.size() > 2 and args[2] != "all" else ""
 	for a: CharacterData in roster:
 		for b: CharacterData in roster:
 			if only == "" or String(a.id) == only or String(b.id) == only:
