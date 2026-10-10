@@ -58,6 +58,37 @@ rival_lines = {
 "jin": ["Your kicks against my fists. Again.", "Fists one, kicks nothing."],
 "lian": ["They say you can't be hit. Let's find out.", "Even still water can be stirred."]
 }
+combo_trials = Array[Dictionary]([{
+&"corner": false,
+&"name": "Jab String",
+&"steps": PackedStringArray("LP", "LP", "HP"),
+&"tip": "Jabs chain into each other and into the straight."
+}, {
+&"corner": false,
+&"name": "Snap Kick Rush",
+&"steps": PackedStringArray("6LK", "6HP"),
+&"tip": "Hold forward: the snap kick chains into the advancing straight."
+}, {
+&"corner": false,
+&"name": "Fireball Confirm",
+&"steps": PackedStringArray("LP", "HP", "236P"),
+&"tip": "Cancel the straight into Ki Blast as it hits."
+}, {
+&"corner": false,
+&"name": "Rising Dragon",
+&"steps": PackedStringArray("2LP", "2LP", "623P"),
+&"tip": "Low jabs, then cancel into the dragon punch."
+}, {
+&"corner": true,
+&"name": "Corner Splat",
+&"steps": PackedStringArray("HK", "WALL", "6LK", "6HP"),
+&"tip": "A roundhouse near the edge splats them: walk in and follow up."
+}, {
+&"corner": false,
+&"name": "Dragon Barrage",
+&"steps": PackedStringArray("LP", "HP", "236236P"),
+&"tip": "With a full meter, cancel the straight into the super."
+}])
 power_rating = 0.55
 speed_rating = 0.55
 moves = Array[ExtResource("1_qdmbc")]([ExtResource("5_5a4ip"), ExtResource("6_e40xy"), ExtResource("7_bthns"), ExtResource("8_ynpm3"), ExtResource("9_yj4mt"), ExtResource("10_65oi5"), ExtResource("11_jc7cg"), ExtResource("12_hp42r"), ExtResource("13_26eyd"), ExtResource("14_xn3v5"), ExtResource("15_ffpqg"), ExtResource("16_h8qr8"), ExtResource("17_p7x8d"), ExtResource("18_eengp"), ExtResource("20_jc7cg"), ExtResource("21_hp42r"), ExtResource("22_26eyd"), ExtResource("23_xn3v5")])

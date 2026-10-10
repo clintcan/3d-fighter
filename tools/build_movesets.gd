@@ -250,6 +250,63 @@ const CHARACTERS := {
 
 ## Pre-fight intros and match-win quotes (FightIntro, FightManager). `rivals`: opponent
 ## id -> [intro line, win quote], used instead of a random line for that matchup.
+## Combo trials, easiest first (TrainingMode; CharacterData.combo_trials). steps: move
+## inputs to land in one combo, "WALL" = a wall splat; corner: the dummy starts at the
+## edge. sim_test plays every trial's demo (TrialDemoController) against every dummy.
+const TRIALS := {
+	"kenji": [
+		{name = "Jab String", steps = ["LP", "LP", "HP"], tip = "Jabs chain into each other and into the straight."},
+		{name = "Snap Kick Rush", steps = ["6LK", "6HP"], tip = "Hold forward: the snap kick chains into the advancing straight."},
+		{name = "Fireball Confirm", steps = ["LP", "HP", "236P"], tip = "Cancel the straight into Ki Blast as it hits."},
+		{name = "Rising Dragon", steps = ["2LP", "2LP", "623P"], tip = "Low jabs, then cancel into the dragon punch."},
+		{name = "Corner Splat", steps = ["HK", "WALL", "6LK", "6HP"], corner = true, tip = "A roundhouse near the edge splats them: walk in and follow up."},
+		{name = "Dragon Barrage", steps = ["LP", "HP", "236236P"], tip = "With a full meter, cancel the straight into the super."},
+	],
+	"rhea": [
+		{name = "Quick Hands", steps = ["LP", "LP", "HP"], tip = "Jabs chain into each other and into the straight."},
+		{name = "Step In", steps = ["6LK", "6HP"], tip = "Hold forward: the step kick chains into the rushing hook."},
+		{name = "Low Slide", steps = ["2LP", "2LK", "236K"], tip = "Cancel the low kick into Gale Slide."},
+		{name = "Crescent Launcher", steps = ["LP", "LP", "623K"], tip = "Cancel the second jab into Crescent Rise."},
+		{name = "Corner Splat", steps = ["HK", "WALL", "LK", "HP"], corner = true, tip = "A roundhouse near the edge splats them: walk in and follow up."},
+		{name = "Tempest Kicks", steps = ["LP", "LP", "236236K"], tip = "With a full meter, cancel the jabs into the super."},
+	],
+	"brutus": [
+		{name = "Heavy Hands", steps = ["LP", "HP"], tip = "Even Brutus's jab chains into his straight."},
+		{name = "Bull Run", steps = ["LP", "HP", "236P"], tip = "Cancel the straight into Bull Charge."},
+		{name = "Low Grind", steps = ["2LP", "2LP", "2LK"], tip = "Low jabs chain into each other and into the low kick."},
+		{name = "Corner Boot", steps = ["6HK", "WALL", "LP", "HP"], corner = true, tip = "The heavy boot near the edge splats them: walk in and follow up."},
+		{name = "Titan Rush", steps = ["LP", "HP", "236236P"], tip = "With a full meter, cancel the straight into the super."},
+	],
+	"valka": [
+		{name = "Jab String", steps = ["LP", "LP", "HP"], tip = "Jabs chain into each other and into the straight."},
+		{name = "Low Lariat", steps = ["2LP", "2LP", "623P"], tip = "Low jabs, then cancel into Spinning Lariat."},
+		{name = "Knee and Lariat", steps = ["6LK", "623P"], tip = "Cancel the knee lift into Spinning Lariat while they're in the air."},
+		{name = "Corner Splat", steps = ["HK", "WALL", "LK", "HP"], corner = true, tip = "A roundhouse near the edge splats them: walk in and follow up."},
+		{name = "Tackle to the Wall", steps = ["6HP", "WALL", "LP", "623P"], corner = true, tip = "The shoulder tackle splats them on the edge: jab, then cancel into the lariat."},
+	],
+	"jin": [
+		{name = "Jab String", steps = ["LP", "LP", "HP"], tip = "Jabs chain into each other and into the straight."},
+		{name = "Push and Spin", steps = ["6LK", "236K"], tip = "Cancel the push kick into Spinning Back Kick."},
+		{name = "Tornado", steps = ["2LP", "2LK", "623K"], tip = "Cancel the low kick into Tornado Kick."},
+		{name = "Corner Splat", steps = ["HK", "WALL", "LK", "HP"], corner = true, tip = "A roundhouse near the edge splats them: walk in and follow up."},
+		{name = "Hurricane Kicks", steps = ["LP", "HP", "236236K"], tip = "With a full meter, cancel the straight into the super."},
+	],
+	"mira": [
+		{name = "Tapik String", steps = ["6LP", "6LP", "HP"], tip = "Hold forward: backfists chain into each other and into the straight."},
+		{name = "Sipa Launcher", steps = ["6LP", "6HK"], tip = "The backfist chains into Sipa Flip."},
+		{name = "Bagyo Confirm", steps = ["LP", "HP", "236P"], tip = "Cancel the straight into Bagyo Rush."},
+		{name = "Corner Splat", steps = ["HK", "WALL", "LK", "HP"], corner = true, tip = "A roundhouse near the edge splats them: walk in and follow up."},
+		{name = "Huling Hagupit", steps = ["LP", "HP", "236236P"], tip = "With a full meter, cancel the straight into the super."},
+	],
+	"lian": [
+		{name = "Chain Punch", steps = ["6LP", "HP"], tip = "Hold forward: the chain punch flows into the straight."},
+		{name = "Double Palm", steps = ["6LP", "6HP"], tip = "Hold forward: the chain punch flows into the double palm."},
+		{name = "Low Palm", steps = ["2LP", "2LK", "236P"], tip = "Cancel the low kick into Inch Palm at once: it is slow to come out."},
+		{name = "Palm to the Wall", steps = ["LP", "HP", "236P", "WALL", "6LP", "HP"], corner = true, tip = "Inch Palm near the edge splats them: walk in and follow up."},
+		{name = "Thousand Hands", steps = ["6LP", "HP", "236236P"], tip = "With a full meter, cancel the straight into the super."},
+	],
+}
+
 const INTROS := {
 	"kenji": {
 		animation = &"fight/intro_salute", expression = &"guard",
@@ -341,6 +398,10 @@ func _initialize() -> void:
 		character.intro_lines = PackedStringArray(intro.get("lines", []))
 		character.win_quotes = PackedStringArray(intro.get("quotes", []))
 		character.rival_lines = intro.get("rivals", {}).duplicate(true)
+		var trials: Array[Dictionary] = []
+		for trial: Dictionary in TRIALS.get(id, []):
+			trials.append({name = trial.name, steps = PackedStringArray(trial.steps), corner = trial.get("corner", false), tip = trial.get("tip", "")})
+		character.combo_trials = trials
 		var portrait := "res://assets/ui/portraits/%s.png" % id # from tools/render_portraits.gd
 		if ResourceLoader.exists(portrait):
 			character.portrait = load(portrait)

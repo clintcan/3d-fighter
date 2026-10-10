@@ -35,6 +35,7 @@ func _initialize() -> void:
 	stage = Node3D.new()
 	stage.name = "Ring"
 	stage.set_script(load(STAGE_SCRIPT))
+	stage.set("edge_style", 1) # Fighter.EdgeStyle.ROPES: knocked into the ropes, fighters bounce off
 
 	_build_environment()
 	_build_lights()

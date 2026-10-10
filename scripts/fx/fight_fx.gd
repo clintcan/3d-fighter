@@ -20,6 +20,7 @@ const FOCUS_COLOR := Color(1.0, 0.55, 0.15) # a focus power-up (Mira's Lakas Sta
 const REVERSAL_COLOR := Color(0.55, 1.0, 0.8) # a reversal stance catching a strike (Lian)
 const TRAIL_COLOR := Color(0.8, 0.9, 1.0)
 const DEBRIS_COLOR := Color(0.55, 0.45, 0.35)
+const WALL_COLOR := Color(1.0, 0.95, 0.85) # the shock ring of a wall splat
 
 var manager: Node
 ## Total effects spawned (lets tests confirm hits produce effects).
@@ -66,6 +67,7 @@ func setup(fight_manager: Node) -> void:
 		_strike_sparks[fighter] = _make_strike_sparks()
 		fighter.landed_hard.connect(manager.cosmetic(_on_landed_hard))
 		fighter.throw_impact.connect(manager.cosmetic(_on_throw_impact))
+		fighter.wall_hit.connect(manager.cosmetic(_on_wall_hit))
 	_keep_materials()
 
 
@@ -196,6 +198,27 @@ func _on_landed_hard(fighter: Fighter) -> void:
 	Audio.sfx(&"fall", -2.0)
 
 
+## Slammed into the edge: a burst and a shock ring standing on the (unseen) wall, dust
+## off its foot, a heavy thud. Off the ropes: a lighter burst and a rope twang.
+func _on_wall_hit(fighter: Fighter) -> void:
+	var normal := fighter.wall_normal
+	var point := fighter.global_position + Vector3.UP * maxf(1.0 - fighter.global_position.y * 0.5, 0.6) \
+			+ normal * Fighter.BODY_RADIUS
+	if fighter.edge_style == Fighter.EdgeStyle.ROPES:
+		spark(point, HIT_COLOR, 0.9)
+		Audio.sfx(&"block", -2.0, 0.6)
+		Audio.sfx(&"fall", -8.0, 1.3)
+	else:
+		spark(point, HIT_COLOR, 1.5)
+		_ring(point, WALL_COLOR, 1.1, false, normal)
+		dust(Vector3(point.x, 0.0, point.z))
+		_debris(point)
+		Audio.sfx(&"hit_heavy", 1.0, 0.7)
+		Audio.sfx(&"fall", -1.0, 0.9)
+	if fighter.model:
+		fighter.model.flash(Color.WHITE, 0.18)
+
+
 func _on_throw_impact(defender: Fighter) -> void:
 	spark(defender.global_position + Vector3.UP * 1.1, HIT_COLOR, 1.4)
 	Audio.sfx(&"hit_heavy", 1.0, 0.85)
@@ -230,8 +253,9 @@ func spark(point: Vector3, color: Color, size: float) -> void:
 	_impact_flash(point, color, size)
 
 
-## Expanding ring: flat on the floor (ground pound) or facing the camera (impacts).
-func _ring(point: Vector3, color: Color, size: float, flat: bool) -> void:
+## Expanding ring: flat on the floor (ground pound), facing the camera (impacts), or
+## lying in a wall whose outward normal is `facing`.
+func _ring(point: Vector3, color: Color, size: float, flat: bool, facing := Vector3.ZERO) -> void:
 	spawned += 1
 	var torus := TorusMesh.new()
 	torus.inner_radius = 0.42
@@ -252,6 +276,8 @@ func _ring(point: Vector3, color: Color, size: float, flat: bool) -> void:
 	ring.global_position = point
 	if flat:
 		ring.scale = Vector3(1.0, 0.15, 1.0)
+	elif facing != Vector3.ZERO:
+		ring.basis = Basis(Quaternion(Vector3.UP, facing.normalized())) # torus axis along the normal
 	else:
 		var camera := get_viewport().get_camera_3d()
 		if camera:

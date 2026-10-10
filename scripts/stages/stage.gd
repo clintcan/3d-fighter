@@ -8,6 +8,9 @@ extends Node3D
 ## Narrower limit across the stage (Z), for long thin stages like the train roof.
 ## Negative = the same as bounds_half_extent.
 @export var bounds_depth: float = -1.0
+## What the edge does to a fighter knocked hard into it: splat against it (an unseen
+## wall), or bounce off the ropes (the ring).
+@export var edge_style: Fighter.EdgeStyle = Fighter.EdgeStyle.WALL
 
 
 ## The Z limit actually in force.

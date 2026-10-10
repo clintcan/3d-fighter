@@ -122,6 +122,7 @@ func _ready() -> void:
 		fighter.knocked_out.connect(_on_knocked_out)
 		fighter.throw_teched.connect(_on_throw_teched)
 		fighter.super_started.connect(_on_super_started)
+		fighter.wall_hit.connect(cosmetic(_on_wall_hit))
 
 	hud.setup(p1, p2, GameState.ROUNDS_TO_WIN, "P2" if is_versus() else "Dummy" if is_training() else "CPU")
 	if is_demo():
@@ -217,6 +218,7 @@ func _spawn_fighter(character: CharacterData, controller: FighterController, alt
 	fighter.setup(character, controller, alt_look)
 	fighter.bounds_half_extent = stage.bounds_half_extent
 	fighter.bounds_depth = stage.depth_limit()
+	fighter.edge_style = stage.edge_style
 	add_child(fighter)
 	fighters.append(fighter)
 	return fighter
@@ -654,7 +656,9 @@ func _resolve_hits() -> void:
 			_remove_projectile(attacker)
 		else:
 			attacker.on_hit_confirmed()
-			if defender.is_pinned_against_bounds(attacker.forward) and attacker.position.y <= 0.0:
+			# Against the edge the attacker takes the push, unless the hit splats: then
+			# the wall takes it, and the attacker stays close enough to follow up.
+			if defender.is_pinned_against_bounds(attacker.forward) and attacker.position.y <= 0.0 and not defender.will_splat():
 				attacker.velocity -= attacker.forward * move.knockback.x * CORNER_PUSHBACK
 		_award_meter(attacker, defender, move, result, health_before - defender.health)
 		if result == Fighter.HitResult.COUNTER and not resimulating:
@@ -686,6 +690,10 @@ func _award_meter(attacker: Fighter, defender: Fighter, move: MoveData, result: 
 func _on_knocked_out(loser: Fighter) -> void:
 	if phase == Phase.FIGHT:
 		_knocked_out.append(loser)
+
+
+func _on_wall_hit(fighter: Fighter) -> void:
+	hud.note(fighters.find(fighter.opponent), "ROPE BOUNCE" if fighter.edge_style == Fighter.EdgeStyle.ROPES else "WALL SPLAT")
 
 
 func _on_throw_teched(defender: Fighter) -> void:

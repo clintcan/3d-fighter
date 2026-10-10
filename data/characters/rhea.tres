@@ -58,6 +58,37 @@ rival_lines = {
 "brutus": ["Big guy. Slow guy.", "The bigger they are..."],
 "mira": ["Market girl, huh? Let's dance.", "Fast beats feisty."]
 }
+combo_trials = Array[Dictionary]([{
+&"corner": false,
+&"name": "Quick Hands",
+&"steps": PackedStringArray("LP", "LP", "HP"),
+&"tip": "Jabs chain into each other and into the straight."
+}, {
+&"corner": false,
+&"name": "Step In",
+&"steps": PackedStringArray("6LK", "6HP"),
+&"tip": "Hold forward: the step kick chains into the rushing hook."
+}, {
+&"corner": false,
+&"name": "Low Slide",
+&"steps": PackedStringArray("2LP", "2LK", "236K"),
+&"tip": "Cancel the low kick into Gale Slide."
+}, {
+&"corner": false,
+&"name": "Crescent Launcher",
+&"steps": PackedStringArray("LP", "LP", "623K"),
+&"tip": "Cancel the second jab into Crescent Rise."
+}, {
+&"corner": true,
+&"name": "Corner Splat",
+&"steps": PackedStringArray("HK", "WALL", "LK", "HP"),
+&"tip": "A roundhouse near the edge splats them: walk in and follow up."
+}, {
+&"corner": false,
+&"name": "Tempest Kicks",
+&"steps": PackedStringArray("LP", "LP", "236236K"),
+&"tip": "With a full meter, cancel the jabs into the super."
+}])
 max_health = 960
 walk_speed = 2.6
 back_walk_speed = 2.0

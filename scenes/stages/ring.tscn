@@ -658,6 +658,7 @@ size = Vector2(25, 25)
 
 [node name="Ring" type="Node3D" unique_id=2103179205]
 script = ExtResource("1_x7uwn")
+edge_style = 1
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=567212144]
 environment = SubResource("Environment_o176v")

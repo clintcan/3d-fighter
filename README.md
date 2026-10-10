@@ -18,8 +18,8 @@ Its signature is a **dynamic action camera** that orbits and dollies in on every
   - **Mira**: street brawler who powers up with Lakas Stance (Focus) until her rushes hit like a typhoon.
 - **Outfits** that fit each style: a karate gi with headband, a Tae Kwon Do dobok, kickboxing gear, a wrestling singlet with knee pads and boots, a brawler's tank top and work pants, a street fighter's zip-up, track pants and sneakers. Woven fabric textures, stitched hems and skin detail hold up in close-ups. Mirror matches get alternate colours.
 - **8 stages**: Boxing Ring, Dojo, Rooftop, Temple, Beach, Night Market, the Express (a fight on the roof of a speeding train) and the Kowloon Courtyard, where the sun rises round by round, the neighbours come out to watch and jets roar in low overhead. Each has its own music and ambient life (crowds, flames, smoke, rain, neon, passing trains, pigeons).
-- **Modes**: Vs CPU, Arcade (ladder, scoring, shadow boss), local 2-player Versus, **Online** (rollback netcode, LAN discovery, join by IP, or an internet lobby server with rooms and spectating), Training (frame data, input display, record/playback) and a Demo of two CPU fighters on a random stage.
-- **Fighting-game systems**: super meter with cinematic super freezes, counter hits, combos, juggles, throws and throw breaks, high/mid/low blocking, and Tekken-style sidesteps.
+- **Modes**: Vs CPU, Arcade (ladder, scoring, shadow boss), local 2-player Versus, **Online** (rollback netcode, LAN discovery, join by IP, or an internet lobby server with rooms and spectating), Training (frame data, input display, record/playback, and combo trials with a "show me" demo) and a Demo of two CPU fighters on a random stage.
+- **Fighting-game systems**: super meter with cinematic super freezes, counter hits, combos, juggles, wall splats and rope bounces at the stage edge, throws and throw breaks, high/mid/low blocking, and Tekken-style sidesteps.
 - **Engine**: a deterministic 60 Hz simulation (verified identical on Windows and Linux) with a headless regression test suite.
 
 ## Screenshots

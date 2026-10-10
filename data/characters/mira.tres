@@ -61,6 +61,32 @@ win_quotes = PackedStringArray("Salamat! Good fight.", "Street-tested. Lola-appr
 rival_lines = {
 "rhea": ["Speed's nice. Heart's better.", "Next time, merienda's on you."]
 }
+combo_trials = Array[Dictionary]([{
+&"corner": false,
+&"name": "Tapik String",
+&"steps": PackedStringArray("6LP", "6LP", "HP"),
+&"tip": "Hold forward: backfists chain into each other and into the straight."
+}, {
+&"corner": false,
+&"name": "Sipa Launcher",
+&"steps": PackedStringArray("6LP", "6HK"),
+&"tip": "The backfist chains into Sipa Flip."
+}, {
+&"corner": false,
+&"name": "Bagyo Confirm",
+&"steps": PackedStringArray("LP", "HP", "236P"),
+&"tip": "Cancel the straight into Bagyo Rush."
+}, {
+&"corner": true,
+&"name": "Corner Splat",
+&"steps": PackedStringArray("HK", "WALL", "LK", "HP"),
+&"tip": "A roundhouse near the edge splats them: walk in and follow up."
+}, {
+&"corner": false,
+&"name": "Huling Hagupit",
+&"steps": PackedStringArray("LP", "HP", "236236P"),
+&"tip": "With a full meter, cancel the straight into the super."
+}])
 walk_speed = 2.3
 back_walk_speed = 1.8
 dash_speed = 7.0

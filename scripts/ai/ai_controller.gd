@@ -150,6 +150,7 @@ var _moves: Dictionary = {} # input string -> MoveData, filled by attach()
 ## The attached character's personality (DEFAULT_PERSONALITY until attach()).
 var personality: Dictionary = DEFAULT_PERSONALITY
 var _rolled_pressure := ""
+var _rolled_wall := ""
 ## Recent output directions, newest last (to avoid accidental double-tap dashes).
 var _recent_dirs: Array[int] = []
 ## True while the current plan step is part of an intended dash / backdash.
@@ -202,6 +203,7 @@ func reset() -> void:
 	_blocking = false
 	_rolled_projectile = 0
 	_rolled_pressure = ""
+	_rolled_wall = ""
 	_recent_dirs.clear()
 	_dashing = false
 
@@ -381,6 +383,13 @@ func _react(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 		Fighter.State.AIR_HIT:
 			if dist < 1.5 and seen.position.y < 1.4:
 				_queue_press(HK if _rng.randf() < 0.5 else HP)
+		Fighter.State.WALL_SPLAT:
+			# Pinned on the wall: follow up, rolled once per splat (punish odds).
+			var wall_id := "w%d" % seen.start_tick
+			if wall_id != _rolled_wall:
+				_rolled_wall = wall_id
+				if _rng.randf() < punish_chance:
+					_wall_followup(fighter, dist)
 		Fighter.State.BLOCKSTUN:
 			# Pressure: keep attacking a blocking opponent (frame traps, a low, or a throw
 			# as they come out of blockstun). Rolled once per blockstun.
@@ -425,6 +434,22 @@ func _punish(fighter: Fighter, dist: float, target_crouching: bool) -> void:
 		_queue_press(HK)
 
 
+## Off a wall splat: the launcher, else the heaviest normal in reach, else a rushing
+## special, else dash in (the splat lasts long enough to get there).
+func _wall_followup(fighter: Fighter, dist: float) -> void:
+	var launcher := _move("2HP")
+	var rush := _special_with(func(m: MoveData) -> bool: return (m.travel > 0.0 or m.lunge > 0.0) and m.rise == 0.0 and not m.super_move)
+	if launcher and dist <= reach(launcher):
+		_queue_press(HP, 2)
+	elif dist <= reach(_move("HK")):
+		_queue_press(HK)
+	elif rush and dist <= reach(rush):
+		_queue_special(rush)
+	elif dist <= reach(_move("HP")) + 1.2:
+		_plan.append([6, 0, 6])
+		_queue_press(HP)
+
+
 # --- Decisions -------------------------------------------------------------------
 
 func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
@@ -444,7 +469,7 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 				_react(fighter, seen, dist)
 				if not _plan.is_empty():
 					return
-		Fighter.State.AIR_HIT:
+		Fighter.State.AIR_HIT, Fighter.State.WALL_SPLAT:
 			_react(fighter, seen, dist)
 			return
 	if _attack_phase(seen) == "threat" and (seen.move as MoveData).reversal:

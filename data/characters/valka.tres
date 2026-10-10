@@ -60,6 +60,32 @@ rival_lines = {
 "brutus": ["Big man. Bigger fall.", "Timber!"],
 "lian": ["Counter this: I'm already holding you.", "You can't redirect what's already holding you."]
 }
+combo_trials = Array[Dictionary]([{
+&"corner": false,
+&"name": "Jab String",
+&"steps": PackedStringArray("LP", "LP", "HP"),
+&"tip": "Jabs chain into each other and into the straight."
+}, {
+&"corner": false,
+&"name": "Low Lariat",
+&"steps": PackedStringArray("2LP", "2LP", "623P"),
+&"tip": "Low jabs, then cancel into Spinning Lariat."
+}, {
+&"corner": false,
+&"name": "Knee and Lariat",
+&"steps": PackedStringArray("6LK", "623P"),
+&"tip": "Cancel the knee lift into Spinning Lariat while they're in the air."
+}, {
+&"corner": true,
+&"name": "Corner Splat",
+&"steps": PackedStringArray("HK", "WALL", "LK", "HP"),
+&"tip": "A roundhouse near the edge splats them: walk in and follow up."
+}, {
+&"corner": true,
+&"name": "Tackle to the Wall",
+&"steps": PackedStringArray("6HP", "WALL", "LP", "623P"),
+&"tip": "The shoulder tackle splats them on the edge: jab, then cancel into the lariat."
+}])
 max_health = 1050
 walk_speed = 1.8
 back_walk_speed = 1.4

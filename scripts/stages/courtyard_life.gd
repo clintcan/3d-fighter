@@ -197,6 +197,7 @@ func _connect_fight() -> void:
 		return
 	for fighter: Fighter in manager.fighters:
 		fighter.landed_hard.connect(manager.cosmetic(func(_f: Fighter) -> void: react(0.35)))
+		fighter.wall_hit.connect(manager.cosmetic(func(_f: Fighter) -> void: react(0.55)))
 		fighter.knocked_out.connect(manager.cosmetic(func(_f: Fighter) -> void:
 			react(0.8)
 			_puff_until = _time + 1.5))

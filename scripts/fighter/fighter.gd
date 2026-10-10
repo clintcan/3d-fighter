@@ -19,6 +19,8 @@ signal focus_changed(level: int)
 signal super_started(fighter: Fighter, move: MoveData)
 ## Cosmetic: the current move's first active frame (impact effects).
 signal move_active(fighter: Fighter, move: MoveData)
+## Knocked into the stage edge hard enough to splat (or bounce off the ropes).
+signal wall_hit(fighter: Fighter)
 
 enum State {
 	IDLE, WALK_FWD, WALK_BACK, CROUCH,
@@ -28,9 +30,12 @@ enum State {
 	BLOCKSTUN, HITSTUN, AIR_HIT, KNOCKDOWN, GETUP,
 	KO,
 	THROW, THROWN, TECH,
+	WALL_SPLAT,
 }
 
 enum HitResult { HIT, BLOCKED, COUNTER }
+## What the stage edge does to a fighter knocked into it (Stage.edge_style).
+enum EdgeStyle { WALL, ROPES }
 
 const DT := 1.0 / 60.0
 const GRAVITY := 20.0
@@ -62,6 +67,19 @@ const MIN_COMBO_SCALE := 0.3
 const MAX_JUGGLE_HITS := 3
 const KNOCKDOWN_POP_SPEED := 2.5
 
+## Wall splat: a fighter still sliding from a hit with this much push or more (its
+## knockback: a roundhouse's, not a jab's or a straight's) who reaches the stage edge
+## sticks there, open to a follow-up, then crumples into a knockdown. Once per combo.
+const WALL_SPLAT_PUSH := 3.0
+const WALL_MIN_SPEED := 0.4 # m/s still carrying them into the edge
+const WALL_SPLAT_FRAMES := 44
+const WALL_SPLAT_DAMAGE := 20 # scaled like a combo hit
+const WALL_SLIDE_SPEED := 1.2 # an airborne splat slides down the wall
+## Ropes (the ring): a short stretch into them, then flung back toward the attacker.
+const ROPE_HOLD_FRAMES := 8
+const ROPE_REBOUND_SPEED := 3.2
+const ROPE_POP_SPEED := 4.5
+
 ## Throw: LP+LK within THROW_INPUT_WINDOW ticks. Grab checks on THROW_STARTUP.
 const THROW_INPUT_WINDOW := 3
 const THROW_STARTUP := 5
@@ -71,12 +89,13 @@ const THROW_HOLD_FRAMES := 30
 const THROW_RECOVERY := 14
 const THROW_HOLD_DISTANCE := 0.75
 const GRAB_SNAP_FRAMES := 8.0 # the grabbed fighter's model eases into the hold this long
+const ROPE_SINK := 0.3 # metres the model leans back into the ropes (cosmetic)
 ## Defender can break a throw with LP+LK during the first ticks of being held.
 const THROW_TECH_WINDOW := 10
 const TECH_FRAMES := 18
 const TECH_PUSH_SPEED := 2.5
 const NOT_THROWABLE_STATES := [State.JUMP, State.AIR_HIT, State.KNOCKDOWN, State.GETUP, State.KO,
-	State.HITSTUN, State.BLOCKSTUN, State.THROW, State.THROWN, State.TECH]
+	State.HITSTUN, State.BLOCKSTUN, State.THROW, State.THROWN, State.TECH, State.WALL_SPLAT]
 
 ## Extra distance beyond an attack's reach at which holding back stops walking.
 const PROXIMITY_GUARD_MARGIN := 0.5
@@ -118,7 +137,7 @@ const SIM_FIELDS := [&"input_locked", &"view_right", &"view_depth", &"state", &"
 	&"juggle_hits", &"air_attack_used", &"throw_grab_frame", &"grab_move", &"throw_techable",
 	&"current_move", &"move_has_hit", &"hits_landed", &"next_hit_frame", &"meter", &"frozen",
 	&"_landing_frames", &"sidestep_dir", &"victory", &"last_hit_level", &"immortal", &"focus",
-	&"move_focus"]
+	&"move_focus", &"wall_used", &"wall_normal", &"hit_push"]
 ## (victory_clip is cosmetic: each machine picks its own victory animation.)
 
 var data: CharacterData
@@ -130,6 +149,8 @@ var input_locked := false
 var bounds_half_extent := 3.6
 ## Z limit (Stage.depth_limit(); the same as bounds_half_extent on square stages).
 var bounds_depth := 3.6
+## What the edge does (Stage.edge_style): splat against it, or bounce off the ropes.
+var edge_style := EdgeStyle.WALL
 
 ## Set by FightManager each tick from the camera's logical view direction.
 var view_right := Vector3.RIGHT
@@ -163,6 +184,12 @@ var next_hit_frame := 0
 var meter := 0
 var focus := 0
 var move_focus := 0 # focus level the current move started with
+## The edge already splatted (or bounced) this fighter in the current combo.
+var wall_used := false
+## Outward normal of the edge being splatted against.
+var wall_normal := Vector3.ZERO
+## Knockback of the last hit taken (its push decides whether the edge splats).
+var hit_push := 0.0
 ## This fighter's projectile in flight (one at a time), ticked by FightManager.
 var projectile: Projectile
 ## Set by FightManager during the super freeze (holds animation).
@@ -259,6 +286,9 @@ func reset_to(spawn_position: Vector3) -> void:
 	grab_move = null
 	throw_techable = true
 	sidestep_dir = Vector3.ZERO
+	wall_used = false
+	wall_normal = Vector3.ZERO
+	hit_push = 0.0
 	last_hit_level = MoveData.HitLevel.MID
 	victory = false
 	victory_clip = &""
@@ -384,6 +414,15 @@ func tick() -> void:
 		State.TECH:
 			if state_frame >= TECH_FRAMES:
 				_return_to_neutral()
+		State.WALL_SPLAT:
+			if edge_style == EdgeStyle.ROPES:
+				if state_frame >= ROPE_HOLD_FRAMES:
+					velocity = -wall_normal * ROPE_REBOUND_SPEED + Vector3.UP * ROPE_POP_SPEED
+					_set_state(State.AIR_HIT)
+			elif state_frame >= WALL_SPLAT_FRAMES:
+				# Crumples off the wall into a knockdown.
+				velocity = -wall_normal * 0.6 + Vector3.UP * 1.0
+				_set_state(State.AIR_HIT)
 	_apply_motion()
 
 
@@ -665,6 +704,8 @@ func _start_sidestep(toward_camera: bool) -> void:
 
 
 func _apply_motion() -> void:
+	if state == State.WALL_SPLAT:
+		velocity = Vector3.DOWN * WALL_SLIDE_SPEED if position.y > 0.0 else Vector3.ZERO
 	var airborne := state in [State.JUMP, State.AIR_HIT] or position.y > 0.0
 	if airborne:
 		velocity.y -= GRAVITY * DT
@@ -676,7 +717,36 @@ func _apply_motion() -> void:
 		velocity.y = 0.0
 		if airborne:
 			_on_landed()
+	var unclamped := position
 	clamp_to_bounds()
+	if state in [State.HITSTUN, State.AIR_HIT] and not wall_used:
+		_check_wall(unclamped - position)
+
+
+## Just hit hard enough to splat if it reaches the edge (and hasn't splatted this combo).
+func will_splat() -> bool:
+	return state in [State.HITSTUN, State.AIR_HIT] and not wall_used and hit_push >= WALL_SPLAT_PUSH
+
+
+## `overshoot`: how far the clamp just pulled this fighter back inside the edge. Driven
+## into it fast enough, it splats (or hits the ropes).
+func _check_wall(overshoot: Vector3) -> void:
+	var normal := Vector3.ZERO
+	if absf(overshoot.x) > 0.0 and absf(overshoot.x) >= absf(overshoot.z):
+		normal = Vector3(signf(overshoot.x), 0, 0)
+	elif absf(overshoot.z) > 0.0:
+		normal = Vector3(0, 0, signf(overshoot.z))
+	if normal == Vector3.ZERO or hit_push < WALL_SPLAT_PUSH or velocity.dot(normal) < WALL_MIN_SPEED:
+		return
+	wall_used = true
+	wall_normal = normal
+	velocity = Vector3.ZERO
+	_set_state(State.WALL_SPLAT)
+	if edge_style == EdgeStyle.WALL:
+		_take_damage(roundi(WALL_SPLAT_DAMAGE * maxf(MIN_COMBO_SCALE, 1.0 - COMBO_SCALING_STEP * combo_hits)))
+	wall_hit.emit(self)
+	if health == 0:
+		_knock_out(-normal)
 
 
 func _on_landed() -> void:
@@ -698,6 +768,7 @@ func _on_landed() -> void:
 func _return_to_neutral() -> void:
 	current_move = null
 	juggle_hits = 0
+	wall_used = false
 	_set_combo(0)
 	_set_state(State.IDLE)
 
@@ -782,6 +853,7 @@ func receive_hit(attacker: Fighter, move: MoveData, push_dir := Vector3.ZERO, fi
 	last_hit_level = move.hit_level
 	current_move = null
 	velocity = push_dir * knockback.x / data.weight + Vector3.UP * knockback.y
+	hit_push = knockback.x
 
 	if health == 0:
 		_knock_out(push_dir)
@@ -965,6 +1037,7 @@ func _release_from_throw(attacker: Fighter) -> void:
 	throw_techable = true
 	# Command grabs slam harder: a higher toss.
 	velocity = push_dir * 2.5 + Vector3.UP * (6.0 if grab else 4.5)
+	hit_push = 2.5 # a throw never splats
 	if health == 0:
 		_knock_out(push_dir)
 	else:
@@ -1119,8 +1192,12 @@ func _update_model(delta: float) -> void:
 	model.set_face(face_expression(), delta)
 	model.set_gaze(gaze_target(), delta)
 	var shake := Vector3.ZERO
-	if frozen and state in [State.HITSTUN, State.BLOCKSTUN, State.AIR_HIT, State.KO]:
+	if frozen and state in [State.HITSTUN, State.BLOCKSTUN, State.AIR_HIT, State.KO, State.WALL_SPLAT]:
 		shake.x = randf_range(-0.03, 0.03)
+	if state == State.WALL_SPLAT and edge_style == EdgeStyle.ROPES:
+		# Sinks back into the ropes before they fling it out.
+		var f := (float(state_frame) + Engine.get_physics_interpolation_fraction()) / ROPE_HOLD_FRAMES
+		shake += global_transform.basis.inverse() * (wall_normal * ROPE_SINK * sin(PI * clampf(f, 0.0, 1.0)))
 	if state == State.THROWN and state_frame < GRAB_SNAP_FRAMES:
 		var f := (float(state_frame) + Engine.get_physics_interpolation_fraction()) / GRAB_SNAP_FRAMES
 		shake += global_transform.basis.inverse() * (_grab_snap * (1.0 - smoothstep(0.0, 1.0, f)))
@@ -1140,7 +1217,7 @@ func face_expression() -> StringName:
 			return &"effort" if through_active else &"neutral"
 		State.THROW:
 			return &"shout" if throw_grab_frame >= 0 else &"effort"
-		State.HITSTUN, State.AIR_HIT, State.THROWN:
+		State.HITSTUN, State.AIR_HIT, State.THROWN, State.WALL_SPLAT:
 			return &"pain"
 		State.BLOCKSTUN:
 			return &"guard"
@@ -1223,6 +1300,8 @@ func _animation_request(frozen: bool) -> Array:
 			return [&"fight/thrown", t, 1.0]
 		State.TECH:
 			return [&"fight/block_stand", 0.0, 1.0]
+		State.WALL_SPLAT:
+			return [&"fight/wall_splat", t, 1.0]
 	if intro_clip != &"":
 		return [intro_clip, _intro_time, 1.0]
 	if victory and victory_clip != &"":

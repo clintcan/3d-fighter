@@ -60,6 +60,32 @@ win_quotes = PackedStringArray("You never found the distance.", "My legs reach f
 rival_lines = {
 "kenji": ["Still hiding behind fireballs, Kenji?", "Keep your distance next time. Oh, wait."]
 }
+combo_trials = Array[Dictionary]([{
+&"corner": false,
+&"name": "Jab String",
+&"steps": PackedStringArray("LP", "LP", "HP"),
+&"tip": "Jabs chain into each other and into the straight."
+}, {
+&"corner": false,
+&"name": "Push and Spin",
+&"steps": PackedStringArray("6LK", "236K"),
+&"tip": "Cancel the push kick into Spinning Back Kick."
+}, {
+&"corner": false,
+&"name": "Tornado",
+&"steps": PackedStringArray("2LP", "2LK", "623K"),
+&"tip": "Cancel the low kick into Tornado Kick."
+}, {
+&"corner": true,
+&"name": "Corner Splat",
+&"steps": PackedStringArray("HK", "WALL", "LK", "HP"),
+&"tip": "A roundhouse near the edge splats them: walk in and follow up."
+}, {
+&"corner": false,
+&"name": "Hurricane Kicks",
+&"steps": PackedStringArray("LP", "HP", "236236K"),
+&"tip": "With a full meter, cancel the straight into the super."
+}])
 max_health = 980
 walk_speed = 2.2
 back_walk_speed = 1.8

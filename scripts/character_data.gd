@@ -56,6 +56,12 @@ extends Resource
 ## Rivalries: opponent id -> [intro line, win quote].
 @export var rival_lines: Dictionary = {}
 
+@export_group("Training")
+## Combo trials (TrainingMode): each {name, steps, corner, tip}. `steps` are move inputs
+## ("LP", "2HP", "236P"...) to land in one combo, plus "WALL" for a wall splat; `corner`
+## starts the dummy at the stage edge. From tools/build_movesets.gd TRIALS.
+@export var combo_trials: Array[Dictionary] = []
+
 @export_group("Stats")
 @export var max_health: int = 1000
 ## Meters per second.

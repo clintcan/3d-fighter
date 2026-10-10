@@ -4,8 +4,9 @@ extends Node
 ## endless session with health refill, dummy settings (stance, guard, CPU, record &
 ## playback), measured frame data for P1's attacks, input history with a live input
 ## display (stick + buttons), hitbox display, and
-## a training menu. Keys: Tab / pad Back = menu, Backspace / L3 = reset, F6 = record,
-## F7 = playback.
+## a training menu, and combo trials (ComboTrial, demo by TrialDemoController). Keys:
+## Tab / pad Back = menu, Backspace / L3 = reset (retry a trial), F6 = record,
+## F7 = playback, F8 / R3 = show the trial, Page Up / Down = previous / next trial.
 
 const REFILL_DELAY_TICKS := 40
 const HISTORY_SIZE := 16
@@ -17,7 +18,16 @@ const ACTIONS := {
 	"training_reset": [KEY_BACKSPACE, JOY_BUTTON_LEFT_STICK],
 	"training_record": [KEY_F6, -1],
 	"training_playback": [KEY_F7, -1],
+	"training_demo": [KEY_F8, JOY_BUTTON_RIGHT_STICK],
+	"training_trial_next": [KEY_PAGEDOWN, -1],
+	"training_trial_prev": [KEY_PAGEUP, -1],
 }
+const SUCCESS_TICKS := 110 # the "SUCCESS" call before the next trial
+const DEMO_LIMIT_TICKS := 900
+const DONE_COLOR := Color(0.45, 1.0, 0.5)
+const CURRENT_COLOR := Color(1.0, 0.82, 0.3)
+## Completed trials, per fighter id: [trials] <id> = [indices]. Tests point it elsewhere.
+static var trials_path := "user://trials.cfg"
 
 var manager: Node
 var player: Fighter
@@ -53,6 +63,19 @@ var _input_display: InputDisplay
 var _menu: PanelContainer
 var _menu_first: Control
 
+## Combo trials: the player's list, the one running (null = free training), its demo.
+var trials: Array[Dictionary] = []
+var trial_index := -1
+var trial: ComboTrial
+var demo: TrialDemoController
+var completed_trials := {} # trial index -> true
+var _demo_ticks := 0
+var _success_ticks := 0
+var _trial_panel: PanelContainer
+var _trial_label: RichTextLabel
+var _trial_option: OptionButton
+var _guard_option: OptionButton
+
 
 func setup(fight_manager: Node) -> void:
 	manager = fight_manager
@@ -63,10 +86,16 @@ func setup(fight_manager: Node) -> void:
 	dummy_controller.ai = manager.ai
 	_player_controller = player.controller
 	_dummy_prev_health = dummy.health
+	trials = player.data.combo_trials
+	completed_trials = load_completed(player.data.id)
 	_add_actions()
 	_build_ui()
 	manager.ticked.connect(_on_tick)
 	manager.hit_landed.connect(_on_hit_landed)
+	player.attack_started.connect(_on_player_attack)
+	dummy.wall_hit.connect(func(_f: Fighter) -> void:
+		if trial:
+			trial.wall())
 	_refresh()
 
 
@@ -76,6 +105,7 @@ func _on_tick() -> void:
 	_track_history()
 	_track_frame_data()
 	_track_combo()
+	_track_trial()
 	if refill_health:
 		_refill(player)
 		_refill(dummy)
@@ -92,6 +122,8 @@ func _on_tick() -> void:
 func _on_hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult) -> void:
 	if attacker != player:
 		return
+	if trial and result != Fighter.HitResult.BLOCKED:
+		trial.hit(move)
 	_pending = {
 		name = move.name, startup = move.startup + 1, active = move.active, recovery = move.recovery,
 		damage = move.damage, result = result, ticks = 0, attacker_free = -1, defender_free = -1,
@@ -209,7 +241,189 @@ func reset_positions() -> void:
 	manager.start_match()
 	_pending = {}
 	dummy_controller.restart_playback()
+	if trial:
+		_place_for_trial()
+		trial.reset()
+		_update_trial_panel()
 	_refresh()
+
+
+# --- Combo trials ------------------------------------------------------------------
+
+## Starts trial `index` of the player's list (-1 = back to free training): a standing,
+## unguarded dummy, health refill and a full meter, positions reset (at the edge for a
+## corner trial).
+func start_trial(index: int) -> void:
+	stop_demo()
+	if index < 0 or index >= trials.size():
+		trial_index = -1
+		trial = null
+	else:
+		trial_index = index
+		trial = ComboTrial.new(trials[index])
+		trial.completed.connect(_on_trial_completed)
+		trial.progressed.connect(func(_i: int) -> void: _update_trial_panel())
+		trial.dropped.connect(_update_trial_panel)
+		dummy_controller.stance = TrainingDummyController.Stance.STAND
+		dummy_controller.guard = TrainingDummyController.Guard.NONE
+		refill_health = true
+		# A full meter only for a trial with the super: otherwise a sloppy motion could
+		# come out as the super instead of the special the trial asks for.
+		infinite_meter = trial.steps.size() > 0 and Array(trial.steps).any(func(step: String) -> bool:
+			var move := player._move_for_input(step)
+			return move != null and move.super_move)
+		if not infinite_meter:
+			player.add_meter(-Fighter.MAX_METER)
+		if _menu_first:
+			(_menu_first as OptionButton).selected = dummy_controller.stance
+			_guard_option.selected = dummy_controller.guard
+	_success_ticks = 0
+	manager.hud.announce("")
+	reset_positions()
+	_update_trial_panel()
+	if _trial_option:
+		_trial_option.selected = trial_index + 1
+
+
+func next_trial(step := 1) -> void:
+	if trials.is_empty():
+		return
+	start_trial(posmod(trial_index + step, trials.size()) if trial else (0 if step > 0 else trials.size() - 1))
+
+
+## "Show me": the trial played on the player's fighter (doesn't count as completed).
+func start_demo() -> void:
+	if trial == null:
+		return
+	start_trial(trial_index)
+	demo = TrialDemoController.new(trial.steps, dummy)
+	player.controller = demo
+	_demo_ticks = 0
+	_update_status()
+
+
+func stop_demo() -> void:
+	if demo == null:
+		return
+	demo = null
+	player.controller = _player_controller
+	if trial:
+		trial.reset()
+	_update_trial_panel()
+	_update_status()
+
+
+func _place_for_trial() -> void:
+	if not trial.trial.get("corner", false):
+		return
+	# Dummy at the edge on its side, the player close enough to strike.
+	var edge := player.bounds_half_extent
+	var side := signf(dummy.position.x - player.position.x)
+	dummy.position = Vector3(side * (edge - 0.1), 0, 0)
+	player.position = Vector3(side * (edge - 1.1), 0, 0)
+	for fighter: Fighter in manager.fighters:
+		fighter.face_opponent()
+		fighter.reset_physics_interpolation()
+	manager.camera.snap()
+
+
+func _on_player_attack(move: MoveData) -> void:
+	if trial:
+		trial.move_started(move)
+	if demo:
+		demo.move_started(move)
+
+
+func _track_trial() -> void:
+	if trial == null:
+		return
+	if trial.progress > 0 and not trial.done and dummy.combo_hits == 0:
+		trial.combo_ended()
+	if demo:
+		_demo_ticks += 1
+		var over := demo.finished() and player.is_actionable() and dummy.combo_hits == 0
+		if over or _demo_ticks > DEMO_LIMIT_TICKS or (trial.done and _demo_ticks > 0 and dummy.combo_hits == 0):
+			stop_demo()
+	elif _success_ticks > 0:
+		_success_ticks -= 1
+		if _success_ticks == 0:
+			manager.hud.announce("")
+			if trial_index + 1 < trials.size():
+				start_trial(trial_index + 1)
+			else:
+				trial.reset()
+				_update_trial_panel()
+
+
+func _on_trial_completed() -> void:
+	_update_trial_panel()
+	if demo:
+		return
+	var audio := get_tree().root.get_node_or_null("Audio") # not by name: tests compile this before autoloads
+	if audio:
+		audio.sfx(&"bell", -4.0)
+		audio.sfx(&"ui_accept")
+	var first_time := not completed_trials.has(trial_index)
+	completed_trials[trial_index] = true
+	save_completed(player.data.id, completed_trials)
+	_trial_option.set_item_text(trial_index + 1, "%d. %s  ✓" % [trial_index + 1, trial.trial.name])
+	var all_done := completed_trials.size() >= trials.size()
+	manager.hud.announce("SUCCESS!", "ALL TRIALS COMPLETE" if all_done and first_time else trial.trial.name, true)
+	_success_ticks = SUCCESS_TICKS
+
+
+static func load_completed(id: String) -> Dictionary:
+	var config := ConfigFile.new()
+	var done := {}
+	if config.load(trials_path) == OK:
+		for i in config.get_value("trials", id, []):
+			done[int(i)] = true
+	return done
+
+
+static func save_completed(id: String, done: Dictionary) -> void:
+	var config := ConfigFile.new()
+	config.load(trials_path)
+	var indices := done.keys()
+	indices.sort()
+	config.set_value("trials", id, indices)
+	config.save(trials_path)
+
+
+## The checklist: each step in notation with the move's name, done ones ticked green, the
+## next one gold.
+func trial_text() -> String:
+	if trial == null:
+		return ""
+	var lines := PackedStringArray()
+	var mark := "  [color=#73ff80]✓[/color]" if completed_trials.has(trial_index) else ""
+	lines.append("[b]COMBO TRIAL %d/%d[/b]%s" % [trial_index + 1, trials.size(), mark])
+	lines.append("[font_size=30][b]%s[/b][/font_size]" % trial.trial.name.to_upper())
+	for i in trial.steps.size():
+		var step := trial.steps[i]
+		var text := "Wall splat" if step == "WALL" else "%s   %s" % [FightHud.notation(step), _move_name(step)]
+		if i < trial.progress:
+			lines.append("[color=#%s]✓  %s[/color]" % [DONE_COLOR.to_html(false), text])
+		elif i == trial.progress and not trial.done:
+			lines.append("[color=#%s]▶  %s[/color]" % [CURRENT_COLOR.to_html(false), text])
+		else:
+			lines.append("    " + text)
+	var tip: String = trial.trial.get("tip", "")
+	if tip != "":
+		lines.append("[color=#b8b8b8][font_size=19]%s[/font_size][/color]" % tip)
+	return "\n".join(lines)
+
+
+func _move_name(input: String) -> String:
+	var move := player._move_for_input(input)
+	return move.name if move else input
+
+
+func _update_trial_panel() -> void:
+	if _trial_panel == null:
+		return
+	_trial_panel.visible = trial != null
+	_trial_label.text = trial_text()
 
 
 # --- Input & UI ------------------------------------------------------------------
@@ -233,6 +447,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			start_recording()
 	elif event.is_action_pressed("training_playback"):
 		toggle_playback()
+	elif event.is_action_pressed("training_demo"):
+		if demo:
+			stop_demo()
+		else:
+			start_demo()
+	elif event.is_action_pressed("training_trial_next"):
+		next_trial(1)
+	elif event.is_action_pressed("training_trial_prev"):
+		next_trial(-1)
 	else:
 		return
 	get_viewport().set_input_as_handled()
@@ -270,6 +493,14 @@ func _refresh() -> void:
 
 
 func _update_status() -> void:
+	if demo:
+		_status.text = "▶  DEMO  -  F8 to stop"
+		_status.modulate = CURRENT_COLOR
+		return
+	if trial:
+		_status.modulate = Color.WHITE
+		_status.text = "COMBO TRIALS  ·  F8: Show Me  ·  PgUp/PgDn: Trial  ·  Backspace: Retry  ·  Tab: Menu"
+		return
 	if recording:
 		_status.text = "●  RECORDING DUMMY  %.1fs  -  F6 to stop" % (_record_buffer.size() / 60.0)
 		_status.modulate = Color(1, 0.35, 0.3)
@@ -331,6 +562,21 @@ func _build_ui() -> void:
 	history_box.add_child(_input_display)
 	_history_label = _label(22, mono)
 	history_box.add_child(_history_label)
+
+	_trial_panel = _panel(Vector2(-560, 210), Control.PRESET_TOP_RIGHT)
+	_trial_label = RichTextLabel.new()
+	_trial_label.bbcode_enabled = true
+	_trial_label.fit_content = true
+	_trial_label.scroll_active = false
+	_trial_label.custom_minimum_size = Vector2(520, 0)
+	_trial_label.add_theme_font_size_override("normal_font_size", 24)
+	_trial_label.add_theme_font_size_override("bold_font_size", 24)
+	_trial_label.add_theme_constant_override("outline_size", 6)
+	_trial_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_trial_label.add_theme_constant_override("line_separation", 6)
+	_trial_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_trial_panel.add_child(_trial_label)
+	_trial_panel.visible = false
 
 	_build_menu()
 
@@ -398,7 +644,7 @@ func _build_menu() -> void:
 			dummy_controller.stance = i as TrainingDummyController.Stance
 			dummy_controller.restart_playback()
 			_refresh())
-	_option(grid, "Guard", TrainingDummyController.GUARD_NAMES, dummy_controller.guard,
+	_guard_option = _option(grid, "Guard", TrainingDummyController.GUARD_NAMES, dummy_controller.guard,
 		func(i: int) -> void:
 			dummy_controller.guard = i as TrainingDummyController.Guard
 			_refresh())
@@ -413,8 +659,17 @@ func _build_menu() -> void:
 	_toggle(grid, "Hitboxes", show_hitboxes, func(on: bool) -> void:
 		show_hitboxes = on
 		_refresh())
+	var trial_names := ["Off (free training)"]
+	for i in trials.size():
+		trial_names.append("%d. %s%s" % [i + 1, trials[i].name, "  ✓" if completed_trials.has(i) else ""])
+	_trial_option = _option(grid, "Combo Trial", trial_names, trial_index + 1, func(i: int) -> void:
+		_toggle_menu()
+		start_trial(i - 1))
 
-	for item in [["Record Dummy (F6)", func() -> void:
+	for item in [["Show Me the Trial (F8)", func() -> void:
+			_toggle_menu()
+			start_demo()],
+		["Record Dummy (F6)", func() -> void:
 			_toggle_menu()
 			start_recording()],
 		["Reset Positions (Backspace)", func() -> void:

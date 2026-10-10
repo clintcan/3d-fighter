@@ -195,6 +195,10 @@ func _connect_fight() -> void:
 	manager.hit_landed.connect(manager.cosmetic(_on_hit))
 	manager.throw_landed.connect(manager.cosmetic(_on_throw))
 	manager.super_flash.connect(manager.cosmetic(_on_super))
+	for fighter: Fighter in manager.fighters:
+		fighter.wall_hit.connect(manager.cosmetic(func(_f: Fighter) -> void:
+			excite(0.2)
+			shout(&"ooh")))
 
 
 ## The crowd's reactions (crowd_<kind>_N.ogg) and its looping cheering layer.

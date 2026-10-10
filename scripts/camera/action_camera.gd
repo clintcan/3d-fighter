@@ -40,6 +40,7 @@ const MODE_SCALES := [0.0, 0.5, 1.0]
 @export var counter_gain := 0.15
 @export var launch_gain := 0.25
 @export var throw_gain := 0.45
+@export var wall_gain := 0.35
 @export var block_gain := 0.03
 ## Decay per second while the victim is still in hitstun / airborne, and once they're free.
 @export var stunned_decay := 0.25
@@ -116,6 +117,7 @@ func setup(fight_manager: Node) -> void:
 	manager.throw_landed.connect(manager.cosmetic(_on_throw_landed))
 	for fighter: Fighter in manager.fighters:
 		fighter.knocked_out.connect(manager.cosmetic(_on_knocked_out))
+		fighter.wall_hit.connect(manager.cosmetic(_on_wall_hit))
 	snap()
 
 
@@ -345,6 +347,13 @@ func _on_throw_landed(_attacker: Fighter, defender: Fighter) -> void:
 	_add_trauma(0.2)
 
 
+func _on_wall_hit(fighter: Fighter) -> void:
+	focus = fighter
+	intensity = minf(intensity + wall_gain, 1.0)
+	_add_trauma(0.35 if fighter.edge_style == Fighter.EdgeStyle.WALL else 0.15)
+	_fov_punch = MODE_SCALES[mode]
+
+
 func _on_knocked_out(loser: Fighter) -> void:
 	focus = loser
 	intensity = 1.0
@@ -367,7 +376,7 @@ func _add_trauma(amount: float) -> void:
 
 func _update_intensity(delta: float) -> void:
 	var stunned := focus != null and focus.state in [Fighter.State.HITSTUN, Fighter.State.AIR_HIT,
-		Fighter.State.THROWN, Fighter.State.KO]
+		Fighter.State.THROWN, Fighter.State.KO, Fighter.State.WALL_SPLAT]
 	intensity = move_toward(intensity, 0.0, (stunned_decay if stunned else free_decay) * delta)
 	var target: float = smoothstep(0.1, 1.0, intensity) * MODE_SCALES[mode]
 	var rate := rise_speed if target > _strength else fall_speed

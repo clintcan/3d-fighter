@@ -94,6 +94,7 @@ func _initialize() -> void:
 	lib.add_animation("chain_punch_short", build_chain_punch(3))
 	lib.add_animation("reversal_throw", build_reversal_throw())
 	lib.add_animation("reversed", build_reversed())
+	lib.add_animation("wall_splat", build_wall_splat())
 	lib.add_animation("slide_kick",build_in_place_ranges([[ual2.get_animation("Slide_Start"), 0.2, 0.83], [ual2.get_animation("Slide_Exit"), 0.0, 0.3]], crouch, 0.25))
 	lib.add_animation("shoulder_charge", build_in_place_ranges([[ual2.get_animation("Shield_Dash"), 0.0, 0.5]], guard, 0.3))
 	var err := ResourceSaver.save(lib, OUTPUT)
@@ -189,6 +190,40 @@ func build_reversed() -> Animation:
 	lean(struck, 18.0, 0.0)
 	rotate_bone(struck, "neck_01", Vector3.RIGHT, -20.0) # head snaps back
 	return make_animation([[0.0, strike], [0.2, pulled], [0.36, pulled], [0.47, struck], [0.6, struck]], false)
+
+
+## Splatted against the stage edge behind (-Z): slammed flat, arched back with the arms
+## flung out against the wall and the head snapped back, then sagging as the knees go.
+## Held through Fighter.WALL_SPLAT_FRAMES (0.73 s); the ropes' short hold plays the slam.
+func build_wall_splat() -> Animation:
+	var foot_y := global_origin(guard, "foot_l").y
+	var feet := {"l": Vector3(0.16, foot_y, 0.02), "r": Vector3(-0.16, foot_y, 0.02)}
+	var hit := sample(ual1.get_animation("Hit_Chest"), 0.04)
+
+	var slam := sample(ual1.get_animation("Hit_Chest"), 0.1)
+	move_bone(slam, "pelvis", Vector3(0, 0.02, -0.1))
+	lean(slam, 15.0, 0.0)
+	rotate_bone(slam, "neck_01", Vector3.RIGHT, -22.0) # head snaps back
+	for side in ["l", "r"]:
+		var x := 1.0 if side == "l" else -1.0
+		aim(slam, "upperarm_" + side, "lowerarm_" + side, Vector3(x * 0.9, -0.1, -0.4)) # flung out against the wall
+		aim(slam, "lowerarm_" + side, "hand_" + side, Vector3(x * 0.55, 0.35, -0.5))
+		plant_foot(slam, side, feet[side])
+
+	var settle := duplicate_pose(slam)
+	lean(settle, -4.0, 0.0)
+	rotate_bone(settle, "neck_01", Vector3.RIGHT, 10.0)
+
+	var sag := duplicate_pose(slam)
+	move_bone(sag, "pelvis", Vector3(0, -0.16, 0.05))
+	lean(sag, -10.0, 0.0)
+	rotate_bone(sag, "neck_01", Vector3.RIGHT, 34.0) # head drops
+	for side in ["l", "r"]:
+		var x := 1.0 if side == "l" else -1.0
+		aim(sag, "upperarm_" + side, "lowerarm_" + side, Vector3(x * 0.55, -0.7, -0.3)) # arms sliding down the wall
+		aim(sag, "lowerarm_" + side, "hand_" + side, Vector3(x * 0.2, -0.95, 0.05))
+		plant_foot(sag, side, feet[side])
+	return make_animation([[0.0, hit], [0.05, slam], [0.2, settle], [0.5, sag], [0.6, sag]], false)
 
 
 ## Front (push) kick with the rear leg, mae-geri style: knee chambers high toward the

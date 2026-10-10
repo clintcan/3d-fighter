@@ -61,6 +61,32 @@ rival_lines = {
 "kenji": ["Your fists are honest. That makes them easy.", "Discipline is good. Patience is better."],
 "valka": ["A grip is a promise. Let me break it.", "You held on. I let go."]
 }
+combo_trials = Array[Dictionary]([{
+&"corner": false,
+&"name": "Chain Punch",
+&"steps": PackedStringArray("6LP", "HP"),
+&"tip": "Hold forward: the chain punch flows into the straight."
+}, {
+&"corner": false,
+&"name": "Double Palm",
+&"steps": PackedStringArray("6LP", "6HP"),
+&"tip": "Hold forward: the chain punch flows into the double palm."
+}, {
+&"corner": false,
+&"name": "Low Palm",
+&"steps": PackedStringArray("2LP", "2LK", "236P"),
+&"tip": "Cancel the low kick into Inch Palm at once: it is slow to come out."
+}, {
+&"corner": true,
+&"name": "Palm to the Wall",
+&"steps": PackedStringArray("LP", "HP", "236P", "WALL", "6LP", "HP"),
+&"tip": "Inch Palm near the edge splats them: walk in and follow up."
+}, {
+&"corner": false,
+&"name": "Thousand Hands",
+&"steps": PackedStringArray("6LP", "HP", "236236P"),
+&"tip": "With a full meter, cancel the straight into the super."
+}])
 max_health = 980
 back_walk_speed = 1.7
 dash_speed = 6.2

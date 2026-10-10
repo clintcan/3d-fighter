@@ -59,6 +59,32 @@ rival_lines = {
 "rhea": ["Stand still, you gnat!", "Caught you. Finally."],
 "valka": ["Let's see who's really the strongest.", "Nobody throws me around."]
 }
+combo_trials = Array[Dictionary]([{
+&"corner": false,
+&"name": "Heavy Hands",
+&"steps": PackedStringArray("LP", "HP"),
+&"tip": "Even Brutus's jab chains into his straight."
+}, {
+&"corner": false,
+&"name": "Bull Run",
+&"steps": PackedStringArray("LP", "HP", "236P"),
+&"tip": "Cancel the straight into Bull Charge."
+}, {
+&"corner": false,
+&"name": "Low Grind",
+&"steps": PackedStringArray("2LP", "2LP", "2LK"),
+&"tip": "Low jabs chain into each other and into the low kick."
+}, {
+&"corner": true,
+&"name": "Corner Boot",
+&"steps": PackedStringArray("6HK", "WALL", "LP", "HP"),
+&"tip": "The heavy boot near the edge splats them: walk in and follow up."
+}, {
+&"corner": false,
+&"name": "Titan Rush",
+&"steps": PackedStringArray("LP", "HP", "236236P"),
+&"tip": "With a full meter, cancel the straight into the super."
+}])
 max_health = 1100
 walk_speed = 1.5
 back_walk_speed = 1.2
