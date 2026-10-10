@@ -1,4 +1,4 @@
-3D FIGHTER  -  v0.8.0 (prototype)  -  Linux
+3D FIGHTER  -  v0.9.0 (prototype)  -  Linux
 ===========================================
 
 A one-on-one 3D fighting game inspired by Street Fighter and Tekken, with a
