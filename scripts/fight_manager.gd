@@ -706,6 +706,8 @@ func _resolve_hits() -> void:
 		_award_meter(attacker, defender, move, result, health_before - defender.health)
 		if result == Fighter.HitResult.COUNTER and not resimulating:
 			hud.note(fighters.find(attacker), "COUNTER")
+		elif result == Fighter.HitResult.ARMORED and not resimulating:
+			hud.note(fighters.find(defender), "ARMOR")
 		last_hit_point = hit[2]
 		hit_landed.emit(attacker, defender, move, result)
 
@@ -725,7 +727,7 @@ func _reverse(reverser: Fighter, attacker: Fighter, point: Vector3) -> void:
 ## Both sides build meter from an exchange; supers don't refund meter.
 func _award_meter(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult, damage: int) -> void:
 	if not move.super_move and not move.input.begins_with("~"): # supers and their follow-ups
-		var rate := Fighter.METER_PER_DAMAGE_BLOCKED if result == Fighter.HitResult.BLOCKED else Fighter.METER_PER_DAMAGE_HIT
+		var rate := Fighter.METER_PER_DAMAGE_BLOCKED if result in [Fighter.HitResult.BLOCKED, Fighter.HitResult.ARMORED] else Fighter.METER_PER_DAMAGE_HIT
 		attacker.add_meter(roundi(move.damage * rate))
 	defender.add_meter(roundi(damage * Fighter.METER_PER_DAMAGE_TAKEN))
 

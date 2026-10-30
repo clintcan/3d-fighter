@@ -13,6 +13,7 @@ the page here.
 | [Jin](jin.md) | Kicker | 980 | Footsies | Longest reach, overhead axe kick |
 | [Mira](mira.md) | Brawler | 1000 | Brawler | Focus: powers up with Lakas Stance |
 | [Lian](lian.md) | Counter | 980 | Counter | Reversal stance: catches strikes and throws |
+| [Aelia](aelia.md) | Knight | 1050 | Knight | Super armour on her heavy moves |
 
 ## Shared base moves
 
@@ -50,3 +51,6 @@ Each fighter adds two or three signature normals, two or three specials and a su
 6. Presentation: voice takes (`assets/audio/voice/fighters/<id>_<kind>_N.ogg`), a routine
    in `FighterShowcase.ROUTINES`, a portrait (`tools/render_portraits.gd -- <id>`), credits.
 7. Tests in `tests/sim_test.gd`, and a frame-rate check.
+
+An imported model (not the Quaternius base) can join too: it has to be moved onto the
+game skeleton first. [Aelia](aelia.md#the-imported-model) shows how.

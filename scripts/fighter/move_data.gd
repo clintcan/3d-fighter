@@ -77,6 +77,10 @@ enum HitLevel { HIGH, MID, LOW, OVERHEAD }
 @export var reversal: bool = false
 ## Projectiles pass through the fighter during this move's startup and active frames.
 @export var projectile_immune: bool = false
+## Super armour: this many strikes (body hits or projectiles) landing during the move's
+## startup frames hurt but don't interrupt it. Throws, the strike after the
+## armour is used up (multi-hit moves) and supers get through.
+@export var armor_hits: int = 0
 ## Air move: on its first active frame the attacker dives along (forward, down) m/s
 ## (dive kicks). The move lasts until landing.
 @export var dive: Vector2 = Vector2.ZERO

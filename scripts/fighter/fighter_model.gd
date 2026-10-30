@@ -159,7 +159,8 @@ func build(data: CharacterData, alt: bool = false) -> void:
 		_attach_skinned(hair_scene, data.model_scene.resource_path)
 	var albedo := data.alt_body_albedo if alt and data.alt_body_albedo else data.body_albedo
 	var realistic := data.realistic_shading and not _low_graphics()
-	_customize_materials(albedo, data.alt_hair_color if alt else data.hair_color, data.detailed_textures, realistic)
+	_customize_materials(albedo, data.alt_hair_color if alt else data.hair_color, data.detailed_textures, realistic,
+		data.alt_material_colors if alt else {})
 	if realistic:
 		_add_eye_light()
 	if data.outfit_mesh:
@@ -357,8 +358,8 @@ func _attach_skinned(scene: PackedScene, base_path: String) -> void:
 
 ## Swaps the body's skin texture and tints hair, working on per-instance material copies.
 ## `detailed` adds the skin pore detail (the dressed body carries the second UV set);
-## `realistic` the realistic skin, eye and hair shading.
-func _customize_materials(body_albedo: Texture2D, hair_color: Color, detailed: bool, realistic: bool) -> void:
+## `realistic` the realistic skin, eye and hair shading; `tints` recolours materials by name.
+func _customize_materials(body_albedo: Texture2D, hair_color: Color, detailed: bool, realistic: bool, tints: Dictionary = {}) -> void:
 	for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
 		for surface in mesh.get_surface_override_material_count():
 			var material := mesh.mesh.surface_get_material(surface) as StandardMaterial3D
@@ -389,6 +390,10 @@ func _customize_materials(body_albedo: Texture2D, hair_color: Color, detailed: b
 				eyes.clearcoat = 1.0
 				eyes.clearcoat_roughness = EYE_CLEARCOAT_ROUGHNESS
 				mesh.set_surface_override_material(surface, eyes)
+			elif tints.has(material.resource_name):
+				var tinted := material.duplicate() as StandardMaterial3D
+				tinted.albedo_color = tints[material.resource_name]
+				mesh.set_surface_override_material(surface, tinted)
 
 
 # --- Face ------------------------------------------------------------------------------

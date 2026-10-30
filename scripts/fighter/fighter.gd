@@ -33,7 +33,8 @@ enum State {
 	WALL_SPLAT,
 }
 
-enum HitResult { HIT, BLOCKED, COUNTER }
+## ARMORED: the hit landed on super armour (it hurt, but the move carried on).
+enum HitResult { HIT, BLOCKED, COUNTER, ARMORED }
 ## What the stage edge does to a fighter knocked into it (Stage.edge_style).
 enum EdgeStyle { WALL, ROPES }
 
@@ -60,6 +61,7 @@ const JUGGLE_MIN_UP_SPEED := 3.0
 ## Hitting a fighter during their own attack's startup/active frames.
 const COUNTER_DAMAGE_SCALE := 1.25
 const COUNTER_HITSTUN_BONUS := 6
+const ARMOR_FLASH := Color(0.55, 1.0, 0.45) # emerald flash: the hit landed on super armour
 ## Each hit already in the combo reduces damage by this much, down to the minimum.
 const COMBO_SCALING_STEP := 0.1
 const MIN_COMBO_SCALE := 0.3
@@ -137,7 +139,7 @@ const SIM_FIELDS := [&"input_locked", &"view_right", &"view_depth", &"state", &"
 	&"juggle_hits", &"air_attack_used", &"throw_grab_frame", &"grab_move", &"throw_techable",
 	&"current_move", &"move_has_hit", &"hits_landed", &"next_hit_frame", &"meter", &"frozen",
 	&"_landing_frames", &"sidestep_dir", &"victory", &"last_hit_level", &"immortal", &"focus",
-	&"move_focus", &"wall_used", &"wall_normal", &"hit_push"]
+	&"move_focus", &"wall_used", &"wall_normal", &"hit_push", &"armor_used"]
 ## (victory_clip is cosmetic: each machine picks its own victory animation.)
 
 var data: CharacterData
@@ -190,6 +192,8 @@ var wall_used := false
 var wall_normal := Vector3.ZERO
 ## Knockback of the last hit taken (its push decides whether the edge splats).
 var hit_push := 0.0
+## Strikes the current move's super armour has absorbed (MoveData.armor_hits).
+var armor_used := 0
 ## This fighter's projectile in flight (one at a time), ticked by FightManager.
 var projectile: Projectile
 ## Set by FightManager during the super freeze (holds animation).
@@ -292,6 +296,7 @@ func reset_to(spawn_position: Vector3) -> void:
 	wall_used = false
 	wall_normal = Vector3.ZERO
 	hit_push = 0.0
+	armor_used = 0
 	last_hit_level = MoveData.HitLevel.MID
 	victory = false
 	victory_clip = &""
@@ -617,6 +622,7 @@ func _start_move(move: MoveData, airborne: bool, carried_focus := -1) -> void:
 	move_has_hit = false
 	hits_landed = 0
 	next_hit_frame = 0
+	armor_used = 0
 	air_attack_used = air_attack_used or airborne
 	# Crouching normals (2LP...) crouch; specials whose motion starts with 2 (236, 214) don't.
 	_set_state(State.ATTACK, (move.input.begins_with("2") and not move.is_special()) or move.low_profile)
@@ -845,6 +851,15 @@ func receive_hit(attacker: Fighter, move: MoveData, push_dir := Vector3.ZERO, fi
 				_knock_out(push_dir)
 		return HitResult.BLOCKED
 
+	if _armor_absorbs(move):
+		# Takes the damage, keeps attacking: no hitstun, no knockback, no combo.
+		armor_used += 1
+		_take_damage(roundi(move.damage * attacker.focus_damage_scale(move)))
+		_flash_color = ARMOR_FLASH
+		if health == 0:
+			_knock_out(push_dir)
+		return HitResult.ARMORED
+
 	var counter := state == State.ATTACK and current_move != null \
 			and state_frame <= current_move.startup + current_move.active
 	var airborne := position.y > 0.0 or state in [State.JUMP, State.AIR_HIT]
@@ -875,6 +890,17 @@ func receive_hit(attacker: Fighter, move: MoveData, push_dir := Vector3.ZERO, fi
 		_set_state(State.HITSTUN, was_crouching)
 		stun = move.hitstun + (COUNTER_HITSTUN_BONUS if counter else 0)
 	return HitResult.COUNTER if counter else HitResult.HIT
+
+
+## True if the current move's super armour takes `move` (supers break through).
+func _armor_absorbs(move: MoveData) -> bool:
+	return has_armor() and not move.super_move
+
+
+## True while the current move still has super armour to spend: its startup frames only.
+func has_armor() -> bool:
+	return state == State.ATTACK and current_move != null and armor_used < current_move.armor_hits \
+			and state_frame <= current_move.startup
 
 
 func _take_damage(amount: int) -> void:

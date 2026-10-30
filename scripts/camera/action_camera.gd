@@ -330,7 +330,7 @@ func _victory_right(fighter: Fighter) -> Vector3:
 # --- Intensity -------------------------------------------------------------------
 
 func _on_hit_landed(_attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult) -> void:
-	if result == Fighter.HitResult.BLOCKED:
+	if result in [Fighter.HitResult.BLOCKED, Fighter.HitResult.ARMORED]:
 		intensity = minf(intensity + block_gain, 1.0)
 		_add_trauma(clampf((move.hitstop - 6) * 0.03, 0.0, 0.15))
 		return

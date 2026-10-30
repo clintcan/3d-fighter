@@ -16,7 +16,7 @@ const H := MoveData.HitLevel
 ##         chip_damage, hits, hit_interval, travel, rise, landing_recovery, invuln_frames,
 ##         low_profile, super_move, followup, projectile_speed, projectile_lifetime,
 ##         projectile_color, dive, focus_gain, focus_hits, focus_damage, focus_rise,
-##         focus_consume, focus_followup, reversal (see MoveData)
+##         focus_consume, focus_followup, reversal, armor_hits (see MoveData)
 const BASE := {
 	"jab": ["Jab", "LP", &"ual1/Punch_Jab", 0.20, 0.62, 4, 2, 8, 30, H.HIGH, 14, 10, 5, Vector2(1.2, 0), Vector3(0, 1.40, -0.78), 0.15, {cancel_into = ["LP", "HP", "2LP"]}],
 	"straight": ["Straight", "HP", &"ual1/Punch_Cross", 0.28, 0.85, 9, 3, 18, 80, H.HIGH, 20, 14, 8, Vector2(2.5, 0), Vector3(0.1, 1.36, -0.70), 0.18, {camera_intensity = 0.1}],
@@ -247,6 +247,44 @@ const CHARACTERS := {
 				{knockdown = true, chip_damage = 14, camera_intensity = 0.6, impact_fx = &"shockwave"}],
 		},
 	},
+	"aelia": {
+		startup = 1, damage = 1.05, knockback = 1.1, hitstop = 1,
+		base_startup = {jab = 0, crouch_jab = 0}, # the jabs stay quick: armour moves are her answer up close
+		create = {display_name = "Aelia", archetype = "Knight", select_order = 7,
+			description = "Armoured knight. Wades through your attacks on super armour and hits back with gauntlet and plate.",
+			model_scene = "res://assets/characters/aelia/aelia.scn", # Blend Swap 30219 by Abinady10 (CC-BY), tools/build_aelia.gd
+			body_albedo = "res://assets/characters/aelia/source/textures/aelia_piel.jpg",
+			model_scale = 1.04, hair_color = Color(0.45, 0.18, 0.075), placeholder_color = Color(0.25, 0.6, 0.3)},
+		stats = {max_health = 1050, walk_speed = 1.7, back_walk_speed = 1.35, dash_speed = 5.0,
+			jump_velocity = 5.7, weight = 1.2, throw_damage = 140, power_rating = 0.8, speed_rating = 0.35,
+			realistic_shading = true,
+			victory_animations = [&"fight/victory_oath", &"fight/victory_fist_pump"],
+			alt_body_albedo = "res://assets/characters/aelia/source/textures/aelia_piel.jpg", alt_hair_color = Color(0.88, 0.8, 0.6),
+			alt_material_colors = {"Aelia_Armour": Color(0.4, 0.07, 0.06)}}, # crimson plate in mirror matches
+		signatures = {
+			# Armoured straight with a step: walks through a poke, splats near the edge.
+			"gauntlet_drive": ["Gauntlet Drive", "6HP", &"ual1/Punch_Cross", 0.28, 0.85, 14, 3, 20, 95, H.MID, 22, 16, 10, Vector2(3.6, 0), Vector3(0.1, 1.36, -0.70), 0.2,
+				{lunge = 3.5, armor_hits = 1, camera_intensity = 0.2}],
+			# Raking low kick with the spurs: quick, cancels into Shield Rush.
+			"spur_rake": ["Spur Rake", "6LK", &"fight/sweep", 0.18, 0.0, 8, 3, 14, 45, H.LOW, 20, 12, 6, Vector2(1.4, 0), Vector3(0.08, 0.18, -0.85), 0.2,
+				{lunge = 2.0, cancel_into = ["236P"]}],
+		},
+		specials = {
+			# Armoured shoulder charge: shrugs off one hit on the way in.
+			"shield_rush": ["Shield Rush", "236P", &"fight/shoulder_charge", 0.15, 0.83, 14, 14, 24, 90, H.MID, 24, 18, 12, Vector2(4.5, 0), Vector3(0, 1.0, -0.6), 0.38,
+				{travel = 6.0, armor_hits = 1, chip_damage = 12, camera_intensity = 0.3}],
+			# Armoured (not invincible) rising uppercut: beats a single meaty hit, loses to throws.
+			"rising_gauntlet": ["Rising Gauntlet", "623P", &"fight/rising_uppercut", 0.09, 0.7, 6, 10, 16, 100, H.MID, 0, 18, 10, Vector2(1.0, 6.8), Vector3(-0.15, 1.55, -0.35), 0.38,
+				{launches = true, rise = 6.0, travel = 1.0, armor_hits = 1, landing_recovery = 22, chip_damage = 10, camera_intensity = 0.35}],
+			# Two-fisted overhead: armoured, slow, knocks down with a shockwave.
+			"hammerfall": ["Hammerfall", "214P", &"ual2/OverhandThrow", 0.40, 0.9, 20, 4, 22, 120, H.OVERHEAD, 0, 18, 13, Vector2(2.0, 0), Vector3(0.2, 0.8, -0.95), 0.3,
+				{knockdown = true, armor_hits = 1, chip_damage = 12, camera_intensity = 0.3, impact_fx = &"shockwave"}],
+			"emerald_oath": ["Emerald Oath", "236236P", &"fight/punch_flurry", 0.10, 0.70, 6, 30, 24, 30, H.MID, 22, 16, 4, Vector2(0.6, 0), Vector3(0, 1.22, -0.6), 0.32,
+				{super_move = true, hits = 5, hit_interval = 6, travel = 2.0, invuln_frames = 10, chip_damage = 6, followup = "~oath_finish", camera_intensity = 0.15}],
+			"oath_finish": ["Emerald Oath", "~oath_finish", &"ual2/OverhandThrow", 0.40, 0.9, 6, 5, 26, 200, H.MID, 0, 20, 16, Vector2(2.5, 0), Vector3(0.2, 0.8, -0.95), 0.42,
+				{knockdown = true, chip_damage = 16, camera_intensity = 0.6, impact_fx = &"shockwave"}],
+		},
+	},
 }
 
 
@@ -307,6 +345,13 @@ const TRIALS := {
 		{name = "Palm to the Wall", steps = ["LP", "HP", "236P", "WALL", "6LP", "HP"], corner = true, tip = "Inch Palm near the edge splats them: walk in and follow up."},
 		{name = "Thousand Hands", steps = ["6LP", "HP", "236236P"], tip = "With a full meter, cancel the straight into the super."},
 	],
+	"aelia": [
+		{name = "Jab String", steps = ["LP", "LP", "HP"], tip = "Jabs chain into each other and into the straight."},
+		{name = "Spur and Shield", steps = ["6LK", "236P"], tip = "Hold forward: cancel the spur rake into Shield Rush."},
+		{name = "Rising Gauntlet", steps = ["2LP", "2LP", "623P"], tip = "Low jabs, then cancel into Rising Gauntlet."},
+		{name = "Gauntlet to the Wall", steps = ["6HP", "WALL", "LP", "HP"], corner = true, tip = "Gauntlet Drive near the edge splats them: walk in and follow up."},
+		{name = "Emerald Oath", steps = ["LP", "HP", "236236P"], tip = "With a full meter, cancel the straight into the super."},
+	],
 }
 
 const INTROS := {
@@ -329,7 +374,8 @@ const INTROS := {
 		lines = ["I'm gonna fold you in half.", "Step closer. I dare you.", "Hope you brought a mouthguard."],
 		quotes = ["Stay down. It's easier.", "That's what happens when you stand in front of me.", "Next!"],
 		rivals = {"rhea": ["Stand still, you gnat!", "Caught you. Finally."],
-			"valka": ["Let's see who's really the strongest.", "Nobody throws me around."]},
+			"valka": ["Let's see who's really the strongest.", "Nobody throws me around."],
+			"aelia": ["Nice armour. I'll dent it.", "Should've worn more of it."]},
 	},
 	"valka": {
 		animation = &"fight/intro_beckon", expression = &"smirk",
@@ -356,6 +402,13 @@ const INTROS := {
 		quotes = ["Your strength became my strength.", "Force met nothing. Then everything.", "Breathe. Then try again."],
 		rivals = {"valka": ["A grip is a promise. Let me break it.", "You held on. I let go."],
 			"kenji": ["Your fists are honest. That makes them easy.", "Discipline is good. Patience is better."]},
+	},
+	"aelia": {
+		animation = &"fight/intro_oath", expression = &"neutral",
+		lines = ["I swore an oath. You will not pass.", "Strike me. I will still be standing.", "Steel and resolve. Show me yours."],
+		quotes = ["My armour held. Did your resolve?", "Rise. Then train until you can break plate.", "An oath kept is a battle won."],
+		rivals = {"brutus": ["Strength without discipline. I've seen it before.", "You hit hard. I hit last."],
+			"lian": ["Turn my strikes if you can. They do not stop.", "You redirected the blow. Not the next one."]},
 	},
 }
 
@@ -392,6 +445,8 @@ func _initialize() -> void:
 				character.victory_animations.assign(spec.stats[stat])
 			elif stat == "alt_body_albedo":
 				character.alt_body_albedo = load(spec.stats[stat])
+			elif stat == "alt_material_colors":
+				character.alt_material_colors = spec.stats[stat].duplicate()
 			else:
 				character.set(stat, spec.stats[stat])
 		var intro: Dictionary = INTROS.get(id, {})
@@ -458,7 +513,7 @@ func _make(row: Array) -> MoveData:
 	for key in ["chip_damage", "hits", "hit_interval", "travel", "rise", "landing_recovery", "invuln_frames",
 			"low_profile", "super_move", "followup", "projectile_speed", "projectile_lifetime", "projectile_color", "impact_fx",
 			"command_grab", "grab_range", "projectile_immune", "dive", "focus_gain", "focus_hits", "focus_damage",
-			"focus_rise", "focus_consume", "focus_followup", "reversal"]:
+			"focus_rise", "focus_consume", "focus_followup", "reversal", "armor_hits"]:
 		if extras.has(key):
 			m.set(key, extras[key])
 	return m

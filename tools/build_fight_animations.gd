@@ -63,6 +63,7 @@ func _initialize() -> void:
 	lib.add_animation("victory_fist_pump", build_victory_fist_pump())
 	lib.add_animation("victory_flex", build_victory_flex())
 	lib.add_animation("victory_point", build_victory_point())
+	lib.add_animation("victory_oath", build_victory_oath())
 	# Pre-fight intros (one per fighter, ~2 s, ending in the guard)
 	lib.add_animation("intro_salute", build_intro_salute())
 	lib.add_animation("intro_shadowbox", build_intro_shadowbox())
@@ -71,6 +72,7 @@ func _initialize() -> void:
 	lib.add_animation("intro_kick", build_intro_kick())
 	lib.add_animation("intro_power", build_intro_power())
 	lib.add_animation("intro_wing_chun", build_intro_wing_chun())
+	lib.add_animation("intro_oath", build_intro_oath())
 	lib.add_animation("rushing_hook", build_in_place([ual2.get_animation("Melee_Hook"), ual2.get_animation("Melee_Hook_Rec")]))
 	# Specials and supers
 	lib.add_animation("palm_blast", build_palm_blast())
@@ -795,6 +797,46 @@ func build_intro_wing_chun() -> Animation:
 	var still := _counter_pose(global_origin(guard, "foot_" + lead), global_origin(guard, "foot_" + rear))
 	return make_animation([[0.0, stand], [0.35, salute], [0.9, salute], [1.15, chamber], [1.35, chamber],
 		[1.6, still], [1.85, still], [2.2, guard]], false)
+
+
+## Aelia: a knight's oath, right fist to the heart and a bow of the head, then the chin
+## comes up and she drops into the guard. ~2.2 s.
+func build_intro_oath() -> Animation:
+	var stand := _victory_stance(0.13, 0.04)
+	var oath := duplicate_pose(stand)
+	_oath_hands(oath)
+	var bow := duplicate_pose(stand)
+	lean(bow, -10.0, 0.0)
+	rotate_bone(bow, "neck_01", Vector3.RIGHT, 16.0)
+	_oath_hands(bow)
+	var proud := duplicate_pose(oath)
+	rotate_bone(proud, "neck_01", Vector3.RIGHT, -6.0)
+	return make_animation([[0.0, stand], [0.4, oath], [0.8, bow], [1.25, bow], [1.55, proud],
+		[1.8, proud], [2.2, guard]], false)
+
+
+## Aelia's match win: the oath, a bow of the head, then held with the chin up. ~3.2 s.
+func build_victory_oath() -> Animation:
+	var stand := _victory_stance(0.13, 0.05)
+	var oath := duplicate_pose(stand)
+	_oath_hands(oath)
+	rotate_bone(oath, "neck_01", Vector3.RIGHT, -8.0)
+	var bow := duplicate_pose(stand)
+	lean(bow, -8.0, 0.0)
+	rotate_bone(bow, "neck_01", Vector3.RIGHT, 14.0)
+	_oath_hands(bow)
+	var breathe := duplicate_pose(oath)
+	move_bone(breathe, "pelvis", Vector3(0, -0.012, 0))
+	return make_animation([[0.0, guard], [0.4, stand], [0.8, oath], [1.4, bow], [1.9, oath],
+		[2.6, breathe], [3.2, oath]], false)
+
+
+## Right fist over the heart, left hand relaxed at the side.
+func _oath_hands(pose: Dictionary) -> void:
+	var chest := global_origin(pose, "spine_03")
+	reach_arm(pose, "r", chest + Vector3(0.07, 0.06, 0.17))
+	var hip := global_origin(pose, "thigh_l")
+	reach_arm(pose, "l", hip + Vector3(0.17, -0.06, 0.02))
 
 
 ## Upright stance with feet `half_width` apart and the pelvis raised `rise`.

@@ -15,6 +15,7 @@ const DUST_POOL := 3
 const HIT_COLOR := Color(1.0, 0.75, 0.35)
 const COUNTER_COLOR := Color(1.0, 0.35, 0.15)
 const BLOCK_COLOR := Color(0.45, 0.75, 1.0)
+const ARMOR_COLOR := Color(0.55, 1.0, 0.45) # emerald, like Fighter.ARMOR_FLASH
 const SUPER_COLOR := Color(1.0, 0.82, 0.3)
 const FOCUS_COLOR := Color(1.0, 0.55, 0.15) # a focus power-up (Mira's Lakas Stance)
 const REVERSAL_COLOR := Color(0.55, 1.0, 0.8) # a reversal stance catching a strike (Lian)
@@ -90,7 +91,7 @@ func _keep_materials() -> void:
 func _on_hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult) -> void:
 	var point: Vector3 = manager.last_hit_point
 	var heavy := move.hitstop >= HEAVY_HITSTOP
-	if result != Fighter.HitResult.BLOCKED:
+	if result not in [Fighter.HitResult.BLOCKED, Fighter.HitResult.ARMORED]:
 		if move.projectile_speed > 0.0:
 			spark(point, move.projectile_color, 2.0) # energy burst
 			_ring(point, move.projectile_color, 1.6, false)
@@ -104,6 +105,13 @@ func _on_hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result
 			Audio.sfx(&"block", -2.0)
 			if defender.model:
 				defender.model.flash(BLOCK_COLOR, 0.12)
+		Fighter.HitResult.ARMORED:
+			# Clang: the strike glances off the plate and the move carries on.
+			spark(point, ARMOR_COLOR, 1.1)
+			Audio.sfx(&"armor", 2.0, 0.7)
+			Audio.sfx(&"hit_light", -6.0)
+			if defender.model:
+				defender.model.flash(ARMOR_COLOR, 0.14)
 		Fighter.HitResult.COUNTER:
 			spark(point, COUNTER_COLOR, 1.6)
 			Audio.sfx(&"hit_heavy", 2.0, 0.9)

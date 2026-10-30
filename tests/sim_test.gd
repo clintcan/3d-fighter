@@ -358,6 +358,7 @@ func _initialize() -> void:
 	await lian_tests()
 	presentation_tests()
 	intro_tests()
+	await aelia_tests()
 	await beach_tests()
 	await market_tests()
 	await courtyard_tests()
@@ -2370,6 +2371,141 @@ func lian_tests() -> void:
 	p2.controller = m.dummy
 
 
+## Aelia, the knight (an imported model on the game skeleton): her model has every game
+## bone with the base skeleton's rest rotations, and mirror matches recolour her armour.
+## Super armour takes one strike during an armoured move's startup frames (she
+## takes the damage, keeps attacking and lands her own hit); the strike after it, supers
+## and throws get through; ordinary moves and recovery have none; it's rollback state. Her
+## CPU answers single strikes with armour, and other CPUs throw an armoured move up close.
+func aelia_tests() -> void:
+	var gs = root.get_node("GameState")
+	var aelia: CharacterData = gs.roster.filter(func(c): return c.id == &"aelia").front()
+	check("Aelia: in the roster as the eighth fighter", aelia != null and gs.roster.size() >= 8 and gs.roster[7] == aelia)
+	check("Aelia: her own model, not the base body", not aelia.uses_base_body() and aelia.outfit_mesh == null)
+	var base_scene: Node = load("res://assets/characters/base/Superhero_Female_FullBody.gltf").instantiate()
+	var base_sk := base_scene.find_child("Skeleton3D") as Skeleton3D
+	var own: Node = aelia.model_scene.instantiate()
+	var sk := own.find_child("Skeleton3D") as Skeleton3D
+	var same := sk.get_bone_count() == base_sk.get_bone_count() and sk.get_parent().name == "Armature"
+	for b in mini(sk.get_bone_count(), base_sk.get_bone_count()):
+		same = same and sk.get_bone_name(b) == base_sk.get_bone_name(b) and sk.get_bone_parent(b) == base_sk.get_bone_parent(b) \
+			and sk.get_bone_rest(b).basis.is_equal_approx(base_sk.get_bone_rest(b).basis)
+	check("Aelia: every game bone, same parents and rest rotations (the clips play unchanged)", same)
+	var skinned := sk.find_children("*", "MeshInstance3D", true, false)
+	check("Aelia: body and eyes are skinned to it", skinned.size() == 2 and skinned.all(
+		func(mi: MeshInstance3D) -> bool: return mi.skin != null and mi.skin.get_bind_count() == base_sk.get_bone_count()))
+	own.free()
+	base_scene.free()
+	var alt_model := FighterModel.new()
+	root.add_child(alt_model)
+	alt_model.build(aelia, true)
+	var armour := Color.BLACK
+	for mi: MeshInstance3D in alt_model.skeleton.find_children("*", "MeshInstance3D", true, false):
+		for s in mi.get_surface_override_material_count():
+			var mat := mi.get_surface_override_material(s) as StandardMaterial3D
+			if mat and mat.resource_name == "Aelia_Armour":
+				armour = mat.albedo_color
+	check("Aelia: a mirror match recolours her armour", armour.is_equal_approx(aelia.alt_material_colors["Aelia_Armour"]), "%s" % armour)
+	alt_model.free()
+
+	gs.mode = gs.Mode.VS_CPU
+	gs.player_character = aelia; gs.p2_character = gs.roster[0]
+	gs.stage_path = gs.DEFAULT_STAGE
+	change_scene_to_file("res://scenes/fight.tscn")
+	await process_frame; await process_frame
+	m = current_scene
+	m.set_physics_process(false)
+	p1 = m.fighters[0]; p2 = m.fighters[1]
+	p1.controller = ctl
+	var cpu := AIController.new()
+	cpu.attach(p1)
+	check("Aelia: Knight CPU personality", cpu.personality_name() == "Knight")
+	check("Aelia: spent armour is rollback state", &"armor_used" in Fighter.SIM_FIELDS)
+
+	var results := []
+	var on_hit := func(attacker: Fighter, _defender: Fighter, _move: MoveData, result: Fighter.HitResult) -> void:
+		results.append([attacker == p1, result])
+	m.hit_landed.connect(on_hit)
+	# Kenji (scripted) strikes `delay` ticks into her Gauntlet Drive (6HP, armoured startup).
+	var vs_drive := func(button: int, d: int, distance: float, delay: int) -> Dictionary:
+		reset(DummyController.Mode.STAND)
+		p2.controller = ctl2
+		approach(distance); step(10)
+		results.clear()
+		var hp1 := p1.health
+		var hp2 := p2.health
+		ctl.dir = 6; ctl.buttons = InputBuffer.HP; step(1); ctl.dir = 5; ctl.buttons = 0
+		step(delay)
+		ctl2.dir = d; ctl2.buttons = button; step(1); ctl2.dir = 5; ctl2.buttons = 0
+		var stunned := false
+		for t in 50:
+			step()
+			stunned = stunned or p1.state in [Fighter.State.HITSTUN, Fighter.State.AIR_HIT, Fighter.State.THROWN]
+		step(40)
+		return {results = results.duplicate(), stunned = stunned, aelia_lost = hp1 - p1.health, kenji_lost = hp2 - p2.health}
+	var A := Fighter.HitResult.ARMORED
+	var jab: Dictionary = vs_drive.call(InputBuffer.LP, 5, 1.0, 2)
+	check("Aelia: a jab into Gauntlet Drive lands on the armour; she takes it and hits back",
+		jab.results.size() >= 2 and jab.results[0] == [false, A] and jab.results[1][0] == true and jab.results[1][1] != Fighter.HitResult.BLOCKED
+		and not jab.stunned and jab.aelia_lost == dmg(p2, "LP") and jab.kenji_lost >= dmg(p1, "6HP"), "%s" % jab)
+	var thrown: Dictionary = vs_drive.call(InputBuffer.LP | InputBuffer.LK, 5, 0.6, 1)
+	check("Aelia: a throw goes through the armour", thrown.stunned and not thrown.results.any(func(r): return r[1] == A), "%s" % thrown)
+	# Straight into the fighter: the armour takes one strike, then it's spent.
+	var drive := p1._move_for_input("6HP")
+	reset(DummyController.Mode.STAND)
+	press(InputBuffer.HP, 6); ctl.dir = 5; ctl.buttons = 0; step(2)
+	var first := p1.receive_hit(p2, p2._move_for_input("LP"))
+	var second := p1.receive_hit(p2, p2._move_for_input("LP"))
+	check("Aelia: the armour takes one strike, the next one gets through", first == A and second != A,
+		"%s %s" % [Fighter.HitResult.keys()[first], Fighter.HitResult.keys()[second]])
+	reset(DummyController.Mode.STAND)
+	press(InputBuffer.HP, 6); ctl.dir = 5; ctl.buttons = 0; step(2)
+	check("Aelia: a super breaks the armour", p1.receive_hit(p2, p2._move_for_input("236236P")) != A)
+	reset(DummyController.Mode.STAND)
+	press(InputBuffer.HP, 6); ctl.dir = 5; ctl.buttons = 0; step(drive.startup + drive.active + 2)
+	check("Aelia: no armour in the recovery", p1.state == Fighter.State.ATTACK and p1.receive_hit(p2, p2._move_for_input("LP")) != A)
+	reset(DummyController.Mode.STAND)
+	p2.position = p1.position + p1.forward * 3.0 # out of reach: the strike mustn't connect first
+	press(InputBuffer.HP, 6); ctl.dir = 5; ctl.buttons = 0; step(drive.startup + 1)
+	check("Aelia: armour on the startup only, none once the strike is out",
+		p1.state == Fighter.State.ATTACK and p1.state_frame > drive.startup and p1.receive_hit(p2, p2._move_for_input("LP")) != A,
+		"%s frame %d" % [state_name(p1), p1.state_frame])
+	reset(DummyController.Mode.STAND)
+	press(InputBuffer.LP); ctl.buttons = 0; step(1)
+	check("Aelia: ordinary moves have no armour", p1.receive_hit(p2, p2._move_for_input("LP")) != A)
+	m.hit_landed.disconnect(on_hit)
+	reset(DummyController.Mode.STAND)
+
+	# Her CPU sometimes answers a single strike with armour, never a multi-hit super.
+	cpu.set_difficulty(AIController.Difficulty.HARD)
+	var answered := 0
+	var into_super := 0
+	for t in 60:
+		for mv: MoveData in [p2._move_for_input("HK"), p2._move_for_input("236236P")]:
+			cpu._plan.clear()
+			var seen := {state = Fighter.State.ATTACK, state_frame = 0, move = mv, position = p2.position,
+				velocity = Vector3.ZERO, crouching = false, start_tick = t * 2 + (1 if mv.super_move else 0)}
+			if cpu._try_armor(p1, seen, 1.0):
+				if mv.super_move:
+					into_super += 1
+				else:
+					answered += 1
+	check("Aelia: the CPU answers single strikes with armour, not supers", answered > 5 and into_super == 0, "%d / %d" % [answered, into_super])
+	# Any CPU facing an armoured move up close throws it.
+	var kenji_cpu := AIController.new()
+	kenji_cpu.attach(p2)
+	var throws := 0
+	for t in 20:
+		kenji_cpu._plan.clear()
+		var seen := {state = Fighter.State.ATTACK, state_frame = 4, move = drive, position = p1.position,
+			velocity = Vector3.ZERO, crouching = false, start_tick = t}
+		kenji_cpu._decide(p2, seen, 0.6)
+		if kenji_cpu._plan.any(func(s: Array) -> bool: return s[1] == (InputBuffer.LP | InputBuffer.LK)):
+			throws += 1
+	check("Aelia: CPUs throw an armoured move up close", throws == 20, "%d" % throws)
+	p2.controller = m.dummy
+
+
 ## Super cut-ins, limb trails, and the thrown / reversed reactions. Runs in the fight
 ## lian_tests() left (Lian vs Kenji).
 ## Pre-fight intros and win quotes, on presentation_tests' fight (Lian vs Kenji).
@@ -2665,7 +2801,8 @@ func mira_tests() -> void:
 		model.queue_free()
 	check("Mira: detailed cloth (weave, hem shading) and skin detail", looks[&"mira"] == [true, true], "%s" % [looks])
 	check("Kenji gets the detailed materials too", looks[&"kenji"] == [true, true], "%s" % [looks])
-	check("Every fighter has detailed textures", gs.roster.all(func(c: CharacterData) -> bool: return c.detailed_textures))
+	check("Every fighter on the base body has detailed textures",
+		gs.roster.all(func(c: CharacterData) -> bool: return c.detailed_textures or not c.uses_base_body()))
 
 	# Realistic shading (every fighter): wrapped skin with a backlight (never screen-space
 	# scattering: it costs a third of the frame rate), wet eyes with their own eye light,
@@ -2714,6 +2851,8 @@ func face_tests() -> void:
 	var gs = root.get_node("GameState")
 	check("FighterModel and the shape builder agree on the shapes", FighterModel.FACE_SHAPES == FaceShapes.SHAPES)
 	for character: CharacterData in gs.roster:
+		if not character.uses_base_body():
+			continue # an imported model brings its own face (aelia_tests)
 		var id := String(character.id)
 		var body := character.outfit_body_mesh as ArrayMesh
 		var names := []
@@ -2858,6 +2997,8 @@ func face_tests() -> void:
 func outfit_tests() -> void:
 	var gs = root.get_node("GameState")
 	for character: CharacterData in gs.roster:
+		if not character.uses_base_body():
+			continue # an imported model wears its own clothes (aelia_tests)
 		var id := String(character.id)
 		var outfit := character.outfit_mesh as ArrayMesh
 		check("%s has an outfit" % id, outfit != null and character.outfit_body_mesh != null and outfit.get_surface_count() >= 2)

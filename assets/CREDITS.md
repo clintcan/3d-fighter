@@ -2,13 +2,14 @@
 
 Every third-party asset must be listed here. CC-BY assets must also appear on the in-game credits screen.
 
-Third-party assets are CC0, except the Permanent Marker font that `tools/build_logo.py` letters the logo with (Apache 2.0; it stays in `tools/fonts/` and isn't part of the game). Assets made for this project are © Clint Christopher Canada under
+Third-party assets are CC0, except the "Aelia" character model (CC-BY, credited in game) and the Permanent Marker font that `tools/build_logo.py` letters the logo with (Apache 2.0; it stays in `tools/fonts/` and isn't part of the game). Assets made for this project are © Clint Christopher Canada under
 [CC BY 4.0](../LICENSE-ASSETS.md) (marked below); the code is MIT ([LICENSE](../LICENSE)).
 
 | Asset | Path | Author | Source URL | License |
 |-------|------|--------|------------|---------|
 | Universal Base Characters (Standard/free): Superhero Male & Female bodies, textures | `assets/characters/base/` | Quaternius | https://quaternius.itch.io/universal-base-characters | CC0 1.0 |
 | Universal Base Characters hairstyles & eyebrows (rigged to head bone) | `assets/characters/hair/` | Quaternius | https://quaternius.itch.io/universal-base-characters | CC0 1.0 |
+| "Aelia Character Preview" (Aelia: mesh, skin/chainmail/eye textures; posed into a T-pose, weights moved onto the Quaternius skeleton, decimated from 107k to 40k triangles, armour materials retuned by `tools/aelia_blender.py` and `tools/build_aelia.gd`) | `assets/characters/aelia/` | Abinady10 | https://blendswap.com/blend/30219 | CC-BY (credited in game) |
 | Universal Animation Library (Standard/free), `UAL1_Standard.glb` | `assets/animations/` | Quaternius | https://quaternius.itch.io/universal-animation-library | CC0 1.0 |
 | Universal Animation Library 2 (Standard/free), `UAL2_Standard.glb` | `assets/animations/` | Quaternius | https://quaternius.itch.io/universal-animation-library-2 | CC0 1.0 |
 | Basement Boxing Ring HDRI (1k), used for ambient/reflection lighting only | `assets/stages/ring/basement_boxing_ring_1k.hdr` | Sergej Majboroda / Poly Haven | https://polyhaven.com/a/basement_boxing_ring | CC0 1.0 |

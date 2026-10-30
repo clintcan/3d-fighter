@@ -1,0 +1,92 @@
+[gd_resource type="Resource" script_class="CharacterData" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/characters/aelia/source/textures/aelia_piel.jpg" id="1_3xw0p"]
+[ext_resource type="PackedScene" path="res://assets/characters/aelia/aelia.scn" id="2_pb2wo"]
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="3_sjuo3"]
+[ext_resource type="Resource" path="res://data/moves/aelia/jab.tres" id="4_pwhea"]
+[ext_resource type="Resource" path="res://data/moves/aelia/straight.tres" id="5_b3ith"]
+[ext_resource type="Resource" path="res://data/moves/aelia/mid_kick.tres" id="6_f6b4g"]
+[ext_resource type="Resource" path="res://data/moves/aelia/roundhouse.tres" id="7_dt5ox"]
+[ext_resource type="Resource" path="res://data/moves/aelia/crouch_jab.tres" id="8_t6b3k"]
+[ext_resource type="Resource" path="res://data/moves/aelia/low_kick.tres" id="9_rfr7q"]
+[ext_resource type="Resource" path="res://data/moves/aelia/uppercut.tres" id="10_saga7"]
+[ext_resource type="Resource" path="res://data/moves/aelia/sweep.tres" id="11_klaqg"]
+[ext_resource type="Resource" path="res://data/moves/aelia/jump_jab.tres" id="12_l3tv0"]
+[ext_resource type="Resource" path="res://data/moves/aelia/jump_hammer.tres" id="13_a1px5"]
+[ext_resource type="Resource" path="res://data/moves/aelia/jump_kick.tres" id="14_yoh2k"]
+[ext_resource type="Resource" path="res://data/moves/aelia/flying_kick.tres" id="15_clsqq"]
+[ext_resource type="Resource" path="res://data/moves/aelia/gauntlet_drive.tres" id="16_xu7mi"]
+[ext_resource type="Resource" path="res://data/moves/aelia/spur_rake.tres" id="17_d4cra"]
+[ext_resource type="Resource" path="res://data/moves/aelia/shield_rush.tres" id="18_2pb5k"]
+[ext_resource type="Resource" path="res://data/moves/aelia/rising_gauntlet.tres" id="19_kbkcd"]
+[ext_resource type="Resource" path="res://data/moves/aelia/hammerfall.tres" id="20_leogv"]
+[ext_resource type="Resource" path="res://data/moves/aelia/emerald_oath.tres" id="21_pbf7v"]
+[ext_resource type="Resource" path="res://data/moves/aelia/oath_finish.tres" id="22_poh45"]
+[ext_resource type="Script" path="res://scripts/character_data.gd" id="23_kofx2"]
+[ext_resource type="Texture2D" path="res://assets/ui/portraits/aelia.png" id="23_pb2wo"]
+
+[resource]
+script = ExtResource("23_kofx2")
+id = &"aelia"
+display_name = "Aelia"
+archetype = "Knight"
+description = "Armoured knight. Wades through your attacks on super armour and hits back with gauntlet and plate."
+select_order = 7
+portrait = ExtResource("23_pb2wo")
+model_scene = ExtResource("2_pb2wo")
+body_albedo = ExtResource("1_3xw0p")
+model_scale = 1.04
+hair_color = Color(0.45, 0.18, 0.075, 1)
+alt_body_albedo = ExtResource("1_3xw0p")
+alt_hair_color = Color(0.88, 0.8, 0.6, 1)
+alt_material_colors = {
+"Aelia_Armour": Color(0.4, 0.07, 0.06, 1)
+}
+outfit_colors = PackedColorArray()
+alt_outfit_colors = PackedColorArray()
+realistic_shading = true
+victory_animations = Array[StringName]([&"fight/victory_oath", &"fight/victory_fist_pump"])
+placeholder_color = Color(0.25, 0.6, 0.3, 1)
+intro_animation = &"fight/intro_oath"
+intro_lines = PackedStringArray("I swore an oath. You will not pass.", "Strike me. I will still be standing.", "Steel and resolve. Show me yours.")
+win_quotes = PackedStringArray("My armour held. Did your resolve?", "Rise. Then train until you can break plate.", "An oath kept is a battle won.")
+rival_lines = {
+"brutus": ["Strength without discipline. I've seen it before.", "You hit hard. I hit last."],
+"lian": ["Turn my strikes if you can. They do not stop.", "You redirected the blow. Not the next one."]
+}
+combo_trials = Array[Dictionary]([{
+&"corner": false,
+&"name": "Jab String",
+&"steps": PackedStringArray("LP", "LP", "HP"),
+&"tip": "Jabs chain into each other and into the straight."
+}, {
+&"corner": false,
+&"name": "Spur and Shield",
+&"steps": PackedStringArray("6LK", "236P"),
+&"tip": "Hold forward: cancel the spur rake into Shield Rush."
+}, {
+&"corner": false,
+&"name": "Rising Gauntlet",
+&"steps": PackedStringArray("2LP", "2LP", "623P"),
+&"tip": "Low jabs, then cancel into Rising Gauntlet."
+}, {
+&"corner": true,
+&"name": "Gauntlet to the Wall",
+&"steps": PackedStringArray("6HP", "WALL", "LP", "HP"),
+&"tip": "Gauntlet Drive near the edge splats them: walk in and follow up."
+}, {
+&"corner": false,
+&"name": "Emerald Oath",
+&"steps": PackedStringArray("LP", "HP", "236236P"),
+&"tip": "With a full meter, cancel the straight into the super."
+}])
+max_health = 1050
+walk_speed = 1.7
+back_walk_speed = 1.35
+dash_speed = 5.0
+jump_velocity = 5.7
+weight = 1.2
+throw_damage = 140
+power_rating = 0.8
+speed_rating = 0.35
+moves = Array[ExtResource("3_sjuo3")]([ExtResource("4_pwhea"), ExtResource("5_b3ith"), ExtResource("6_f6b4g"), ExtResource("7_dt5ox"), ExtResource("8_t6b3k"), ExtResource("9_rfr7q"), ExtResource("10_saga7"), ExtResource("11_klaqg"), ExtResource("12_l3tv0"), ExtResource("13_a1px5"), ExtResource("14_yoh2k"), ExtResource("15_clsqq"), ExtResource("16_xu7mi"), ExtResource("17_d4cra"), ExtResource("18_2pb5k"), ExtResource("19_kbkcd"), ExtResource("20_leogv"), ExtResource("21_pbf7v"), ExtResource("22_poh45")])

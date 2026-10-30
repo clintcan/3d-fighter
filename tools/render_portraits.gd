@@ -17,7 +17,14 @@ const FACES := {
 	&"jin": {&"brow_down": 1.0, &"squint": 0.6}, # cold focus
 	&"mira": {&"smile": 1.0, &"squint": 0.3, &"brow_up": 0.25}, # grinning
 	&"lian": {&"smile": 0.3, &"brow_down": 0.45, &"squint": 0.3}, # calm, a little amused
+	&"aelia": {}, # her own head has no expression shapes (the model's face as made)
 }
+
+## Pose per fighter when the guard won't do ([clip, time, aim offset]): Aelia's short
+## forearms put her guard glove in front of her eyes, so she poses with the oath (fist on
+## the heart). The offset moves where the camera looks: her face sits further to the side
+## of her head bone, from this angle, than the base body's.
+const POSES := {&"aelia": [&"fight/victory_oath", 3.0, Vector3(0.07, 0, 0)]}
 
 
 func _initialize() -> void:
@@ -69,8 +76,9 @@ func _render(character: CharacterData) -> void:
 	var model := FighterModel.new()
 	vp.add_child(model)
 	model.build(character)
+	var pose: Array = POSES.get(character.id, [&"fight/guard", 0.5, Vector3.ZERO])
 	for i in 3:
-		model.show_clip(&"fight/guard", 0.5, 1.0, 1.0 / 60.0)
+		model.show_clip(pose[0], pose[1], 1.0, 1.0 / 60.0)
 		await process_frame
 
 	# Fighters face -Z; frame the head from a 3/4 front angle, at eye level: the guard
@@ -79,7 +87,7 @@ func _render(character: CharacterData) -> void:
 	var camera := Camera3D.new()
 	camera.fov = 30.0
 	vp.add_child(camera)
-	camera.look_at_from_position(head + Vector3(0.42, 0.04, -1.1), head + Vector3(0, 0.05, 0))
+	camera.look_at_from_position(head + Vector3(0.42, 0.04, -1.1), head + Vector3(0, 0.05, 0) + pose[2])
 	camera.current = true
 	turn_head(model, camera.global_position, HEAD_TURN)
 	var face: Dictionary = FACES.get(character.id, FighterModel.EXPRESSIONS[&"neutral"])

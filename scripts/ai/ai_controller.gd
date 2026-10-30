@@ -95,6 +95,13 @@ const PERSONALITIES := {
 		weights = {reversal = 1.0, glide = 1.5, poke = 1.2, string = 1.4, wait = 1.8, approach = 1.0,
 			retreat = 0.6, jump = 0.4, dash = 0.6, throw = 1.0},
 	},
+	&"aelia": {
+		name = "Knight", blurb = "walks through your attacks on super armour", preferred_range = 1.4,
+		aggression = 0.05, block = 0.0, punish = 0.1, anti_air = 0.15,
+		rising_anti_air = 0.75, pressure = 0.4, far_punish = 0.5, armor = 0.25,
+		weights = {rush = 1.1, approach = 1.6, ground_special = 1.4, poke = 1.0, string = 1.1, wait = 0.8,
+			retreat = 0.4, dash = 0.5, jump = 0.4, throw = 1.0},
+	},
 	&"brutus": {
 		name = "Punisher", blurb = "waits patiently, then punishes every mistake", preferred_range = 1.6,
 		aggression = -0.2, block = 0.15, punish = 0.2, anti_air = 0.0,
@@ -141,6 +148,7 @@ var _step_ticks_left := 0
 var _rolled_attack := ""
 var _rolled_punish := ""
 var _rolled_reversal := ""
+var _rolled_armor := ""
 var _blocking := false
 var _block_dir := 4
 var _block_level: MoveData.HitLevel = MoveData.HitLevel.MID
@@ -200,6 +208,7 @@ func reset() -> void:
 	_rolled_attack = ""
 	_rolled_punish = ""
 	_rolled_reversal = ""
+	_rolled_armor = ""
 	_blocking = false
 	_rolled_projectile = 0
 	_rolled_pressure = ""
@@ -222,7 +231,7 @@ func _choose_input(fighter: Fighter) -> int:
 	var seen_for_block := _perceived(block_reaction_frames)
 
 	# Reactive defense overrides any plan.
-	if _try_reversal(fighter, seen, dist):
+	if _try_reversal(fighter, seen, dist) or _try_armor(fighter, seen, dist):
 		return _next_plan_input()
 	if _wants_block_projectile(fighter):
 		_plan.clear()
@@ -481,6 +490,9 @@ func _decide(fighter: Fighter, seen: Dictionary, dist: float) -> void:
 		else:
 			_plan.append([5, 0, 10])
 		return
+	if _attack_phase(seen) == "threat" and (seen.move as MoveData).armor_hits > 0 and dist < THROW_RANGE:
+		_queue_throw() # don't strike into super armour up close: throws go through it
+		return
 
 	var options: Array = []
 	var projectile_move := _special_with(func(m: MoveData) -> bool: return m.projectile_speed > 0.0)
@@ -642,6 +654,41 @@ func _try_reversal(fighter: Fighter, seen: Dictionary, dist: float) -> bool:
 	_step_ticks_left = 0
 	_queue_special(reversal)
 	return true
+
+
+## Against a single strike seen early enough, sometimes answer with an armoured move
+## (the personality's `armor`): the armour takes the hit and the move lands its own.
+## Multi-hit moves, supers and grabs get through armour, so those are blocked. Seen with the
+## general reaction delay, like reversals; rolled once per attack. True if it was queued.
+func _try_armor(fighter: Fighter, seen: Dictionary, dist: float) -> bool:
+	var chance: float = personality.get("armor", 0.0)
+	if chance <= 0.0 or not fighter.is_actionable() or _attack_phase(seen) != "threat":
+		return false
+	var move: MoveData = seen.move
+	if move.hits > 1 or move.super_move or move.command_grab or move.hitbox_radius <= 0.0 or dist > reach(move) + 0.4:
+		return false
+	var attack_id := _attack_id(seen)
+	if attack_id == _rolled_armor:
+		return false
+	_rolled_armor = attack_id
+	if _rng.randf() >= chance:
+		return false
+	var lands_in: int = move.startup + 1 - (seen.state_frame + reaction_frames)
+	var drive := _move("6HP")
+	var rush := _special_with(func(m: MoveData) -> bool: return m.armor_hits > 0 and m.travel > 0.0)
+	# The armour must already be up when the hit lands (1 tick to press 6HP, 3 for 236P)
+	# and still up then (startup frames only).
+	if drive and drive.armor_hits > 0 and dist <= reach(drive) and lands_in >= 2 and lands_in <= 1 + drive.startup:
+		_plan.clear()
+		_step_ticks_left = 0
+		_queue_press(HP, 6)
+		return true
+	if rush and dist <= reach(rush) and lands_in >= 4 and lands_in <= 3 + rush.startup:
+		_plan.clear()
+		_step_ticks_left = 0
+		_queue_special(rush)
+		return true
+	return false
 
 
 ## The fighter's power-up stance while it can still gain focus and it's safe to take the

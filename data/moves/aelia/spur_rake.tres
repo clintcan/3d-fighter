@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/fighter/move_data.gd" id="1_prxa4"]
+
+[resource]
+script = ExtResource("1_prxa4")
+name = "Spur Rake"
+input = "6LK"
+animation = &"fight/sweep"
+animation_impact = 0.18
+startup = 8
+recovery = 14
+damage = 45
+hit_level = 2
+hitstun = 20
+blockstun = 12
+knockback = Vector2(1.4, 0)
+lunge = 2.0
+hitbox_radius = 0.2
+hitbox_offset = Vector3(0.08, 0.18, -0.85)
+cancel_into = Array[String](["236P"])

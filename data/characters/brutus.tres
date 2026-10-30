@@ -56,6 +56,7 @@ intro_expression = &"grin"
 intro_lines = PackedStringArray("I\'m gonna fold you in half.", "Step closer. I dare you.", "Hope you brought a mouthguard.")
 win_quotes = PackedStringArray("Stay down. It\'s easier.", "That\'s what happens when you stand in front of me.", "Next!")
 rival_lines = {
+"aelia": ["Nice armour. I'll dent it.", "Should've worn more of it."],
 "rhea": ["Stand still, you gnat!", "Caught you. Finally."],
 "valka": ["Let's see who's really the strongest.", "Nobody throws me around."]
 }

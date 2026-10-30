@@ -23,6 +23,9 @@ extends Resource
 ## Alternate look for mirror matches (P2 picks the same character).
 @export var alt_body_albedo: Texture2D
 @export var alt_hair_color: Color = Color.WHITE
+## Mirror matches, for models with their own materials (no generated outfit): material
+## name -> colour replacing that material's albedo colour (Aelia's armour).
+@export var alt_material_colors: Dictionary = {}
 ## Generated clothing (tools/build_outfits.gd): a skinned mesh on the body's skeleton with
 ## one surface per colour slot (main, trim, accent, extra), and the body with the covered
 ## skin removed so nothing pokes through.
@@ -79,3 +82,10 @@ extends Resource
 
 @export_group("Moves")
 @export var moves: Array[MoveData] = []
+
+
+## True for fighters built on the shared base bodies (assets/characters/base/), which get
+## generated outfits, detailed textures and expression shapes; false for an imported model
+## that brings its own (Aelia: her own mesh on the game skeleton, tools/build_aelia.gd).
+func uses_base_body() -> bool:
+	return model_scene != null and model_scene.resource_path.begins_with("res://assets/characters/base/")

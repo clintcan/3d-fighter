@@ -158,7 +158,7 @@ func _on_knockout(_fighter: Fighter) -> void:
 
 
 func _on_hit(_attacker: Fighter, defender: Fighter, move: MoveData, result: int) -> void:
-	if result == Fighter.HitResult.BLOCKED:
+	if result in [Fighter.HitResult.BLOCKED, Fighter.HitResult.ARMORED]:
 		excite(0.02, 0.5)
 		return
 	var combo := defender.combo_hits

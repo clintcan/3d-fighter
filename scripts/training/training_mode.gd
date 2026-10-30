@@ -122,7 +122,7 @@ func _on_tick() -> void:
 func _on_hit_landed(attacker: Fighter, defender: Fighter, move: MoveData, result: Fighter.HitResult) -> void:
 	if attacker != player:
 		return
-	if trial and result != Fighter.HitResult.BLOCKED:
+	if trial and result not in [Fighter.HitResult.BLOCKED, Fighter.HitResult.ARMORED]:
 		trial.hit(move)
 	_pending = {
 		name = move.name, startup = move.startup + 1, active = move.active, recovery = move.recovery,

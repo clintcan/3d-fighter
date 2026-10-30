@@ -14,6 +14,7 @@ const SFX := {
 	&"block": ["impactPlate_light_000", "impactPlate_light_001", "impactPlate_light_002", "impactPlate_light_003", "impactPlate_light_004"],
 	&"fall": ["impactSoft_heavy_000", "impactSoft_heavy_001", "impactSoft_heavy_002", "impactSoft_heavy_003", "impactSoft_heavy_004"],
 	&"bell": ["impactBell_heavy_000", "impactBell_heavy_001"],
+	&"armor": ["impactPlate_light_000", "impactPlate_light_002", "impactPlate_light_004"], # played pitched down
 	&"swing_light": ["swing_light.wav"],
 	&"swing_heavy": ["swing_heavy.wav"],
 	&"energy": ["energy.wav"],

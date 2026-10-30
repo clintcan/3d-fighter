@@ -38,6 +38,11 @@ const ROUTINES := {
 	&"lian": [["idle", 1.2], ["move", "6LP"], ["move", "6HP"], ["idle", 0.8], ["move", "214P"],
 		["clip", &"fight/reversal_throw", 0.85], ["idle", 0.7], ["move", "236P"], ["idle", 0.8],
 		["move", "236236P"], ["idle", 0.6], ["clip", &"fight/victory_bow", 3.4], ["idle", 1.0]],
+	# Knight: walks in, then the armoured moves: gauntlet drive, shield rush, rising
+	# gauntlet, hammerfall, and the oath.
+	&"aelia": [["idle", 1.2, &"fight/walk_guard", 0.6], ["move", "6HP"], ["idle", 0.7], ["move", "236P"],
+		["idle", 0.7], ["move", "623P"], ["idle", 0.8], ["move", "214P"], ["idle", 0.8],
+		["clip", &"fight/victory_oath", 3.2], ["idle", 1.0]],
 	# Punisher: waits with folded arms, then slams, charges, smashes, flexes.
 	&"brutus": [["idle", 2.2, &"ual2/Idle_FoldArms", 1.0], ["move", "214P"], ["idle", 1.6],
 		["move", "236P"], ["idle", 1.4], ["move", "6HP"], ["idle", 1.0],
