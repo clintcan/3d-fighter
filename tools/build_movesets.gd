@@ -255,7 +255,7 @@ const CHARACTERS := {
 			model_scene = "res://assets/characters/aelia/aelia.scn", # Blend Swap 30219 by Abinady10 (CC-BY), tools/build_aelia.gd
 			body_albedo = "res://assets/characters/aelia/source/textures/aelia_piel.jpg",
 			model_scale = 1.04, hair_color = Color(0.45, 0.18, 0.075), placeholder_color = Color(0.25, 0.6, 0.3)},
-		stats = {max_health = 1050, walk_speed = 1.7, back_walk_speed = 1.35, dash_speed = 5.0,
+		stats = {max_health = 1050, walk_speed = 1.85, back_walk_speed = 1.4, dash_speed = 5.0,
 			jump_velocity = 5.7, weight = 1.2, throw_damage = 140, power_rating = 0.8, speed_rating = 0.35,
 			realistic_shading = true,
 			victory_animations = [&"fight/victory_oath", &"fight/victory_fist_pump"],
@@ -271,7 +271,7 @@ const CHARACTERS := {
 		},
 		specials = {
 			# Armoured shoulder charge: shrugs off one hit on the way in.
-			"shield_rush": ["Shield Rush", "236P", &"fight/shoulder_charge", 0.15, 0.83, 14, 14, 24, 90, H.MID, 24, 18, 12, Vector2(4.5, 0), Vector3(0, 1.0, -0.6), 0.38,
+			"shield_rush": ["Shield Rush", "236P", &"fight/shoulder_charge", 0.15, 0.83, 14, 14, 21, 90, H.MID, 24, 18, 12, Vector2(4.5, 0), Vector3(0, 1.0, -0.6), 0.38,
 				{travel = 6.0, armor_hits = 1, chip_damage = 12, camera_intensity = 0.3}],
 			# Armoured (not invincible) rising uppercut: beats a single meaty hit, loses to throws.
 			"rising_gauntlet": ["Rising Gauntlet", "623P", &"fight/rising_uppercut", 0.09, 0.7, 6, 10, 16, 100, H.MID, 0, 18, 10, Vector2(1.0, 6.8), Vector3(-0.15, 1.55, -0.35), 0.38,

@@ -22,7 +22,7 @@ go through the armour with a second hit, or wait out her slow, punishable moves.
 
 | HP | Walk | Dash | Throw | Damage |
 |---|---|---|---|---|
-| 1050 | 1.7 | 5.0 | 140 | ×1.05 |
+| 1050 | 1.85 | 5.0 | 140 | ×1.05 |
 
 Base moves are one frame slower (the jabs stay at 4), with ×1.1 knockback.
 
@@ -32,7 +32,7 @@ Base moves are one frame slower (the jabs stay at 4), with ×1.1 knockback.
 |---|---|---|
 | 6HP | Gauntlet Drive | Armoured straight with a step (14 startup). Big push: splats near a wall. |
 | 6LK | Spur Rake | Quick low kick with the spurs. Cancels into Shield Rush. |
-| 236P | Shield Rush | Armoured shoulder charge (14 startup, travels 6 m/s). −15 on block. |
+| 236P | Shield Rush | Armoured shoulder charge (14 startup, travels 6 m/s). −16 on block. |
 | 623P | Rising Gauntlet | Rising uppercut that launches. Armoured, not invincible: beats a single meaty hit, loses to a throw or a second hit. |
 | 214P | Hammerfall | Slow two-fisted overhead with a shockwave. Armoured, knocks down. |
 | 236236P | Emerald Oath (super) | Five gauntlet punches while advancing, then the Hammerfall with a shockwave. |
@@ -54,13 +54,14 @@ Her signature mechanic, `MoveData.armor_hits`:
 
 ## Balance
 
-The balance sim (24 Hard CPU matches per pairing, dojo) has her at 53% overall: she beats
-the fighters who poke with single strikes (Jin 75%, Lian 96%), loses to rushdown and
-pressure that throws or hits twice (Rhea 23%, Mira 25%, Kenji 31%), and is even with the
-heavies (Brutus 65%, Valka 58%). Armour through the active frames as well made her 72%;
-it now covers the startup only, with Shield Rush 90 damage / 24 recovery and Rising
-Gauntlet +22 landing frames. (Lian's 4% here isn't Aelia's doing: v0.9.1 has Lian at
-6-16% against everyone in the same sim.)
+The balance sim on Hard (`balance_sim.gd -- 12 2 aelia dojo`: 24 matches per pairing)
+has her at 42% overall: Kenji 46%, Rhea 38%, Brutus 38%, Valka 42%, Jin 33%, Mira 46%,
+Lian 42%. Armour covers the startup only (through the active frames as well was far too
+strong), with Rising Gauntlet +22 landing frames. Before v0.10.0 she walked at 1.7 with a
+24-frame Shield Rush recovery: that was 41% with Jin beating her 79/21 (he out-poked her
+slow walk) and Brutus 71/29, so she now walks at 1.85 and Shield Rush recovers in 21
+(−16 on block). Her first tuning used numbers from a run that was accidentally on Easy
+(the sim reads the difficulty as a number).
 
 ## Animations
 

@@ -75,6 +75,9 @@ Balance simulator (`tools/balance_sim.gd -- 10 2 lian`, Hard, 20 matches per pai
 - **Result:** about 41–42% overall. She beats Brutus and Mira and loses to Jin, Rhea and
   Valka, whose long kicks, speed and grabs are what a counter fighter struggles with. The
   runs are noisy (about ±11% per pairing).
+- **Checked again for v0.10.0** (`-- 12 2 lian dojo`, Hard, 24 per pairing, with Aelia):
+  46% overall (Kenji 58%, Rhea 25%, Brutus 58%, Valka 33%, Jin 42%, Mira 42%, Aelia 58%).
+  A report that she had collapsed to 0–16% came from a run accidentally on Easy.
 
 A fix found along the way: specials whose motion starts with 2 (236, 214) used to set the
 crouching hurtbox, so highs whiffed over every fireball and charge startup. Only crouching

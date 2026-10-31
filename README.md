@@ -9,14 +9,16 @@ Its signature is a **dynamic action camera** that orbits and dollies in on every
 
 ## Features
 
-- **7 fighters**, each with normals, motion-input specials, a super and a distinct CPU personality (design notes in [docs/characters](docs/characters/README.md)):
+- **8 fighters**, each with normals, motion-input specials, a super and a distinct CPU personality (design notes in [docs/characters](docs/characters/README.md)):
   - **Kenji**: zoner;
   - **Rhea**: rushdown;
   - **Brutus**: punisher;
   - **Valka**: grappler with an unblockable command grab;
   - **Jin**: Tae Kwon Do kicker who controls kick range;
-  - **Mira**: street brawler who powers up with Lakas Stance (Focus) until her rushes hit like a typhoon.
-- **Outfits** that fit each style: a karate gi with headband, a Tae Kwon Do dobok, kickboxing gear, a wrestling singlet with knee pads and boots, a brawler's tank top and work pants, a street fighter's zip-up, track pants and sneakers. Woven fabric textures, stitched hems and skin detail hold up in close-ups. Mirror matches get alternate colours.
+  - **Mira**: street brawler who powers up with Lakas Stance (Focus) until her rushes hit like a typhoon;
+  - **Lian**: Wing Chun counter fighter who catches strikes with a reversal stance and throws the attacker;
+  - **Aelia**: armoured knight whose heaviest moves shrug off a hit (super armour).
+- **Outfits** that fit each style: a karate gi with headband, a Tae Kwon Do dobok, kickboxing gear, a wrestling singlet with knee pads and boots, a brawler's tank top and work pants, a street fighter's zip-up, track pants and sneakers, a kung fu jacket, and a knight's plate armour. Loose clothes hang and fold like cloth (wide gi sleeves, bloused jackets, baggy pants). Woven fabric textures, stitched hems and skin detail hold up in close-ups. Mirror matches get alternate colours.
 - **8 stages**: Boxing Ring, Dojo, Rooftop, Temple, Beach, Night Market, the Express (a fight on the roof of a speeding train) and the Kowloon Courtyard, where the sun rises round by round, the neighbours come out to watch and jets roar in low overhead. Each has its own music and ambient life (crowds, flames, smoke, rain, neon, passing trains, pigeons).
 - **Modes**: Vs CPU, Arcade (ladder, scoring, shadow boss), local 2-player Versus, **Online** (rollback netcode, LAN discovery, join by IP, or an internet lobby server with rooms and spectating), Training (frame data, input display, record/playback, and combo trials with a "show me" demo) and a Demo of two CPU fighters on a random stage. Finished matches are saved as **replays** (pause, frame step, slow motion, seeking).
 - **Fighting-game systems**: super meter with cinematic super freezes, counter hits, combos, juggles, wall splats and rope bounces at the stage edge, throws and throw breaks, high/mid/low blocking, and Tekken-style sidesteps.
@@ -96,9 +98,10 @@ tests/     headless simulation tests
 
 ## Credits
 
-All third-party assets in the game are CC0, credited in [assets/CREDITS.md](assets/CREDITS.md) (the logo is lettered with the Permanent Marker font, Apache 2.0, kept in `tools/fonts/`):
+Third-party assets in the game are CC0 except Aelia's model (CC BY), all credited in [assets/CREDITS.md](assets/CREDITS.md) (the logo is lettered with the Permanent Marker font, Apache 2.0, kept in `tools/fonts/`):
 
 - **Characters and animations:** [Quaternius](https://quaternius.com).
+- **Aelia's model:** "Aelia Character Preview" by Abinady10 ([Blend Swap 30219](https://blendswap.com/blend/30219)), CC BY; rigged, posed and recoloured for the game.
 - **Skies and textures:** [Poly Haven](https://polyhaven.com).
 - **Sounds and announcer:** [Kenney](https://kenney.nl).
 - **Music and voices:** [OpenGameArt](https://opengameart.org) artists.
@@ -111,4 +114,4 @@ Made with [Godot Engine](https://godotengine.org).
 
 - **Code:** [MIT License](LICENSE).
 - **Original assets** (stages, generated animations, portraits, key art and logo, synthesized sounds): [CC BY 4.0](LICENSE-ASSETS.md).
-- **Third-party assets:** keep their own licenses (CC0; the logo tool's font is Apache 2.0); see [assets/CREDITS.md](assets/CREDITS.md).
+- **Third-party assets:** keep their own licenses (CC0, Aelia's model CC BY; the logo tool's font is Apache 2.0); see [assets/CREDITS.md](assets/CREDITS.md).

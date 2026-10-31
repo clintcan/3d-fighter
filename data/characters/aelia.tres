@@ -81,8 +81,8 @@ combo_trials = Array[Dictionary]([{
 &"tip": "With a full meter, cancel the straight into the super."
 }])
 max_health = 1050
-walk_speed = 1.7
-back_walk_speed = 1.35
+walk_speed = 1.85
+back_walk_speed = 1.4
 dash_speed = 5.0
 jump_velocity = 5.7
 weight = 1.2

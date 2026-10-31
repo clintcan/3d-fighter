@@ -32,7 +32,8 @@ On the character select screen each player picks in turn with
 Light Punch (select) and Heavy Punch (back).
 
 STAGES: after picking fighters, choose the Boxing Ring, the Dojo, the Rooftop,
-the Temple, the Beach, the Night Market, the Express or Random.
+the Temple, the Beach, the Night Market, the Express, the Kowloon
+Courtyard or Random.
 
 ARCADE - choose "Arcade" in the main menu
 Fight your way up a ladder of CPU opponents to the final boss: your own
@@ -124,9 +125,12 @@ CREDITS
 -------
 Made with Godot Engine (MIT License) - https://godotengine.org
 
-All third-party assets are CC0 (public domain), credited with thanks:
+Third-party assets are CC0 (public domain) except Aelia's model (CC BY),
+credited with thanks:
 - Characters & animations: Quaternius - Universal Base Characters,
   Universal Animation Library 1 & 2 - https://quaternius.com
+- Aelia: "Aelia Character Preview" by Abinady10 -
+  https://blendswap.com/blend/30219 (CC BY; rigged, posed and recoloured)
 - Stage lighting & textures: Poly Haven - "Basement Boxing Ring" HDRI by
   Sergej Majboroda; Terlenka, Fabric Leather 02, Concrete Floor Worn 001
   - https://polyhaven.com; Dojo: Tatami Mat, Hinoki Planks, Japanese Cedar
@@ -178,4 +182,4 @@ sounds were created for this project. The logo is lettered with the
 
 LICENSE: code (c) 2026 Clint Christopher Canada, MIT License. Original
 assets (c) 2026 Clint Christopher Canada, CC BY 4.0
-(https://creativecommons.org/licenses/by/4.0/). Third-party assets: CC0.
+(https://creativecommons.org/licenses/by/4.0/). Third-party assets: CC0, Aelia's model CC BY.
