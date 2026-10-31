@@ -60,6 +60,8 @@ var model: FighterModel
 var data: CharacterData
 var pivot: Node3D
 var fx_parent: Node3D
+var side := 1.0 # -1 mirrors the turn (the main menu's fighters on the right face left)
+var loops := 0 # times the routine has run to its end
 
 var _steps: Array = []
 var _moves := {}
@@ -95,7 +97,7 @@ func restart() -> void:
 func process(delta: float) -> void:
 	var step: Array = _steps[_index]
 	_time += delta
-	var target_angle := REST_ANGLE
+	var target_angle := REST_ANGLE * side
 	var face := &"neutral"
 	match step[0]:
 		"idle":
@@ -109,7 +111,7 @@ func process(delta: float) -> void:
 			if _time >= step[2]:
 				_next()
 		"move":
-			target_angle = ATTACK_ANGLE
+			target_angle = ATTACK_ANGLE * side
 			var move: MoveData = _moves.get(step[1])
 			if move:
 				face = _move_face(move)
@@ -188,6 +190,8 @@ func _next() -> void:
 	if step[0] == "move" and String(step[1]).begins_with("~"):
 		_steps[_index] = ROUTINES[data.id][_index].duplicate()
 	_index = (_index + 1) % _steps.size()
+	if _index == 0:
+		loops += 1
 	_begin_step()
 
 

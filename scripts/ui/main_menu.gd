@@ -17,7 +17,6 @@ const REPLAYS_SCENE := "res://scenes/replays.tscn"
 @onready var credits_button: Button = %CreditsButton
 
 
-const WALLPAPER := "res://assets/ui/wallpaper.png"
 const LOGO := "res://assets/ui/logo.png" # the brush title, from tools/build_logo.py
 const LOGO_SIZE := Vector2(900, 167)
 
@@ -126,25 +125,30 @@ func _online_smoke_test() -> bool:
 	return false
 
 
-## Key art behind the menu, darkened toward the center so the buttons stay readable.
+## Behind the menu: fighters in close-up running their routines (MenuShowcase), with a
+## dark band down the middle so the buttons stay readable. Smoke tests leave straight
+## away, so they skip it.
 func _add_wallpaper() -> void:
-	var art := TextureRect.new()
-	art.texture = load(WALLPAPER)
-	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	art.set_anchors_preset(Control.PRESET_FULL_RECT)
-	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(art)
-	move_child(art, 1) # just above the background color
+	var back: Control
+	if "--smoke-test" in OS.get_cmdline_user_args():
+		back = Control.new()
+	else:
+		back = MenuShowcase.new()
+		back.name = "Showcase"
+	back.set_anchors_preset(Control.PRESET_FULL_RECT)
+	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(back)
+	move_child(back, 1) # just above the background color
 	var shade := TextureRect.new()
 	var gradient := Gradient.new()
-	gradient.set_color(0, Color(0.02, 0.02, 0.04, 0.82))
-	gradient.set_color(1, Color(0.02, 0.02, 0.04, 0.35))
+	gradient.offsets = PackedFloat32Array([0.0, 0.3, 0.5, 0.7, 1.0])
+	var clear := Color(0.02, 0.02, 0.04, 0.0)
+	var dark := Color(0.02, 0.02, 0.04, 0.8)
+	gradient.colors = PackedColorArray([clear, clear, dark, clear, clear])
 	var tex := GradientTexture2D.new()
 	tex.gradient = gradient
-	tex.fill = GradientTexture2D.FILL_RADIAL
-	tex.fill_from = Vector2(0.5, 0.5)
-	tex.fill_to = Vector2(1.1, 0.5)
+	tex.width = 256
+	tex.height = 1
 	shade.texture = tex
 	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	shade.stretch_mode = TextureRect.STRETCH_SCALE

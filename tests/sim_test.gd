@@ -1702,6 +1702,28 @@ func showcase_tests() -> void:
 		progressed.append(steps_seen.size() >= 4 and show.data == gs.roster[i])
 	check("Character select: each fighter performs a personality routine", not progressed.has(false), str(progressed))
 
+	# The main menu shows fighters in close-up, one after another, everyone before a repeat.
+	change_scene_to_file("res://scenes/main_menu.tscn")
+	await process_frame; await process_frame
+	var menu_show := current_scene.get_node_or_null("Showcase") as MenuShowcase
+	check("Main menu: a fighter showcase plays behind the buttons", menu_show != null and menu_show.model != null and menu_show.showcase != null)
+	if menu_show:
+		var frames := 0
+		Engine.time_scale = 20.0 # shots last seconds; tweens and _process both follow the scale
+		while menu_show.shown.size() <= gs.roster.size() and frames < 6000:
+			await process_frame
+			frames += 1
+		Engine.time_scale = 1.0
+		var first_round: Array = menu_show.shown.slice(0, gs.roster.size())
+		var unique := {}
+		for c in first_round:
+			unique[c] = true
+		var repeats := false
+		for i in range(1, menu_show.shown.size()):
+			repeats = repeats or menu_show.shown[i] == menu_show.shown[i - 1]
+		check("Main menu: the showcase shows every fighter once before repeating, never twice in a row",
+			unique.size() == gs.roster.size() and not repeats, str(menu_show.shown.map(func(c: CharacterData) -> StringName: return c.id)))
+
 
 func loading_tests() -> void:
 	var gs = root.get_node("GameState")
