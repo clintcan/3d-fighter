@@ -16,6 +16,7 @@ const FIGHT_SCENE := "res://scenes/fight.tscn"
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const ONLINE_MENU_SCENE := "res://scenes/online_menu.tscn"
 const HEALTH_SCALE := 1200.0 # max_health shown as a full bar
+const PORTRAIT_INSET := 5 # px between a tile's edge and its portrait: the focused border is 5 px wide
 
 @onready var roster_box: GridContainer = %Roster
 @onready var viewport: SubViewport = %Viewport
@@ -244,11 +245,27 @@ func _make_portrait_button(character: CharacterData) -> Button:
 	var rows := ceili(float(count) / _columns())
 	var side := clampf((760.0 - 18.0 * (rows - 1)) / rows, 140.0, 240.0)
 	button.custom_minimum_size = Vector2(side, side)
-	button.icon = character.portrait
-	button.expand_icon = true
-	button.text = character.display_name
-	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
-	button.add_theme_font_size_override("font_size", 26)
+	button.clip_contents = true
+	# The portrait fills the tile inside the border, with the name over its lower edge. (As
+	# the button's icon it shared the width with the name, so a longer name shrank the face
+	# and pushed it into a corner.)
+	var portrait := TextureRect.new()
+	portrait.texture = character.portrait
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, PORTRAIT_INSET)
+	button.add_child(portrait)
+	var label := Label.new()
+	label.text = character.display_name
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 26)
+	label.add_theme_constant_override("outline_size", 8)
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE, Control.PRESET_MODE_MINSIZE, PORTRAIT_INSET)
+	label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	button.add_child(label)
 
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = character.placeholder_color.darkened(0.7)

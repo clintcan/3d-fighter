@@ -20,11 +20,11 @@ const FACES := {
 	&"aelia": {}, # her own head has no expression shapes (the model's face as made)
 }
 
-## Pose per fighter when the guard won't do ([clip, time, aim offset]): Aelia's short
-## forearms put her guard glove in front of her eyes, so she poses with the oath (fist on
-## the heart). The offset moves where the camera looks: her face sits further to the side
-## of her head bone, from this angle, than the base body's.
-const POSES := {&"aelia": [&"fight/victory_oath", 3.0, Vector3(0.07, 0, 0)]}
+## Pose per fighter when the guard won't do ([clip, time, aim offset, camera distance
+## factor]): Aelia's short forearms put her guard glove in front of her eyes, so she poses
+## with the oath (fist on the heart). The offset and distance put her face, smaller than
+## the base body's, at the same size and place in the frame as everyone else's.
+const POSES := {&"aelia": [&"fight/victory_oath", 3.0, Vector3(-0.03, -0.02, 0), 0.8]}
 
 
 func _initialize() -> void:
@@ -87,7 +87,9 @@ func _render(character: CharacterData) -> void:
 	var camera := Camera3D.new()
 	camera.fov = 30.0
 	vp.add_child(camera)
-	camera.look_at_from_position(head + Vector3(0.42, 0.04, -1.1), head + Vector3(0, 0.05, 0) + pose[2])
+	var aim: Vector3 = head + Vector3(0, 0.05, 0) + pose[2]
+	var zoom: float = pose[3] if pose.size() > 3 else 1.0
+	camera.look_at_from_position(aim + (Vector3(0.42, -0.01, -1.1)) * zoom, aim)
 	camera.current = true
 	turn_head(model, camera.global_position, HEAD_TURN)
 	var face: Dictionary = FACES.get(character.id, FighterModel.EXPRESSIONS[&"neutral"])

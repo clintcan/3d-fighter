@@ -367,6 +367,7 @@ func _initialize() -> void:
 	await replay_tests()
 	await controls_tests()
 	await outfit_tests()
+	await hair_tests()
 	await rollback_tests()
 	await net_tests()
 	await server_tests()
@@ -3036,6 +3037,84 @@ func face_tests() -> void:
 ## Generated clothing (tools/build_outfits.gd): every fighter is dressed, the outfit is
 ## a valid skinned mesh on the body's skin, the covered skin is removed, and mirror
 ## matches get the alternate colours.
+## Hair motion: the rigged pieces (tools/build_hair_motion.gd) replace the originals, add
+## their spring bones under the Head, keep the crown on the Head, and the simulator swings
+## the ends but restarts from the pose after a cut.
+func hair_tests() -> void:
+	var gs = root.get_node("GameState")
+	var moving := {&"valka": true, &"mira": true, &"rhea": true}
+	for character: CharacterData in gs.roster:
+		var model := FighterModel.new()
+		root.add_child(model)
+		model.build(character)
+		var id := String(character.id)
+		var springs := model.hair_springs
+		if not moving.has(character.id):
+			check("%s has no hair springs (short or stiff hair)" % id, springs == null)
+			model.free()
+			continue
+		check("%s has hair springs" % id, springs != null and springs.setting_count >= 5, "%s" % [springs])
+		if springs == null:
+			model.free()
+			continue
+		var sk := model.skeleton
+		var head := sk.find_bone("Head")
+		var bones := []
+		for i in springs.setting_count:
+			bones.append(sk.find_bone(springs.get_root_bone_name(i)))
+		check("%s: spring bones hang from the Head, each capped by the limiter after the springs" % id,
+			bones.all(func(b: int) -> bool: return b >= 0 and sk.get_bone_parent(b) == head)
+			and model._hair_limit and Array(model._hair_limit.bones) == bones
+			and model._hair_limit.get_index() > springs.get_index())
+		var hair: MeshInstance3D
+		for mesh: MeshInstance3D in sk.find_children("*", "MeshInstance3D", true, false):
+			if mesh.has_meta(&"spring_chains"):
+				hair = mesh
+		var weights_ok := hair != null
+		var crown_ok := hair != null
+		var swinging := 0
+		if hair:
+			var arrays := hair.mesh.surface_get_arrays(0)
+			var vb: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+			var vw: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var head_bind := -1
+			for b in hair.skin.get_bind_count():
+				if hair.skin.get_bind_name(b) == &"Head":
+					head_bind = b
+			for v in verts.size():
+				var total := vw[v * 4] + vw[v * 4 + 1] + vw[v * 4 + 2] + vw[v * 4 + 3]
+				weights_ok = weights_ok and absf(total - 1.0) < 0.001
+				for k in 4:
+					weights_ok = weights_ok and vb[v * 4 + k] < hair.skin.get_bind_count()
+				if vw[v * 4] < 0.999:
+					swinging += 1
+				if verts[v].y > 1.7: # well above the chains' tops (1.64-1.66)
+					crown_ok = crown_ok and vb[v * 4] == head_bind and vw[v * 4] > 0.999
+		check("%s: hair weights are valid and the crown stays on the Head" % id, weights_ok and crown_ok and swinging > 200, "%d swinging vertices" % swinging)
+
+		# The ends sag and swing, measured where the simulator's result is visible.
+		var worst := [0.0]
+		var on_update := func() -> void:
+			var hp := sk.get_bone_global_pose(head)
+			var w := 0.0
+			for b: int in bones:
+				w = maxf(w, rad_to_deg((hp * sk.get_bone_rest(b)).basis.y.normalized().angle_to(sk.get_bone_global_pose(b).basis.y.normalized())))
+			worst[0] = w
+		sk.skeleton_updated.connect(on_update)
+		var peak := 0.0
+		for f in 40:
+			model.show_clip(&"fight/guard", -1.0, 1.0, 1.0 / 60.0)
+			await process_frame
+			peak = maxf(peak, worst[0])
+		check("%s: the hair settles under gravity in the guard" % id, worst[0] > 2.0 and peak < 60.0, "now %.1f°, peak %.1f°" % [worst[0], peak])
+		model.position = Vector3(3, 0, 0) # placed, as for a new round: a cut, not motion
+		model.show_clip(&"fight/guard", -1.0, 1.0, 1.0 / 60.0)
+		await process_frame
+		check("%s: a cut restarts the hair from the pose" % id, worst[0] < 5.0, "%.1f°" % worst[0])
+		model.free()
+
+
 func outfit_tests() -> void:
 	var gs = root.get_node("GameState")
 	for character: CharacterData in gs.roster:

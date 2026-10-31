@@ -111,10 +111,25 @@ const VOICE_BLEND := 10.0 # how fast the voice takes over the jaw from the expre
 const FLASH_SHADER := preload("res://scripts/fighter/hit_flash.gdshader")
 const FLASH_CORE := 0.02 # share of the hit flash across the middle of the body (1 at the edge); it adds in linear light, so more than a few percent washes a fighter out in a dark stage
 
+const HAIR_MOTION_DIR := "res://assets/characters/hair/motion/" # hair pieces rigged with spring chains (tools/build_hair_motion.gd)
+const HAIR_STIFFNESS := 2.5 # pull back toward the animated pose
+const HAIR_DRAG := 0.5
+const HAIR_GRAVITY := 1.0
+const HAIR_RADIUS := 0.015 # of each chain's end, for the colliders
+const HAIR_SKULL_OFFSET := Vector3(0.0, 0.08, 0.01) # skull centre from the Head bone, skeleton space (T-pose)
+const HAIR_SKULL_RADIUS := 0.085
+const HAIR_NECK_RADIUS := 0.05 # neck and shoulder joints
+const HAIR_MAX_SWING := deg_to_rad(45.0) # HairLimit: a chain never trails further than this from its place on the head
+const HAIR_CUT_DISTANCE := 0.5 # metres the head moves in one frame: the fighter was placed (a new round), so the hair starts again from the pose
+
 const CONTACT_BONES :=[&"foot_l", &"foot_r", &"ball_l", &"ball_r"]
 const SOLE_BELOW_ORIGIN := 0.01
 
 var skeleton: Skeleton3D
+var hair_springs: SpringBoneSimulator3D # null without hair rigged for motion
+var _hair_limit: HairLimit
+var _hair_head := Transform3D() # the head's last world transform, to spot cuts
+var _hair_started := false
 var player: AnimationPlayer
 var _body: Node3D
 var _clip: StringName
@@ -219,6 +234,8 @@ func show_clip(clip: StringName, time: float, speed: float, delta: float) -> voi
 		player.speed_scale = speed
 		player.advance(delta)
 	_keep_feet_above_floor()
+	if hair_springs:
+		_check_hair_cut()
 
 
 ## The UAL clips were authored for slightly different proportions and sink these bodies'
@@ -362,15 +379,90 @@ func _add_skin_detail(skin: StandardMaterial3D) -> void:
 
 func _attach_skinned(scene: PackedScene, base_path: String) -> void:
 	# Hair pieces are rigged to the same skeleton (Head bone). Move their meshes onto our
-	# skeleton; skins bind by bone name.
+	# skeleton; skins bind by bone name. A piece rigged for motion (tools/build_hair_motion.gd)
+	# replaces the original and brings its spring bones.
+	var piece_path := scene.resource_path
+	var motion_path := HAIR_MOTION_DIR + piece_path.get_file().get_basename() + ".scn"
+	if ResourceLoader.exists(motion_path):
+		scene = load(motion_path)
 	var piece := scene.instantiate()
 	for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+		var chains: Array = mesh.get_meta(&"spring_chains", [])
+		_add_hair_springs(chains)
 		mesh.owner = null
 		mesh.get_parent().remove_child(mesh)
 		skeleton.add_child(mesh)
 		mesh.skeleton = mesh.get_path_to(skeleton)
-		_use_face_piece(mesh, base_path, scene.resource_path)
+		_use_face_piece(mesh, base_path, piece_path)
 	piece.free()
+
+
+## Adds a hair piece's spring chains (bones hanging from the Head) to the skeleton and lets
+## a SpringBoneSimulator3D swing them: the ends lag behind the head, settle under gravity
+## and bounce on hits. Colliders keep them out of the skull, neck, shoulders and the floor;
+## HairLimit, after the simulator, stops a fast head move leaving them trailing through the
+## skull (a fight has several such moves a second, too many to restart the hair on).
+## Cosmetic only; the simulation never reads bones.
+func _add_hair_springs(chains: Array) -> void:
+	if chains.is_empty():
+		return
+	var head := skeleton.find_bone("Head")
+	if not hair_springs:
+		hair_springs = SpringBoneSimulator3D.new()
+		hair_springs.name = "HairSprings"
+		skeleton.add_child(hair_springs)
+		_add_hair_colliders(head)
+		_hair_limit = HairLimit.new()
+		_hair_limit.name = "HairLimit"
+		_hair_limit.max_angle = HAIR_MAX_SWING
+		skeleton.add_child(_hair_limit) # modifiers run in child order: after the springs
+	var first := hair_springs.setting_count
+	hair_springs.setting_count = first + chains.size()
+	for i in chains.size():
+		var chain: Dictionary = chains[i]
+		var bone := skeleton.get_bone_count()
+		skeleton.add_bone(chain.name)
+		skeleton.set_bone_parent(bone, head)
+		skeleton.set_bone_rest(bone, chain.rest)
+		skeleton.reset_bone_pose(bone)
+		_hair_limit.bones.append(bone)
+		var s := first + i
+		hair_springs.set_root_bone_name(s, chain.name)
+		hair_springs.set_end_bone_name(s, chain.name)
+		hair_springs.set_extend_end_bone(s, true)
+		hair_springs.set_end_bone_direction(s, SkeletonModifier3D.BONE_DIRECTION_PLUS_Y)
+		hair_springs.set_end_bone_length(s, chain.length)
+		hair_springs.set_radius(s, HAIR_RADIUS)
+		hair_springs.set_stiffness(s, HAIR_STIFFNESS)
+		hair_springs.set_drag(s, HAIR_DRAG)
+		hair_springs.set_gravity(s, HAIR_GRAVITY)
+
+
+## When the fighter is placed somewhere else (a new round, a training reset) the hair
+## restarts from the pose instead of swinging across the gap.
+func _check_hair_cut() -> void:
+	var head := skeleton.global_transform * skeleton.get_bone_global_pose(_head_bone)
+	if not _hair_started or head.origin.distance_to(_hair_head.origin) > HAIR_CUT_DISTANCE:
+		hair_springs.reset()
+	_hair_started = true
+	_hair_head = head
+
+
+func _add_hair_colliders(head: int) -> void:
+	var head_rest := skeleton.get_bone_global_rest(head)
+	var skull := SpringBoneCollisionSphere3D.new()
+	skull.bone = head
+	skull.position_offset = head_rest.basis.inverse() * HAIR_SKULL_OFFSET
+	skull.radius = HAIR_SKULL_RADIUS
+	hair_springs.add_child(skull)
+	for bone_name: StringName in [&"neck_01", &"upperarm_l", &"upperarm_r"]:
+		var sphere := SpringBoneCollisionSphere3D.new()
+		sphere.bone = skeleton.find_bone(bone_name)
+		sphere.radius = HAIR_NECK_RADIUS
+		hair_springs.add_child(sphere)
+	var floor_plane := SpringBoneCollisionPlane3D.new() # the floor, in world space
+	floor_plane.top_level = true
+	hair_springs.add_child(floor_plane)
 
 
 ## Swaps the body's skin texture and tints hair, working on per-instance material copies.

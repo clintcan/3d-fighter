@@ -12,7 +12,8 @@ const SHOT_MIN := 7.0 # a short routine plays on until here
 const FADE := 0.4
 const POSE_HOLD := 0.15 # seconds held black after a swap: the new model's first frames are its rest pose
 const DISTANCE := Vector2(3.5, 2.9) # camera distance at the start / end of a shot
-const AIM_HEIGHT := 1.2
+const HEAD_ABOVE_AIM := 0.4 # the camera aims this far below the fighter's head (rest pose), so every head sits on the same line
+const ZOOM := {&"aelia": 0.9} # camera distance factor: she is slimmer than the base bodies (shoulders 0.27 m vs 0.30) and looked further away
 const SIDE_OFFSET := 1.0 # Camera3D.h_offset: puts the fighter beside the buttons
 const ORBIT := 0.12 # radians the camera drifts round over a shot
 
@@ -29,6 +30,8 @@ var _shade: ColorRect
 var _bag: Array[CharacterData] = []
 var _rng := RandomNumberGenerator.new()
 var _side := 1.0
+var _aim_height := 1.2
+var _zoom := 1.0
 var _time := 0.0
 var _swapping := false
 
@@ -95,6 +98,8 @@ func _show_next() -> void:
 	showcase.side = _side
 	rim.light_color = character.placeholder_color.lerp(Color.WHITE, 0.25)
 	shown.append(character)
+	_zoom = ZOOM.get(character.id, 1.0)
+	_aim_height = head_height(model) - HEAD_ABOVE_AIM * _zoom # a closer camera aims closer to the head: same line on screen
 	_time = 0.0
 	_place_camera()
 
@@ -119,13 +124,22 @@ func _next_fighter() -> CharacterData:
 func _place_camera() -> void:
 	var t := clampf(_time / SHOT_MAX, 0.0, 1.0)
 	var eased := t * t * (3.0 - 2.0 * t)
-	var distance := lerpf(DISTANCE.x, DISTANCE.y, eased)
+	var distance := lerpf(DISTANCE.x, DISTANCE.y, eased) * _zoom
 	var angle := (eased - 0.5) * ORBIT * _side
-	var aim := Vector3(0, AIM_HEIGHT, 0)
+	var aim := Vector3(0, _aim_height, 0)
 	camera.position = aim + Vector3(sin(angle), 0.08, -cos(angle)) * distance
 	camera.look_at(aim)
 	# The fighter on the left (side 1) faces screen right, toward the buttons.
 	camera.h_offset = SIDE_OFFSET * _side
+
+
+## Height of the model's head bone in its rest pose (scaled), above the floor.
+static func head_height(fighter: FighterModel) -> float:
+	var skeleton := fighter.skeleton
+	var head := skeleton.find_bone("Head")
+	if head < 0:
+		return 1.6
+	return (skeleton.global_transform * skeleton.get_bone_global_rest(head)).origin.y - fighter.global_position.y
 
 
 func _build_stage(low_graphics: bool) -> void:
