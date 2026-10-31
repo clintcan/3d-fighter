@@ -108,7 +108,7 @@ func _render(character: CharacterData) -> void:
 
 
 ## Turns the head part of the way toward `target` (world), on top of the pose, so the eyes
-## can reach the viewer: the guard holds it down and away. Also used by render_wallpaper.gd.
+## can reach the viewer: the guard holds it down and away.
 static func turn_head(model: FighterModel, target: Vector3, share: float) -> void:
 	var skeleton := model.skeleton
 	var bone := skeleton.find_bone("Head")

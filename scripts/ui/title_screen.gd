@@ -35,7 +35,7 @@ func _ready() -> void:
 	box.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	box.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	box.offset_bottom = -18 # below the fighters' name plates
+	box.offset_bottom = -18 # near the bottom, well below the logo
 	box.add_theme_constant_override("separation", 5)
 	box.modulate.a = 0.0
 	add_child(box)
