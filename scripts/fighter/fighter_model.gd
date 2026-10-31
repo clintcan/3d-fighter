@@ -108,7 +108,10 @@ const VOICE_JAW := 1.0 # jaw_open at the loudest point of a clip
 const VOICE_FOLLOW := 30.0 # how fast the jaw follows the envelope
 const VOICE_BLEND := 10.0 # how fast the voice takes over the jaw from the expression and back
 
-const CONTACT_BONES := [&"foot_l", &"foot_r", &"ball_l", &"ball_r"]
+const FLASH_SHADER := preload("res://scripts/fighter/hit_flash.gdshader")
+const FLASH_CORE := 0.02 # share of the hit flash across the middle of the body (1 at the edge); it adds in linear light, so more than a few percent washes a fighter out in a dark stage
+
+const CONTACT_BONES :=[&"foot_l", &"foot_r", &"ball_l", &"ball_r"]
 const SOLE_BELOW_ORIGIN := 0.01
 
 var skeleton: Skeleton3D
@@ -116,7 +119,7 @@ var player: AnimationPlayer
 var _body: Node3D
 var _clip: StringName
 var _contacts := {} # bone index -> rest height above the sole
-var _flash_material: StandardMaterial3D
+var _flash_material: ShaderMaterial
 var _flash_tween: Tween
 var face_weights := {} # shape -> current weight (without the blink)
 var _face_meshes: Array[MeshInstance3D] = []
@@ -187,6 +190,7 @@ func _keep_materials(key: String) -> void:
 		for surface in mesh.get_surface_override_material_count():
 			if mesh.get_surface_override_material(surface):
 				materials.append(mesh.get_surface_override_material(surface))
+	materials.append(_flash())
 	game_state.keep_materials("fighter/" + key, materials)
 
 
@@ -227,20 +231,31 @@ func _keep_feet_above_floor() -> void:
 	_body.position.y = maxf(-lowest, 0.0)
 
 
-## Brief additive color flash over the whole character (hit/block feedback).
+## Brief additive color flash (hit/block feedback): strongest at the silhouette's edge and
+## faint across the middle, so the fighter keeps their shading instead of turning into a
+## flat white shape. The overlay is removed when it fades (it would cost a pass per mesh).
 func flash(color: Color, duration: float) -> void:
-	if _flash_material == null:
-		_flash_material = StandardMaterial3D.new()
-		_flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_flash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_flash_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
-			mesh.material_overlay = _flash_material
+	_set_flash_overlay(_flash())
 	if _flash_tween:
 		_flash_tween.kill()
-	_flash_material.albedo_color = Color(color, 0.4)
+	_flash_material.set_shader_parameter("tint", color)
+	_flash_material.set_shader_parameter("strength", 1.0)
 	_flash_tween = create_tween()
-	_flash_tween.tween_property(_flash_material, "albedo_color:a", 0.0, duration)
+	_flash_tween.tween_method(func(s: float) -> void: _flash_material.set_shader_parameter("strength", s), 1.0, 0.0, duration)
+	_flash_tween.tween_callback(_set_flash_overlay.bind(null))
+
+
+func _flash() -> ShaderMaterial:
+	if _flash_material == null:
+		_flash_material = ShaderMaterial.new()
+		_flash_material.shader = FLASH_SHADER
+		_flash_material.set_shader_parameter("core", FLASH_CORE)
+	return _flash_material
+
+
+func _set_flash_overlay(material: Material) -> void:
+	for mesh: MeshInstance3D in skeleton.find_children("*", "MeshInstance3D", true, false):
+		mesh.material_overlay = material
 
 
 ## Clothing: swaps in the body without the covered skin and adds the outfit mesh on the

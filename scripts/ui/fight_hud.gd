@@ -42,7 +42,17 @@ void fragment() {
 }
 """
 ## Numpad digits as arrows, for move notation.
-const ARROWS := {"1": "↙", "2": "↓", "3": "↘", "4": "←", "6": "→", "7": "↖", "8": "↑", "9": "↗"}
+## Callout colours, matching each event's effect colour in FightFx; others use NOTE_COLOR.
+const NOTE_COLOR := Color(1.0, 0.62, 0.2)
+const NOTE_COLORS := {
+	"COUNTER": Color(1.0, 0.36, 0.22),
+	"ARMOR": Color(0.5, 1.0, 0.45),
+	"REVERSAL": Color(0.5, 1.0, 0.82),
+	"TECH": Color(0.55, 0.8, 1.0),
+}
+const NOTE_POP := 1.35 # a callout starts this much larger and settles
+
+const ARROWS :={"1": "↙", "2": "↓", "3": "↘", "4": "←", "6": "→", "7": "↖", "8": "↑", "9": "↗"}
 
 @onready var p1_health: ProgressBar = %P1Health
 @onready var p2_health: ProgressBar = %P2Health
@@ -66,6 +76,7 @@ const ARROWS := {"1": "↙", "2": "↓", "3": "↘", "4": "←", "6": "→", "7"
 @onready var move_list_label: Label = %MoveListLabel
 
 var _trail_tweens := {}
+var _note_tweens := {} # note label -> its tween
 var _announce_tween: Tween
 var _letterbox: Array[ColorRect] = []
 var _cinematic_tween: Tween
@@ -180,14 +191,21 @@ func set_round_wins(wins: Array[int]) -> void:
 			((pips.get_child(i) as Panel).get_theme_stylebox("panel") as StyleBoxFlat).bg_color = PIP_ON if lit else PIP_OFF
 
 
-## Short callout ("COUNTER", "TECH") under a player's side that fades out.
+## Short callout ("COUNTER", "TECH") under a player's side: pops in, holds, fades out.
 func note(player_index: int, text: String) -> void:
 	var label := p1_note if player_index == 0 else p2_note
+	if _note_tweens.has(label):
+		(_note_tweens[label] as Tween).kill() # an older note's fade would dim this one
 	label.text = text
+	label.add_theme_color_override("font_color", NOTE_COLORS.get(text, NOTE_COLOR))
 	label.modulate.a = 1.0
+	label.pivot_offset = Vector2(0.0 if player_index == 0 else label.size.x, label.size.y * 0.5)
+	label.scale = Vector2.ONE * NOTE_POP
 	var tween := label.create_tween()
-	tween.tween_interval(0.6)
+	tween.tween_property(label, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_interval(0.7)
 	tween.tween_property(label, "modulate:a", 0.0, 0.4)
+	_note_tweens[label] = tween
 
 
 func set_debug_text(text: String) -> void:

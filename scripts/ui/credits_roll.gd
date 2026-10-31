@@ -16,7 +16,7 @@ const CREDITS := [
 	["Made with", "Godot Engine (MIT License)"],
 	["", ""],
 	["Characters & animations", "Quaternius: Universal Base Characters,\nUniversal Animation Library 1 & 2 (CC0)"],
-	["Aelia", "\"Aelia Character Preview\" by Abinady10 (Blend Swap, CC-BY),\nposed, re-rigged and retextured for the game"],
+	["Aelia", "\"Aelia Character Preview\" by Abinady10 (CC BY),\nblendswap.com/blend/30219; posed, re-rigged and retextured for the game"],
 	["Stage lighting & textures", "Poly Haven: \"Basement Boxing Ring\" HDRI by Sergej\nMajboroda; Terlenka, Fabric Leather 02,\nConcrete Floor Worn 001 (CC0)"],
 	["Dojo textures", "Poly Haven: Tatami Mat, Hinoki Planks, Japanese Cedar Planks\n(Charlotte Baglioni, Rico Cilliers), Dark Wood (Dario Barresi,\nDimitrios Savva, Rico Cilliers), White Plaster 02 (Rob Tuytel) (CC0)"],
 	["Rooftop skyline", "Poly Haven: \"Shanghai Bund\" HDRI by Greg Zaal (CC0)"],

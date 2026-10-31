@@ -337,7 +337,7 @@ func _initialize() -> void:
 	ai_tests()
 	round_tests()
 	character_tests()
-	fx_tests()
+	await fx_tests()
 	await face_tests()
 	specials_tests()
 	await character_specials_tests()
@@ -537,6 +537,20 @@ func fx_tests() -> void:
 	var before: int = m.fx.spawned
 	press(InputBuffer.LP); step(6)
 	check("hits spawn effects", m.fx.spawned > before, "%d -> %d" % [before, m.fx.spawned])
+	var meshes := p2.model.skeleton.find_children("*", "MeshInstance3D", true, false)
+	check("Hit flash: the struck fighter's meshes get the rim flash overlay",
+		meshes.all(func(mi: MeshInstance3D) -> bool: return mi.material_overlay != null and (mi.material_overlay as ShaderMaterial).shader == FighterModel.FLASH_SHADER))
+	await create_timer(0.4).timeout
+	check("Hit flash: the overlay is removed once it fades", meshes.all(func(mi: MeshInstance3D) -> bool: return mi.material_overlay == null))
+	# A new callout isn't dimmed by an earlier one's fade, and takes its event's colour.
+	m.hud.note(1, "COUNTER")
+	await create_timer(0.85).timeout
+	m.hud.note(1, "ARMOR")
+	await create_timer(0.3).timeout
+	var note_label: Label = m.hud.p2_note
+	check("HUD note: a new callout stays fully visible while the previous one would be fading",
+		note_label.text == "ARMOR" and note_label.modulate.a > 0.99 and note_label.scale.is_equal_approx(Vector2.ONE)
+		and note_label.get_theme_color("font_color") == m.hud.NOTE_COLORS["ARMOR"], "a %.2f" % note_label.modulate.a)
 	check("audio buses exist", AudioServer.get_bus_index("Music") > 0 and AudioServer.get_bus_index("SFX") > 0 and AudioServer.get_bus_index("Voice") > 0
 		and AudioServer.get_bus_index("Ambience") > 0)
 	var limiters := range(AudioServer.get_bus_effect_count(0)).filter(func(i: int) -> bool: return AudioServer.get_bus_effect(0, i) is AudioEffectHardLimiter)
