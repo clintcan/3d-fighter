@@ -2794,19 +2794,25 @@ func mira_tests() -> void:
 
 	# Detailed textures: hem shading and stitch lines in the outfit, a second UV set for the
 	# skin detail, and the materials that use them (other fighters keep the plain ones).
+	# (Draped cloth also has a darker lining inside its hems: ClothDrape.LINING_SHADE.)
 	var outfit := mira.outfit_mesh as ArrayMesh
 	var darkest := 1.0
 	var brightest := 0.0
+	var lined := false
 	for surface in outfit.get_surface_count():
 		var colors = outfit.surface_get_arrays(surface)[Mesh.ARRAY_COLOR]
 		if colors == null:
 			darkest = -1.0
 			break
 		for c: Color in colors:
+			if absf(c.r - ClothDrape.LINING_SHADE) < 0.01: # colours are stored at 8 bits
+				lined = true
+				continue
 			darkest = minf(darkest, c.r)
 			brightest = maxf(brightest, c.r)
 	check("Mira: the outfit has hem shading and stitch lines", mira.detailed_textures and darkest > 0.5 and darkest < 0.7 and brightest > 0.99,
 		"%.2f .. %.2f" % [darkest, brightest])
+	check("Mira: her draped clothes are lined inside the hems", lined)
 	check("Mira: her body carries a second UV set", (mira.outfit_body_mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_TEX_UV2] != null)
 	var looks := {}
 	for character: CharacterData in [mira, gs.roster[0]]:

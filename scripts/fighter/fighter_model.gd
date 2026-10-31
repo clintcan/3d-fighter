@@ -283,7 +283,9 @@ func _dress(data: CharacterData, alt: bool) -> void:
 		cloth.roughness = fabric[3]
 		cloth.metallic_specular = fabric[4]
 		cloth.uv1_scale = Vector3.ONE * fabric[2]
-		cloth.cull_mode = BaseMaterial3D.CULL_DISABLED # the inside shows at hems and sleeves
+		# The inside shows at hems and sleeves (also on draped clothes: their lining only
+		# reaches a little way in, and single-sided they were see-through past it).
+		cloth.cull_mode = BaseMaterial3D.CULL_DISABLED
 		if detailed:
 			cloth.albedo_texture = load(DETAILED_FABRICS[fabric_name][2])
 		if data.detailed_textures:
