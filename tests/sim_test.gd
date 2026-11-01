@@ -368,6 +368,7 @@ func _initialize() -> void:
 	await controls_tests()
 	await outfit_tests()
 	await hair_tests()
+	await tail_tests()
 	await rollback_tests()
 	await net_tests()
 	await server_tests()
@@ -3115,6 +3116,86 @@ func hair_tests() -> void:
 		model.free()
 
 
+
+## Belt and headband tails swing on spring bones (tools/build_outfits.gd `_tail_chain`).
+func tail_tests() -> void:
+	var gs = root.get_node("GameState")
+	var tails := {&"kenji": 4, &"jin": 2} # Kenji: belt + headband, Jin: belt
+	for character: CharacterData in gs.roster:
+		var model := FighterModel.new()
+		root.add_child(model)
+		model.build(character)
+		var id := String(character.id)
+		var springs := model.cloth_springs
+		if not tails.has(character.id):
+			check("%s has no cloth tails" % id, springs == null)
+			model.free()
+			continue
+		var meta: Array = character.outfit_mesh.get_meta(&"spring_tails", [])
+		check("%s has %d swinging tails" % [id, tails[character.id]], springs != null and springs.setting_count == tails[character.id]
+			and meta.size() == tails[character.id], "%s, %d chains" % [springs, meta.size()])
+		if springs == null:
+			model.free()
+			continue
+		var sk := model.skeleton
+		var outfit := sk.get_node("Outfit") as MeshInstance3D
+		var joints := 0
+		var chained := true
+		var roots := []
+		for chain: Dictionary in meta:
+			var parent := sk.find_bone(chain.parent)
+			for joint: Dictionary in chain.joints:
+				var bone := sk.find_bone(joint.name)
+				chained = chained and bone >= 0 and sk.get_bone_parent(bone) == parent
+				parent = bone
+				joints += 1
+			roots.append(sk.find_bone(chain.joints[0].name))
+		var body_binds := (sk.get_node("Outfit").skin as Skin).get_bind_count() - joints
+		check("%s: each tail is a chain of bones from its knot, with skin binds after the body's" % id,
+			chained and joints == meta.size() * 3 and outfit.skin.get_bind_name(body_binds) == StringName(meta[0].joints[0].name),
+			"%d joints, bind %d = %s" % [joints, body_binds, outfit.skin.get_bind_name(body_binds) if body_binds < outfit.skin.get_bind_count() else &""])
+		var weights_ok := true
+		var on_tails := 0
+		for surface in outfit.mesh.get_surface_count():
+			var arrays := outfit.mesh.surface_get_arrays(surface)
+			var vb: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+			var vw: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+			for v in vw.size() / 4:
+				var total := vw[v * 4] + vw[v * 4 + 1] + vw[v * 4 + 2] + vw[v * 4 + 3]
+				weights_ok = weights_ok and absf(total - 1.0) < 0.001
+				var tail := false
+				for k in 4:
+					weights_ok = weights_ok and vb[v * 4 + k] < outfit.skin.get_bind_count()
+					tail = tail or (vb[v * 4 + k] >= body_binds and vw[v * 4 + k] > 0.0)
+				on_tails += 1 if tail else 0
+		check("%s: outfit weights are valid and the tails ride their bones" % id, weights_ok and on_tails > 100 * meta.size(),
+			"%d vertices on tail bones" % on_tails)
+		var limit := sk.get_node("ClothLimit") as HairLimit
+		check("%s: every tail joint is capped by the limiter after the springs" % id,
+			limit.bones.size() == joints and limit.get_index() > springs.get_index())
+
+		# They hang under gravity in the guard without flying off, and a cut restarts them.
+		var worst := [0.0]
+		var on_update := func() -> void:
+			var w := 0.0
+			for b: int in roots:
+				var animated := (sk.get_bone_global_pose(sk.get_bone_parent(b)) * sk.get_bone_rest(b)).basis.y.normalized()
+				w = maxf(w, rad_to_deg(animated.angle_to(sk.get_bone_global_pose(b).basis.y.normalized())))
+			worst[0] = w
+		sk.skeleton_updated.connect(on_update)
+		var peak := 0.0
+		for f in 60:
+			model.show_clip(&"fight/guard", -1.0, 1.0, 1.0 / 60.0)
+			await process_frame
+			peak = maxf(peak, worst[0])
+		check("%s: the tails settle under gravity in the guard" % id, worst[0] > 2.0 and peak < 51.0, "now %.1f°, peak %.1f°" % [worst[0], peak])
+		model.position = Vector3(3, 0, 0)
+		model.show_clip(&"fight/guard", -1.0, 1.0, 1.0 / 60.0)
+		await process_frame
+		check("%s: a cut restarts the tails from the pose" % id, worst[0] < 5.0, "%.1f°" % worst[0])
+		model.free()
+
+
 func outfit_tests() -> void:
 	var gs = root.get_node("GameState")
 	for character: CharacterData in gs.roster:
@@ -3142,6 +3223,8 @@ func outfit_tests() -> void:
 				base_triangles = mi.mesh.surface_get_array_index_len(0) / 3
 				bind_count = mi.skin.get_bind_count()
 		base_scene.free()
+		for chain: Dictionary in outfit.get_meta(&"spring_tails", []):
+			bind_count += chain.joints.size() # the tails' bones come after the body's (tail_tests)
 		var body_triangles := (character.outfit_body_mesh as ArrayMesh).surface_get_array_index_len(0) / 3
 		check("%s: the skin under the clothes is removed" % id, body_triangles < base_triangles and body_triangles > base_triangles / 3,
 			"%d of %d triangles kept" % [body_triangles, base_triangles])
@@ -3176,8 +3259,12 @@ func outfit_tests() -> void:
 		if brightest > FighterModel.MAX_FABRIC_ALBEDO:
 			expected = Color(expected * (FighterModel.MAX_FABRIC_ALBEDO / brightest), 1.0)
 		var material := dressed.get_surface_override_material(0) as StandardMaterial3D if dressed else null
+		var same_binds := dressed != null and body != null and dressed.skin.get_bind_count() > body.skin.get_bind_count()
+		if same_binds: # the body's skin, then the tails' bones
+			for i in body.skin.get_bind_count():
+				same_binds = same_binds and dressed.skin.get_bind_pose(i) == body.skin.get_bind_pose(i) 					and dressed.skin.get_bind_name(i) == body.skin.get_bind_name(i) and dressed.skin.get_bind_bone(i) == body.skin.get_bind_bone(i)
 		check("FighterModel dresses Kenji%s on the body's skin" % (" (alt)" if alt else ""),
-			dressed != null and body != null and dressed.skin == body.skin and dressed.get_node_or_null(dressed.skeleton) == model.skeleton
+			same_binds and dressed.get_node_or_null(dressed.skeleton) == model.skeleton
 			and material != null and material.albedo_color.is_equal_approx(expected) and material.normal_texture != null)
 		var max_specular := 0.0
 		var max_albedo := 0.0
@@ -4571,6 +4658,10 @@ func server_tests() -> void:
 		and mh.is_connected_to_peer() and mg.is_connected_to_peer() and mh.connection_path() == "relay" and mg.connection_path() == "relay",
 		"was direct %s, now %s / %s, lost '%s', switches %s" % [was_direct, mh.connection_path(), mg.connection_path(), dropped[0], paths])
 	check("messages keep arriving after the failover", got_mid[0] == "after the failover", got_mid[0])
+	var netplay: GDScript = load("res://scripts/net/netplay_match.gd") # by path: it uses the Net autoload, which tests compile without
+	check("the connection bar names the path (and nothing on a LAN)", netplay.path_label(mh.connection_path()) == "RELAY   "
+		and netplay.path_label("direct") == "DIRECT   " and netplay.path_label("") == "",
+		"'%s' / '%s'" % [netplay.path_label(mh.connection_path()), netplay.path_label("")])
 	mh.close()
 	mg.close()
 

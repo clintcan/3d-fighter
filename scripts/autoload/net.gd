@@ -156,6 +156,11 @@ func rtt_ms() -> float:
 	return peer.rtt_ms if peer else 0.0
 
 
+## "direct" or "relay" for an internet room's match, "" otherwise (LAN or a typed address).
+func connection_path() -> String:
+	return peer.connection_path() if peer else ""
+
+
 ## Closes the connection (telling the opponent) and forgets the lobby. In an internet
 ## room, leaves the room too (a host leaving closes it).
 func leave() -> void:

@@ -41,10 +41,17 @@ const STITCH_SHADE := 0.62
 const HEM_SHADE := 0.8
 const HEM_SHADE_DEPTH := 0.035
 
+const TAIL_JOINTS := 3 # spring bones down each belt or headband tail, so it bends as it swings
+const TAIL_ROOT_FADE := 0.12 # share of a tail's length, from the knot, still partly held by the knot's bone
+const TAIL_PREFIX := "cloth_tail_"
+
 enum Slot { MAIN, TRIM, ACCENT, EXTRA }
 
 var _body_skin: Skin
 var _pelvis_bind := 0
+var _skeleton: Skeleton3D
+var _to_skeleton := Transform3D() # body mesh space -> skeleton rest space
+var _tails: Array = [] # this outfit's tail chains (the outfit mesh's "spring_tails" meta)
 
 
 func _initialize() -> void:
@@ -498,6 +505,9 @@ func _build(model_scene: PackedScene, spec: Dictionary) -> Dictionary:
 			body_instance = mi
 	_body_skin = body_instance.skin
 	_pelvis_bind = _bind_index(skeleton, "pelvis")
+	_skeleton = skeleton
+	_to_skeleton = skeleton.get_bone_global_rest(skeleton.find_bone("pelvis")) * _body_skin.get_bind_pose(_pelvis_bind)
+	_tails = []
 	var L := _landmarks(skeleton, body_instance.mesh)
 	var arrays := body_instance.mesh.surface_get_arrays(0)
 	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
@@ -630,6 +640,8 @@ func _build(model_scene: PackedScene, spec: Dictionary) -> Dictionary:
 		tools[slot].generate_tangents()
 		tools[slot].commit(outfit)
 		outfit.surface_set_name(outfit.get_surface_count() - 1, Slot.keys()[slot].to_lower())
+	if not _tails.is_empty():
+		outfit.set_meta(&"spring_tails", _tails)
 
 	# The body without the covered skin (same vertices, fewer triangles).
 	var kept := PackedInt32Array()
@@ -813,7 +825,7 @@ func _add_tied_belt(st: SurfaceTool, knot: Dictionary, L: Dictionary, surface: _
 			var tail_y := y - 0.012 - length * t
 			path.append(Vector3(x, tail_y, maxf(z + 0.006 - 0.004 * t, surface.front(x, tail_y) + 0.007)))
 			widths.append(0.019 - 0.002 * t)
-		triangles += _strip(st, path, widths, 0.005, side * 0.25, pelvis, detailed)
+		triangles += _strip(st, path, widths, 0.005, side * 0.25, _tail_chain(path, "pelvis", pelvis), detailed)
 	return triangles
 
 
@@ -842,8 +854,48 @@ func _add_headband_knot(st: SurfaceTool, knot: Dictionary, L: Dictionary, surfac
 			# collar stands out further.
 			path.append(Vector3(x, tail_y, minf(z - 0.01, surface.back(x, tail_y) - 0.006)))
 			widths.append(0.013 - 0.002 * t)
-		triangles += _strip(st, path, widths, 0.003, side * 0.35, skin, detailed)
+		var head := func(_t: float) -> Array:
+			return [PackedInt32Array([binds[0], 0, 0, 0]), PackedFloat32Array([1.0, 0.0, 0.0, 0.0])]
+		triangles += _strip(st, path, widths, 0.003, side * 0.35, _tail_chain(path, "Head", head), detailed)
 	return triangles
+
+
+## Rigs a tail hanging along `path` (points evenly spaced along it) for spring motion:
+## `TAIL_JOINTS` bones from the knot down, under `parent`, each with +Y down the tail, added
+## to `_tails` with their rests and skin binds (appended after the body skin's binds, which
+## FighterModel copies and extends). Returns the strip's skin: the bones' weights blend over
+## each joint, and near the knot the knot's own skin (`knot_skin`) still holds it.
+func _tail_chain(path: Array[Vector3], parent: String, knot_skin: Callable) -> Callable:
+	var at := func(t: float) -> Vector3:
+		var f := t * (path.size() - 1)
+		var i := mini(floori(f), path.size() - 2)
+		return path[i].lerp(path[i + 1], f - i)
+	var base := _body_skin.get_bind_count()
+	for chain: Dictionary in _tails:
+		base += chain.joints.size()
+	var parent_rest := _skeleton.get_bone_global_rest(_skeleton.find_bone(parent))
+	var joints: Array = []
+	var length := 0.0
+	for k in TAIL_JOINTS:
+		var from := _to_skeleton * (at.call(float(k) / TAIL_JOINTS) as Vector3)
+		var to := _to_skeleton * (at.call(float(k + 1) / TAIL_JOINTS) as Vector3)
+		var down := (to - from).normalized()
+		var across := down.cross(Vector3.BACK).normalized()
+		var rest := Transform3D(Basis(across, down, across.cross(down)), from)
+		joints.append({name = "%s%d" % [TAIL_PREFIX, base - _body_skin.get_bind_count() + k],
+			rest = parent_rest.affine_inverse() * rest, bind = rest.affine_inverse() * _to_skeleton})
+		parent_rest = rest
+		length = from.distance_to(to)
+	_tails.append({parent = parent, joints = joints, length = length})
+	return func(t: float) -> Array:
+		var held := clampf(1.0 - t / TAIL_ROOT_FADE, 0.0, 1.0)
+		var knot: Array = knot_skin.call(t)
+		var s := t * TAIL_JOINTS - 0.5 # joint k's segment is centred on k
+		var k0 := clampi(floori(s), 0, TAIL_JOINTS - 1)
+		var k1 := mini(k0 + 1, TAIL_JOINTS - 1)
+		var f := clampf(s - k0, 0.0, 1.0) if k1 != k0 else 0.0
+		return [PackedInt32Array([knot[0][0], base + k0, base + k1, 0]),
+			PackedFloat32Array([held, (1.0 - held) * (1.0 - f), (1.0 - held) * f, 0.0])]
 
 
 ## A flat strip (a belt or headband tail) along `path`, `widths` half wide, `thickness`

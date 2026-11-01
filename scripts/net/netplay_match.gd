@@ -286,9 +286,16 @@ func _update_status() -> void:
 		return
 	var rtt := Net.rtt_ms()
 	var quality := 5 if rtt < 60 else 4 if rtt < 100 else 3 if rtt < 150 else 2 if rtt < 220 else 1
-	_status.text = "%s   PING %d ms   ROLLBACK %d   DELAY %d" % [
-		"▮".repeat(quality) + "▯".repeat(5 - quality), roundi(rtt), session.prediction_depth(), session.input_delay]
+	_status.text = "%s   %sPING %d ms   ROLLBACK %d   DELAY %d" % [
+		"▮".repeat(quality) + "▯".repeat(5 - quality), path_label(Net.connection_path()), roundi(rtt),
+		session.prediction_depth(), session.input_delay]
 	_status.modulate = QUALITY_COLORS[quality - 1]
+
+
+## The connection bar's path tag: "DIRECT   " / "RELAY   " in an internet room (it follows
+## a mid-match failover), nothing on a LAN or a typed address.
+static func path_label(path: String) -> String:
+	return path.to_upper() + "   " if path != "" else ""
 
 
 # --- Smoke test ------------------------------------------------------------------
