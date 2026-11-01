@@ -131,6 +131,13 @@ const TAIL_PLANE_GAP := 0.004 # the cloth plane sits this far behind a tail's re
 const TAIL_MAX_BEND := deg_to_rad(50.0) # per joint, from its place on the knot or the joint above
 const TAIL_LEG_SPHERES := [[0.0, 0.1], [0.45, 0.085], [0.85, 0.07]] # [share of the way hip -> knee, radius], per thigh
 const TAIL_BACK_SPHERES := [[&"neck_01", 0.06], [&"spine_03", 0.13]] # [bone, radius]
+# Loose hems (`_rig_hems`: the jacket skirts, Rhea's shorts): a whole panel of cloth, so
+# stiffer and less bendy than a tail.
+const HEM_STIFFNESS := 3.0
+const HEM_DRAG := 0.5
+const HEM_GRAVITY := 1.0
+const HEM_RADIUS := 0.01
+const HEM_MAX_BEND := deg_to_rad(30.0)
 
 const CONTACT_BONES :=[&"foot_l", &"foot_r", &"ball_l", &"ball_r"]
 const SOLE_BELOW_ORIGIN := 0.01
@@ -140,7 +147,7 @@ var hair_springs: SpringBoneSimulator3D # null without hair rigged for motion
 var _hair_limit: HairLimit
 var _hair_head := Transform3D() # the head's last world transform, to spot cuts
 var _hair_started := false
-var cloth_springs: SpringBoneSimulator3D # null without a belt or headband tail
+var cloth_springs: SpringBoneSimulator3D # null without a belt or headband tail or a loose hem
 var _cut_frames := 0 # frames left to hold the hair and tails at the pose after a cut
 var player: AnimationPlayer
 var _body: Node3D
@@ -470,13 +477,15 @@ func _check_hair_cut() -> void:
 	_hair_head = head
 
 
-## Belt and headband tails (tools/build_outfits.gd): adds each tail's chain of bones under
-## its knot's bone and a SpringBoneSimulator3D to swing them, with a HairLimit on every
-## joint. Each tail collides with the floor, a plane along the cloth it hangs over (fitted
-## through its own rest line: the jacket skirt's front, the back of the neck; without it
-## gravity pulls a tail straight down into a flared skirt), and the thighs (belt) or the
-## neck and upper back (headband). Returns the outfit's skin: the body's, plus the tail
-## bones' binds in the builder's order. Cosmetic only, like the hair.
+## Belt and headband tails and loose hems (tools/build_outfits.gd): adds each chain of
+## bones under its knot's bone (a hem's: the pelvis or a thigh) and a SpringBoneSimulator3D
+## to swing them, with a HairLimit on every joint (hems stiffer and bending less). Each
+## chain collides with the floor, a plane along the cloth it hangs over (fitted through its
+## own rest line: the jacket skirt's front, the back of the neck, a hem's own place on the
+## body; without it gravity pulls a tail straight down into a flared skirt), and the thighs
+## (belt, skirt: only below the hip; a shorts leg: the other thigh) or the neck and upper
+## back (headband). Returns the outfit's skin: the body's, plus the chains' binds in the
+## builder's order. Cosmetic only, like the hair.
 func _add_cloth_springs(tails: Array, body_skin: Skin) -> Skin:
 	if tails.is_empty():
 		return body_skin
@@ -486,16 +495,21 @@ func _add_cloth_springs(tails: Array, body_skin: Skin) -> Skin:
 	skeleton.add_child(cloth_springs)
 	var limit := HairLimit.new()
 	limit.name = "ClothLimit"
-	limit.max_angle = TAIL_MAX_BEND
 	skeleton.add_child(limit) # after the springs
 	var floor_plane := SpringBoneCollisionPlane3D.new()
 	floor_plane.name = "Floor"
 	floor_plane.top_level = true
 	cloth_springs.add_child(floor_plane)
-	var shared := {&"pelvis": _tail_leg_colliders(), &"Head": _tail_back_colliders()}
+	var legs := _tail_leg_colliders()
+	var shared := {&"pelvis": legs, &"Head": _tail_back_colliders(),
+		# A shorts leg's own thigh is its plane; the other thigh can push it.
+		&"thigh_l": legs.filter(func(c: Node) -> bool: return c.name.begins_with("Thigh_r")),
+		&"thigh_r": legs.filter(func(c: Node) -> bool: return c.name.begins_with("Thigh_l"))}
 	cloth_springs.setting_count = tails.size()
 	for s in tails.size():
 		var chain: Dictionary = tails[s]
+		var hem: bool = chain.get("kind", &"tail") == &"hem"
+		var radius := HEM_RADIUS if hem else TAIL_RADIUS
 		var parent := skeleton.find_bone(chain.parent)
 		var parent_rest := skeleton.get_bone_global_rest(parent)
 		var root := parent_rest * (chain.joints[0].rest as Transform3D)
@@ -509,6 +523,7 @@ func _add_cloth_springs(tails: Array, body_skin: Skin) -> Skin:
 			skeleton.reset_bone_pose(bone)
 			skin.add_named_bind(joint.name, joint.bind)
 			limit.bones.append(bone)
+			limit.angles.append(HEM_MAX_BEND if hem else TAIL_MAX_BEND)
 			if j > 0:
 				last = last * (joint.rest as Transform3D)
 			parent = bone
@@ -517,26 +532,31 @@ func _add_cloth_springs(tails: Array, body_skin: Skin) -> Skin:
 		cloth_springs.set_extend_end_bone(s, true)
 		cloth_springs.set_end_bone_direction(s, SkeletonModifier3D.BONE_DIRECTION_PLUS_Y)
 		cloth_springs.set_end_bone_length(s, chain.length)
-		cloth_springs.set_radius(s, TAIL_RADIUS)
-		cloth_springs.set_stiffness(s, TAIL_STIFFNESS)
-		cloth_springs.set_drag(s, TAIL_DRAG)
-		cloth_springs.set_gravity(s, TAIL_GRAVITY)
+		cloth_springs.set_radius(s, radius)
+		cloth_springs.set_stiffness(s, HEM_STIFFNESS if hem else TAIL_STIFFNESS)
+		cloth_springs.set_drag(s, HEM_DRAG if hem else TAIL_DRAG)
+		cloth_springs.set_gravity(s, HEM_GRAVITY if hem else TAIL_GRAVITY)
 		# The cloth under the tail: a plane through its rest line, facing away from the body.
 		var tip: Vector3 = last.origin + last.basis.y.normalized() * float(chain.length)
 		var across := root.basis.x.normalized()
 		var normal: Vector3 = (tip - root.origin).cross(across).normalized()
 		if normal.dot(root.origin - parent_rest.origin) < 0.0:
 			normal = -normal
-		var plane_bone := skeleton.find_bone(&"pelvis" if chain.parent == &"pelvis" else &"spine_03")
+		var plane_bone := skeleton.find_bone(chain.get("plane", &"pelvis" if chain.parent == &"pelvis" else &"spine_03"))
 		var bone_rest := skeleton.get_bone_global_rest(plane_bone)
 		var plane := SpringBoneCollisionPlane3D.new()
 		plane.name = "Cloth%d" % s
 		plane.bone = plane_bone
-		plane.position_offset = bone_rest.basis.inverse() * (root.origin - normal * (TAIL_RADIUS + TAIL_PLANE_GAP) - bone_rest.origin)
+		plane.position_offset = bone_rest.basis.inverse() * (root.origin - normal * (radius + TAIL_PLANE_GAP) - bone_rest.origin)
 		plane.rotation_offset = Quaternion(Vector3.UP, (bone_rest.basis.inverse() * normal).normalized())
 		cloth_springs.add_child(plane)
 		var colliders: Array = [floor_plane, plane]
-		colliders.append_array(shared.get(StringName(chain.parent), []))
+		var others: Array = shared.get(StringName(chain.parent), [])
+		if hem and chain.parent == &"pelvis":
+			# A skirt hangs over the hips, inside the spheres at the hip joints: only the
+			# thighs below push it (kicks lift them into it).
+			others = others.filter(func(c: Node) -> bool: return not c.name.ends_with("0"))
+		colliders.append_array(others)
 		cloth_springs.set_enable_all_child_collisions(s, false)
 		cloth_springs.set_collision_count(s, colliders.size())
 		for c in colliders.size():

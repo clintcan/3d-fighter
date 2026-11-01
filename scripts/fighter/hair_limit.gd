@@ -7,15 +7,18 @@ extends SkeletonModifier3D
 
 var bones := PackedInt32Array()
 var max_angle := deg_to_rad(45.0)
+var angles := PackedFloat32Array() # per bone, overriding `max_angle` when set
 
 
 func _process_modification() -> void:
 	var skeleton := get_skeleton()
 	if skeleton == null:
 		return
-	for bone in bones:
+	for i in bones.size():
+		var bone := bones[i]
+		var limit := angles[i] if i < angles.size() else max_angle
 		var rest := skeleton.get_bone_rest(bone).basis.get_rotation_quaternion()
 		var pose := skeleton.get_bone_pose_rotation(bone)
 		var angle := rest.angle_to(pose)
-		if angle > max_angle:
-			skeleton.set_bone_pose_rotation(bone, rest.slerp(pose, max_angle / angle))
+		if angle > limit:
+			skeleton.set_bone_pose_rotation(bone, rest.slerp(pose, limit / angle))

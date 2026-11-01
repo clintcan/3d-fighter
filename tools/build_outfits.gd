@@ -44,6 +44,7 @@ const HEM_SHADE_DEPTH := 0.035
 const TAIL_JOINTS := 3 # spring bones down each belt or headband tail, so it bends as it swings
 const TAIL_ROOT_FADE := 0.12 # share of a tail's length, from the knot, still partly held by the knot's bone
 const TAIL_PREFIX := "cloth_tail_"
+const HEM_FULL_AT := 0.5 # share of a hem chain's length, from its root, where its bones take over fully
 
 enum Slot { MAIN, TRIM, ACCENT, EXTRA }
 
@@ -116,6 +117,7 @@ func _specs() -> Dictionary:
 					# Gi jacket: loose, past the hips, wide sleeves to mid-forearm, a deep V
 					# at the chest, blousing over the belt and pleating below it.
 					{slot = Slot.MAIN, offset = 0.026, drape = jacket_drape,
+						hem = {top = belt_lo - 0.012, bottom = hem, chains = 8, joints = 2},
 						region = func(p, n): return minf(jacket.call(p, n), -collar.call(p, n))},
 					# The collar: a stiff quilted band around the neck and down the left
 					# panel's edge, which crosses over to the right hip.
@@ -158,7 +160,8 @@ func _specs() -> Dictionary:
 						drape = _top_drape(L, {base = 0.022, sleeve_end = L.wrist - 0.05, cuff_flare = 0.014, sag = 0.016,
 							skirt_from = belt_lo, skirt_flare = 0.02, blouse_at = belt_hi, amount = 0.9,
 							fine_below = belt_hi + 0.16, pin = cinch,
-							fine = func(p: Vector3) -> bool: return _v_cut(p, Vector3.BACK, L, v_bottom - 0.035, 0.08) > -0.06})},
+							fine = func(p: Vector3) -> bool: return _v_cut(p, Vector3.BACK, L, v_bottom - 0.035, 0.08) > -0.06}),
+						hem = {top = belt_lo - 0.012, bottom = hem, chains = 8, joints = 1}},
 					# Loose pants, fuller toward the ankle.
 					{slot = Slot.MAIN, offset = 0.016, region = func(p, n): return _legs(p, L.ankle + 0.05, L.waist - 0.02),
 						drape = _pants_drape(L, {base = 0.016, flare = 0.02, hem = L.ankle + 0.05, pin = cinch,
@@ -182,7 +185,8 @@ func _specs() -> Dictionary:
 					{slot = Slot.TRIM, offset = 0.006, region = func(p, n): return _legs(p, L.knee + 0.2, L.waist + 0.03),
 						drape = _pants_drape(L, {base = 0.006, flare = 0.024, hem = L.knee + 0.2, flare_top = L.hip,
 							flare_span = L.hip - (L.knee + 0.2), amount = 0.6, leg_fall = 6, max = 0.06,
-							pin = func(p: Vector3) -> bool: return p.y > L.waist - 0.01})},
+							pin = func(p: Vector3) -> bool: return p.y > L.waist - 0.01}),
+						hem = {legs = true, top = L.hip - 0.08, bottom = L.knee + 0.2, chains = 6, joints = 2}},
 					# Hand wraps over the wrists and palms.
 					{slot = Slot.ACCENT, offset = 0.004, region = func(p, n):
 						return minf(minf(p.y - (L.arm_y - 0.12), absf(p.x) - (L.wrist - 0.08)), (L.wrist + 0.07) - absf(p.x))},
@@ -615,6 +619,7 @@ func _build(model_scene: PackedScene, spec: Dictionary) -> Dictionary:
 	if not draped_faces.is_empty():
 		var cloth := ClothDrape.process(draped_faces, pieces, verts)
 		triangles += cloth.size() - draped_faces.size()
+		_rig_hems(cloth, pieces)
 		for tri: Array in cloth:
 			for corner: Dictionary in tri[0]:
 				_emit_draped(tools[tri[1]], corner, detailed)
@@ -861,11 +866,24 @@ func _add_headband_knot(st: SurfaceTool, knot: Dictionary, L: Dictionary, surfac
 
 
 ## Rigs a tail hanging along `path` (points evenly spaced along it) for spring motion:
-## `TAIL_JOINTS` bones from the knot down, under `parent`, each with +Y down the tail, added
-## to `_tails` with their rests and skin binds (appended after the body skin's binds, which
-## FighterModel copies and extends). Returns the strip's skin: the bones' weights blend over
-## each joint, and near the knot the knot's own skin (`knot_skin`) still holds it.
+## `TAIL_JOINTS` bones from the knot down, under `parent` (`_add_chain`). Returns the
+## strip's skin: the bones' weights blend over each joint, and near the knot the knot's own
+## skin (`knot_skin`) still holds it.
 func _tail_chain(path: Array[Vector3], parent: String, knot_skin: Callable) -> Callable:
+	var base := _add_chain(path, parent, TAIL_JOINTS, Vector3.BACK, {})
+	return func(t: float) -> Array:
+		var held := clampf(1.0 - t / TAIL_ROOT_FADE, 0.0, 1.0)
+		var knot: Array = knot_skin.call(t)
+		var joint := _chain_joints(t, TAIL_JOINTS)
+		return [PackedInt32Array([knot[0][0], base + joint[0], base + joint[1], 0]),
+			PackedFloat32Array([held, (1.0 - held) * (1.0 - joint[2]), (1.0 - held) * joint[2], 0.0])]
+
+
+## Adds a chain of `count` spring bones along `path` (mesh space, from the root) under
+## `parent`, each with +Y down the chain and +Z toward `outward`, to `_tails` with their
+## rests and skin binds (appended after the body skin's binds, which FighterModel copies
+## and extends) plus the `extra` fields. Returns the first joint's bind index.
+func _add_chain(path: Array[Vector3], parent: String, count: int, outward: Vector3, extra: Dictionary) -> int:
 	var at := func(t: float) -> Vector3:
 		var f := t * (path.size() - 1)
 		var i := mini(floori(f), path.size() - 2)
@@ -876,26 +894,126 @@ func _tail_chain(path: Array[Vector3], parent: String, knot_skin: Callable) -> C
 	var parent_rest := _skeleton.get_bone_global_rest(_skeleton.find_bone(parent))
 	var joints: Array = []
 	var length := 0.0
-	for k in TAIL_JOINTS:
-		var from := _to_skeleton * (at.call(float(k) / TAIL_JOINTS) as Vector3)
-		var to := _to_skeleton * (at.call(float(k + 1) / TAIL_JOINTS) as Vector3)
+	for k in count:
+		var from := _to_skeleton * (at.call(float(k) / count) as Vector3)
+		var to := _to_skeleton * (at.call(float(k + 1) / count) as Vector3)
 		var down := (to - from).normalized()
-		var across := down.cross(Vector3.BACK).normalized()
+		var across := down.cross(_to_skeleton.basis * outward).normalized()
 		var rest := Transform3D(Basis(across, down, across.cross(down)), from)
 		joints.append({name = "%s%d" % [TAIL_PREFIX, base - _body_skin.get_bind_count() + k],
 			rest = parent_rest.affine_inverse() * rest, bind = rest.affine_inverse() * _to_skeleton})
 		parent_rest = rest
 		length = from.distance_to(to)
-	_tails.append({parent = parent, joints = joints, length = length})
-	return func(t: float) -> Array:
-		var held := clampf(1.0 - t / TAIL_ROOT_FADE, 0.0, 1.0)
-		var knot: Array = knot_skin.call(t)
-		var s := t * TAIL_JOINTS - 0.5 # joint k's segment is centred on k
-		var k0 := clampi(floori(s), 0, TAIL_JOINTS - 1)
-		var k1 := mini(k0 + 1, TAIL_JOINTS - 1)
-		var f := clampf(s - k0, 0.0, 1.0) if k1 != k0 else 0.0
-		return [PackedInt32Array([knot[0][0], base + k0, base + k1, 0]),
-			PackedFloat32Array([held, (1.0 - held) * (1.0 - f), (1.0 - held) * f, 0.0])]
+	var chain := {parent = parent, joints = joints, length = length}
+	chain.merge(extra)
+	_tails.append(chain)
+	return base
+
+
+## Where `t` (0..1 down a chain of `count` joints) falls: [joint, next joint, blend
+## toward the next]; joint k's segment is centred on k.
+func _chain_joints(t: float, count: int) -> Array:
+	var s := t * count - 0.5
+	var k0 := clampi(floori(s), 0, count - 1)
+	var k1 := mini(k0 + 1, count - 1)
+	return [k0, k1, clampf(s - k0, 0.0, 1.0) if k1 != k0 else 0.0]
+
+
+## Loose hems (a piece's `hem`: top, bottom, chains, joints, optional `legs` and `share`):
+## a ring of spring chains hanging from `top` to `bottom` around the pelvis (a jacket's
+## skirt) or around each thigh (`legs`: shorts), each on the cloth's outer surface at its
+## angle, and the piece's cloth below `top` reweighted onto the two nearest chains, more
+## the further down it is (fully from `HEM_FULL_AT` of the way down, times `share`; the
+## rest keeps the cloth's own weights, so the hem still follows the legs).
+func _rig_hems(cloth: Array, pieces: Array) -> void:
+	var to_mesh := _to_skeleton.affine_inverse()
+	var rest := func(bone: String) -> Vector3: return to_mesh * _skeleton.get_bone_global_rest(_skeleton.find_bone(bone)).origin
+	for piece_index in pieces.size():
+		var hem: Dictionary = (pieces[piece_index] as Dictionary).get("hem", {})
+		if hem.is_empty():
+			continue
+		var top: float = hem.top
+		var bottom: float = hem.bottom
+		var count: int = hem.chains
+		var corners: Array = []
+		for tri: Array in cloth:
+			if tri[2] == piece_index:
+				corners.append_array(tri[0])
+		# Rings: [parent bone, axis func(y) -> Vector2 (x, z), side (sign of x, 0 = both)].
+		var rings: Array = []
+		if hem.get("legs", false):
+			for side in ["l", "r"]:
+				var hip: Vector3 = rest.call("thigh_" + side)
+				var knee: Vector3 = rest.call("calf_" + side)
+				var axis := func(y: float) -> Vector2:
+					var p := hip.lerp(knee, (hip.y - y) / (hip.y - knee.y))
+					return Vector2(p.x, p.z)
+				rings.append(["thigh_" + side, axis, signf(hip.x)])
+		else:
+			var pelvis: Vector3 = rest.call("pelvis")
+			rings.append(["pelvis", func(_y: float) -> Vector2: return Vector2(pelvis.x, pelvis.z), 0.0])
+		var step := TAU / count
+		var bases: Array = []
+		for ring: Array in rings:
+			var axis: Callable = ring[1]
+			var mine := corners.filter(func(c: Dictionary) -> bool: return ring[2] == 0.0 or signf(c.pos.x) == ring[2])
+			var ring_bases: Array = []
+			for k in count:
+				var angle := step * (k + 0.5)
+				var out := Vector3(sin(angle), 0.0, cos(angle))
+				var path: Array[Vector3] = []
+				var radius := 0.0
+				for i in 5:
+					var y := lerpf(top, bottom, i / 4.0)
+					var center: Vector2 = axis.call(y)
+					var outer := 0.0
+					for c: Dictionary in mine:
+						var d := Vector2(c.pos.x, c.pos.z) - center
+						if absf(c.pos.y - y) < 0.015 and absf(angle_difference(atan2(d.x, d.y), angle)) < step * 0.5:
+							outer = maxf(outer, d.length())
+					if outer > 0.0:
+						radius = outer
+					path.append(Vector3(center.x + out.x * radius, y, center.y + out.z * radius))
+				ring_bases.append(_add_chain(path, ring[0], hem.joints, out, {kind = &"hem", plane = ring[0]}))
+			bases.append(ring_bases)
+		# Every corner's new weights first: corners can be shared between triangles.
+		var skins: Array = []
+		for c: Dictionary in corners:
+			var r := 0
+			if rings.size() > 1 and signf(c.pos.x) != rings[0][2]:
+				r = 1
+			var d := Vector2(c.pos.x, c.pos.z) - ((rings[r][1] as Callable).call(c.pos.y) as Vector2)
+			var u := fposmod(atan2(d.x, d.y) / step - 0.5, count)
+			var a := floori(u) % count
+			var b := (a + 1) % count
+			var f := u - floorf(u)
+			var t := clampf((top - c.pos.y) / (top - bottom), 0.0, 1.0)
+			var share := smoothstep(0.0, HEM_FULL_AT, t) * float(hem.get("share", 1.0))
+			var joint := _chain_joints(t, hem.joints)
+			var map := {}
+			for i in 4:
+				if c.weights[i] > 0.0:
+					map[c.bones[i]] = map.get(c.bones[i], 0.0) + c.weights[i] * (1.0 - share)
+			for chain: Array in [[bases[r][a], 1.0 - f], [bases[r][b], f]]:
+				for j in 2:
+					var w: float = share * chain[1] * (1.0 - joint[2] if j == 0 else joint[2])
+					if w > 0.0:
+						map[chain[0] + joint[j]] = map.get(chain[0] + joint[j], 0.0) + w
+			var order := map.keys()
+			order.sort_custom(func(x: int, y: int) -> bool: return map[x] > map[y])
+			var bones := PackedInt32Array()
+			var weights := PackedFloat32Array()
+			var total := 0.0
+			for i in 4:
+				bones.append(order[i] if i < order.size() else 0)
+				weights.append(map[order[i]] if i < order.size() else 0.0)
+				total += weights[i]
+			for i in 4:
+				weights[i] /= maxf(total, 0.0001)
+			skins.append([bones, weights])
+		for i in corners.size():
+			corners[i].bones = skins[i][0]
+			corners[i].weights = skins[i][1]
 
 
 ## A flat strip (a belt or headband tail) along `path`, `widths` half wide, `thickness`

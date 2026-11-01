@@ -104,7 +104,7 @@ static func subdivide(tri: Array, marked: Array, blend: Callable) -> Array:
 
 ## `faces`: [[v0, v1, v2], piece index, slot, [shade0, shade1, shade2]], vertices being
 ## the skin dictionaries (p, n, uv, bones, weights). `pieces`: the specs. Returns
-## [[corner, corner, corner], slot] with corners {pos, normal, uv, bones, weights, shade}.
+## [[corner, corner, corner], slot, piece index] with corners {pos, normal, uv, bones, weights, shade}.
 static func process(faces: Array, pieces: Array, body: PackedVector3Array) -> Array:
 	var out: Array = []
 	var groups := {}
@@ -301,7 +301,7 @@ static func _process_group(faces: Array, pieces: Array, body: PackedVector3Array
 			var influence: Array = influences[face_ids[f][k]]
 			corners.append({pos = position[key], normal = (smooth[key] as Vector3).normalized(), uv = v.uv,
 				bones = influence[0], weights = influence[1], shade = shade})
-		out.append([corners, face[2]])
+		out.append([corners, face[2], face[1]])
 
 	# Edges: count each piece's edges to find its boundary.
 	for piece in piece_list:
@@ -361,8 +361,8 @@ static func _process_group(faces: Array, pieces: Array, body: PackedVector3Array
 			var order := [0, 1, 2, 0, 2, 3]
 			if (b - a).cross(b_in - a).dot(rim_normal) > 0.0:
 				order = [0, 2, 1, 0, 3, 2]
-			out.append([[rim[order[0]], rim[order[1]], rim[order[2]]], faces[f][2]])
-			out.append([[rim[order[3]], rim[order[4]], rim[order[5]]], faces[f][2]])
+			out.append([[rim[order[0]], rim[order[1]], rim[order[2]]], faces[f][2], piece])
+			out.append([[rim[order[3]], rim[order[4]], rim[order[5]]], faces[f][2], piece])
 		if not drape_lining(pieces[piece]) or opening.is_empty():
 			continue
 		# Lining: the faces within LINING_DEPTH of an opening, copied inward and flipped.
@@ -381,7 +381,7 @@ static func _process_group(faces: Array, pieces: Array, body: PackedVector3Array
 				var influence: Array = influences[ids[k]]
 				corners.append({pos = (position[key] as Vector3) - n * HEM_THICKNESS, normal = -n, uv = v.uv,
 					bones = influence[0], weights = influence[1], shade = LINING_SHADE})
-			out.append([corners, faces[f][2]])
+			out.append([corners, faces[f][2], piece])
 	return out
 
 

@@ -3120,7 +3120,9 @@ func hair_tests() -> void:
 ## Belt and headband tails swing on spring bones (tools/build_outfits.gd `_tail_chain`).
 func tail_tests() -> void:
 	var gs = root.get_node("GameState")
-	var tails := {&"kenji": 4, &"jin": 2} # Kenji: belt + headband, Jin: belt
+	# [tails, hem chains]: Kenji belt + headband and the gi skirt, Jin belt and the dobok's
+	# hem, Rhea a ring around each leg of her shorts.
+	var tails := {&"kenji": [4, 8], &"jin": [2, 8], &"rhea": [0, 12]}
 	for character: CharacterData in gs.roster:
 		var model := FighterModel.new()
 		root.add_child(model)
@@ -3128,12 +3130,15 @@ func tail_tests() -> void:
 		var id := String(character.id)
 		var springs := model.cloth_springs
 		if not tails.has(character.id):
-			check("%s has no cloth tails" % id, springs == null)
+			check("%s has no cloth tails or hems" % id, springs == null)
 			model.free()
 			continue
 		var meta: Array = character.outfit_mesh.get_meta(&"spring_tails", [])
-		check("%s has %d swinging tails" % [id, tails[character.id]], springs != null and springs.setting_count == tails[character.id]
-			and meta.size() == tails[character.id], "%s, %d chains" % [springs, meta.size()])
+		var hems := meta.filter(func(chain: Dictionary) -> bool: return chain.get("kind", &"tail") == &"hem").size()
+		var expected: int = tails[character.id][0] + tails[character.id][1]
+		check("%s has %d swinging tails and %d hem chains" % [id, tails[character.id][0], tails[character.id][1]],
+			springs != null and springs.setting_count == expected and meta.size() == expected and hems == tails[character.id][1],
+			"%s, %d chains, %d hems" % [springs, meta.size(), hems])
 		if springs == null:
 			model.free()
 			continue
@@ -3143,6 +3148,7 @@ func tail_tests() -> void:
 		var chained := true
 		var roots := []
 		for chain: Dictionary in meta:
+			chained = chained and (chain.joints.size() == 3 or chain.get("kind", &"tail") == &"hem")
 			var parent := sk.find_bone(chain.parent)
 			for joint: Dictionary in chain.joints:
 				var bone := sk.find_bone(joint.name)
@@ -3151,8 +3157,8 @@ func tail_tests() -> void:
 				joints += 1
 			roots.append(sk.find_bone(chain.joints[0].name))
 		var body_binds := (sk.get_node("Outfit").skin as Skin).get_bind_count() - joints
-		check("%s: each tail is a chain of bones from its knot, with skin binds after the body's" % id,
-			chained and joints == meta.size() * 3 and outfit.skin.get_bind_name(body_binds) == StringName(meta[0].joints[0].name),
+		check("%s: each tail and hem is a chain of bones from its knot or the cloth's top, with skin binds after the body's" % id,
+			chained and outfit.skin.get_bind_name(body_binds) == StringName(meta[0].joints[0].name),
 			"%d joints, bind %d = %s" % [joints, body_binds, outfit.skin.get_bind_name(body_binds) if body_binds < outfit.skin.get_bind_count() else &""])
 		var weights_ok := true
 		var on_tails := 0
@@ -3168,11 +3174,27 @@ func tail_tests() -> void:
 					weights_ok = weights_ok and vb[v * 4 + k] < outfit.skin.get_bind_count()
 					tail = tail or (vb[v * 4 + k] >= body_binds and vw[v * 4 + k] > 0.0)
 				on_tails += 1 if tail else 0
-		check("%s: outfit weights are valid and the tails ride their bones" % id, weights_ok and on_tails > 100 * meta.size(),
+		check("%s: outfit weights are valid and the tails and hems ride their bones" % id, weights_ok and on_tails > 60 * meta.size(),
 			"%d vertices on tail bones" % on_tails)
 		var limit := sk.get_node("ClothLimit") as HairLimit
-		check("%s: every tail joint is capped by the limiter after the springs" % id,
-			limit.bones.size() == joints and limit.get_index() > springs.get_index())
+		check("%s: every tail and hem joint is capped by the limiter after the springs" % id,
+			limit.bones.size() == joints and limit.angles.size() == joints and limit.get_index() > springs.get_index())
+		# A chain whose rest sits inside one of its colliders would be shoved out all the time.
+		var clearance := INF
+		for s in springs.setting_count:
+			var end := sk.find_bone(springs.get_end_bone_name(s))
+			var points := [sk.get_bone_global_rest(end).origin + sk.get_bone_global_rest(end).basis.y.normalized() * springs.get_end_bone_length(s)]
+			var b := end
+			while b >= 0 and String(sk.get_bone_name(b)).begins_with("cloth_tail_"):
+				points.append(sk.get_bone_global_rest(b).origin)
+				b = sk.get_bone_parent(b)
+			for c in springs.get_collision_count(s):
+				var sphere := springs.get_node(springs.get_collision_path(s, c)) as SpringBoneCollisionSphere3D
+				if sphere:
+					var center := sk.get_bone_global_rest(sphere.bone) * sphere.position_offset
+					for p: Vector3 in points:
+						clearance = minf(clearance, p.distance_to(center) - sphere.radius - springs.get_radius(s))
+		check("%s: the tails and hems rest clear of their colliders" % id, clearance > 0.0, "%.3f m" % clearance)
 
 		# They hang under gravity in the guard without flying off, and a cut restarts them.
 		var worst := [0.0]
@@ -3188,11 +3210,11 @@ func tail_tests() -> void:
 			model.show_clip(&"fight/guard", -1.0, 1.0, 1.0 / 60.0)
 			await process_frame
 			peak = maxf(peak, worst[0])
-		check("%s: the tails settle under gravity in the guard" % id, worst[0] > 2.0 and peak < 51.0, "now %.1f°, peak %.1f°" % [worst[0], peak])
+		check("%s: the tails and hems settle under gravity in the guard" % id, worst[0] > 2.0 and peak < 51.0, "now %.1f°, peak %.1f°" % [worst[0], peak])
 		model.position = Vector3(3, 0, 0)
 		model.show_clip(&"fight/guard", -1.0, 1.0, 1.0 / 60.0)
 		await process_frame
-		check("%s: a cut restarts the tails from the pose" % id, worst[0] < 5.0, "%.1f°" % worst[0])
+		check("%s: a cut restarts the tails and hems from the pose" % id, worst[0] < 5.0, "%.1f°" % worst[0])
 		model.free()
 
 
