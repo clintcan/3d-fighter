@@ -6,9 +6,14 @@ dynamic action camera that moves in on the fighter taking the hits.
 
 HOW TO PLAY
 -----------
-Unzip anywhere and run 3DFighter.exe. No installation needed.
+Installer: run 3DFighter-v0.10.3-windows-setup.exe. It installs for your
+user without asking for admin rights (or for everyone, if you choose),
+adds Start menu shortcuts and an uninstaller in Settings > Apps.
+Zip: unzip anywhere and run 3DFighter.exe. No installation needed.
 (Windows may show a SmartScreen warning for unsigned indie games:
  click "More info" -> "Run anyway".)
+Your settings, scores and replays are kept in
+%APPDATA%\Godot\app_userdata\3DFighter (uninstalling leaves them).
 
 Requirements: Windows 10/11 64-bit, a GPU with Vulkan support.
 

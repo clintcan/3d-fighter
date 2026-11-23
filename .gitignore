@@ -9,6 +9,7 @@
 # Release archives (rebuild with the Windows export + zip step)
 /dist/*.zip
 /dist/*.tar.gz
+/dist/*.exe
 
 # itch.io page kit (cover, screenshots, page text and devlogs): kept locally, not published
 /dist/itch/

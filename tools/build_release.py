@@ -10,6 +10,8 @@ Usage:
 
 Outputs (version from project.godot):
     dist/3DFighter-v<ver>-windows.zip    exe + README.txt          (smoke-tested locally)
+    dist/3DFighter-v<ver>-windows-setup.exe  installer (Inno Setup 6, tools/windows_installer.iss;
+                                         skipped with a note if ISCC isn't installed)
     dist/3DFighter-v<ver>-macos.zip      signed .app + README.txt  (Developer ID; --notarize adds
                                          Apple notarization; --no-sign leaves it unsigned)
     dist/3DFighter-v<ver>-linux.tar.gz   x86_64 binary + README.txt (smoke-tested in WSL if present)
@@ -35,7 +37,7 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 BUILD = os.path.join(ROOT, "build")
 DIST = os.path.join(ROOT, "dist")
 PLATFORMS = ["windows", "macos", "linux"]
-ARCHIVE_SUFFIX = {"windows": "-windows.zip", "macos": "-macos.zip", "linux": "-linux.tar.gz"}
+ARCHIVE_SUFFIXES = {"windows": ["-windows.zip", "-windows-setup.exe"], "macos": ["-macos.zip"], "linux": ["-linux.tar.gz"]}
 
 
 # --- Helpers ---------------------------------------------------------------------
@@ -142,6 +144,7 @@ def bump_version(new: str) -> None:
     }
     for readme in ["dist/README.txt", "dist/README-macOS.txt", "dist/README-Linux.txt"]:
         edits[readme] = [(r"^(3D FIGHTER  -  )v[\d.]+", f"\\1v{new}")]
+    edits["dist/README.txt"].append((r"3DFighter-v[\d.]+-windows-setup\.exe", f"3DFighter-v{new}-windows-setup.exe"))
     for path, rules in edits.items():
         full = os.path.join(ROOT, path)
         if path.startswith("dist/itch/") and not os.path.exists(full):
@@ -185,6 +188,35 @@ def build_windows(version: str) -> str:
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         z.write(exe, "3DFighter/3DFighter.exe")
         z.write(os.path.join(DIST, "README.txt"), "3DFighter/README.txt")
+    print(f"wrote {os.path.relpath(out, ROOT)} ({os.path.getsize(out) // (1024 * 1024)} MB)")
+    return out
+
+
+def iscc() -> str:
+    path = os.environ.get("ISCC") or shutil.which("ISCC")
+    for folder in [os.environ.get("ProgramFiles(x86)", ""), os.environ.get("ProgramFiles", "")]:
+        candidate = os.path.join(folder, "Inno Setup 6", "ISCC.exe")
+        if not path and folder and os.path.exists(candidate):
+            path = candidate
+    return path or ""
+
+
+def build_windows_installer(version: str) -> str:
+    """Wraps the exported exe in an Inno Setup installer (per-user by default, no admin prompt)."""
+    step("Windows installer")
+    compiler = iscc()
+    if not compiler:
+        print("(Inno Setup 6 not found: skipping the installer; winget install JRSoftware.InnoSetup)")
+        return ""
+    exe = os.path.join(BUILD, "windows", "3DFighter.exe")
+    out = os.path.join(DIST, f"3DFighter-v{version}-windows-setup.exe")
+    if os.path.exists(out):
+        os.remove(out)
+    result = run([compiler, "/Q", f"/DAppVersion={version}", f"/DGameExe={exe}", f"/DOutputDir={DIST}",
+                  os.path.join(ROOT, "tools", "windows_installer.iss")], timeout=1800)
+    if result.returncode != 0 or not os.path.exists(out):
+        print(result.stdout[-3000:], result.stderr[-3000:])
+        fail("the Windows installer didn't build")
     print(f"wrote {os.path.relpath(out, ROOT)} ({os.path.getsize(out) // (1024 * 1024)} MB)")
     return out
 
@@ -261,8 +293,8 @@ def remove_old_archives(version: str, targets: list) -> None:
     """Deletes dist/ archives of other versions for `targets` (the ones just built)."""
     removed = []
     for target in targets:
-        suffix = re.escape(ARCHIVE_SUFFIX[target])
-        pattern = re.compile(r"3DFighter-v(\d+\.\d+\.\d+)" + suffix + "$")
+        suffixes = "|".join(re.escape(s) for s in ARCHIVE_SUFFIXES[target])
+        pattern = re.compile(r"3DFighter-v(\d+\.\d+\.\d+)(?:" + suffixes + ")$")
         for name in sorted(os.listdir(DIST)):
             match = pattern.match(name)
             if match and match.group(1) != version:
@@ -301,6 +333,9 @@ def main() -> None:
     for target in targets:
         if target == "windows":
             outputs.append(build_windows(version))
+            installer = build_windows_installer(version)
+            if installer:
+                outputs.append(installer)
         elif target == "macos":
             outputs.append(build_macos(version, sign=not args.no_sign, notarize=args.notarize))
         elif target == "linux":
